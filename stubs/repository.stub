@@ -1,0 +1,18 @@
+<?php
+
+namespace {{ namespace }};
+
+use {{ rootNamespace }}\Models\{{ class }};
+use {{ rootNamespace }}\Traits\RepositoryTrait;
+
+class {{ class }}Repository
+{
+    use RepositoryTrait;
+
+    protected $model;
+
+    public function __construct({{ class }} $model)
+    {
+        $this->model            = $model;
+    }
+}
