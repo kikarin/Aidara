@@ -1,0 +1,5 @@
+Catatan
+Format Excel: Pastikan header/kolom di file Excel sesuai dengan field database. Contoh kolom yang didukung:
+nik, nama, jenis_kelamin, tempat_lahir, tanggal_lahir, alamat, kecamatan_id, kelurahan_id, no_hp, email, is_active
+nama_ibu_kandung, tempat_lahir_ibu, tanggal_lahir_ibu, dst (untuk orang tua)
+tinggi_badan, berat_badan, dst (untuk kesehatan)
