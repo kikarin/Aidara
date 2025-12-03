@@ -46,6 +46,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'target.latihan.permission'  => CheckTargetLatihanPermission::class,
             'turnamen.permission'        => CheckTurnamenPermission::class,
             'check.registration.status'  => CheckRegistrationStatus::class,
+<<<<<<< HEAD
+=======
+            'ensure.email.verified'       => \App\Http\Middleware\EnsureEmailVerified::class,
+>>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
         ]);
 
         // Sanctum middleware untuk stateful API (Remove)

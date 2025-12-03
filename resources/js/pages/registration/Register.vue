@@ -6,8 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthBase from '@/layouts/AuthLayout.vue';
+<<<<<<< HEAD
 import { Head, useForm } from '@inertiajs/vue3';
 import { Eye, EyeOff, LoaderCircle, Lock } from 'lucide-vue-next';
+=======
+import { Head, useForm, usePage } from '@inertiajs/vue3';
+import { Eye, EyeOff, LoaderCircle, Lock, Mail } from 'lucide-vue-next';
+>>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
 import { computed, ref } from 'vue';
 
 const props = defineProps<{
@@ -19,8 +24,26 @@ const form = useForm({
     password: '',
     password_confirmation: '',
     recaptcha_token: '',
+<<<<<<< HEAD
 });
 
+=======
+    otp: '',
+});
+
+const page = usePage();
+const showOtpField = ref(false);
+const emailSent = ref(false);
+const resendOtpForm = useForm({});
+
+// Cek flash message saat component mount
+const flashMessage = page.props.flash as any;
+if (flashMessage?.otp_sent) {
+    showOtpField.value = true;
+    emailSent.value = true;
+}
+
+>>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
 const showPassword = ref(false);
 const showPasswordConfirmation = ref(false);
 const recaptchaRef = ref<InstanceType<typeof Recaptcha> | null>(null);
@@ -82,7 +105,17 @@ const handleRecaptchaError = () => {
     recaptchaVerified.value = false;
 };
 
+<<<<<<< HEAD
 const submit = () => {
+=======
+const submitRegister = () => {
+    // Jika OTP field sudah muncul dan ada OTP, berarti ini submit untuk verifikasi OTP
+    if (showOtpField.value && form.otp) {
+        verifyOtp();
+        return;
+    }
+
+>>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
     // Validate password strength
     if (!isPasswordValid.value) {
         form.setError('password', 'Password harus memenuhi semua kriteria keamanan');
@@ -102,9 +135,31 @@ const submit = () => {
         }
     }
 
+<<<<<<< HEAD
     form.post(route('register'), {
         onFinish: () => {
             form.reset('password', 'password_confirmation', 'recaptcha_token');
+=======
+    // Submit registrasi awal (email & password)
+    form.post(route('register'), {
+        onSuccess: (page) => {
+            // Cek apakah OTP sudah dikirim dari flash message
+            const flashMessage = page.props.flash as any;
+            if (flashMessage?.otp_sent) {
+                showOtpField.value = true;
+                emailSent.value = true;
+                form.reset('password', 'password_confirmation', 'recaptcha_token');
+            }
+            recaptchaVerified.value = false;
+            recaptchaRef.value?.reset();
+            showPassword.value = false;
+            showPasswordConfirmation.value = false;
+        },
+        onFinish: () => {
+            if (!showOtpField.value) {
+                form.reset('password', 'password_confirmation', 'recaptcha_token');
+            }
+>>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
             recaptchaVerified.value = false;
             recaptchaRef.value?.reset();
             showPassword.value = false;
@@ -117,13 +172,39 @@ const submit = () => {
         },
     });
 };
+<<<<<<< HEAD
+=======
+
+const verifyOtp = () => {
+    form.post(route('email.otp.verify'), {
+        onSuccess: () => {
+            // OTP verified, akan redirect ke registration steps
+        },
+        onError: () => {
+            form.reset('otp');
+        },
+    });
+};
+
+const resendOtp = () => {
+    resendOtpForm.post(route('email.otp.resend'), {
+        onSuccess: () => {
+            form.reset('otp');
+        },
+    });
+};
+>>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
 </script>
 
 <template>
     <AuthBase title="Daftar Akun Baru" description="Buat akun untuk mendaftar sebagai peserta (Atlet, Pelatih, atau Tenaga Pendukung)">
         <Head title="Registrasi" />
 
+<<<<<<< HEAD
         <form @submit.prevent="submit" class="flex flex-col gap-6">
+=======
+        <form @submit.prevent="submitRegister" class="flex flex-col gap-6">
+>>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
             <div class="grid gap-6">
                 <div class="grid gap-2">
                     <Label for="email">Email</Label>
@@ -140,6 +221,54 @@ const submit = () => {
                     <InputError :message="form.errors.email" />
                 </div>
 
+<<<<<<< HEAD
+=======
+                <!-- OTP Field (muncul setelah email dikirim) -->
+                <div v-if="showOtpField" class="grid gap-2">
+                    <div class="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+                        <div class="mb-2 flex items-center gap-2">
+                            <Mail class="h-4 w-4 text-primary" />
+                            <p class="text-sm font-medium">Kode OTP telah dikirim ke email Anda</p>
+                        </div>
+                        <p class="mb-3 text-xs text-muted-foreground">
+                            Silakan cek inbox atau folder spam email <strong>{{ form.email }}</strong>
+                        </p>
+                    </div>
+                    <Label for="otp">Kode OTP</Label>
+                    <Input
+                        id="otp"
+                        type="text"
+                        required
+                        autofocus
+                        maxlength="6"
+                        pattern="[0-9]{6}"
+                        inputmode="numeric"
+                        placeholder="000000"
+                        v-model="form.otp"
+                        class="text-center text-2xl font-mono tracking-widest"
+                        :class="{ 'border-red-500': form.errors.otp }"
+                        @input="form.otp = form.otp.replace(/[^0-9]/g, '')"
+                    />
+                    <InputError :message="form.errors.otp" />
+                    <p class="text-xs text-muted-foreground">
+                        Kode OTP berlaku selama 10 menit
+                    </p>
+                    <div class="text-center">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            :disabled="resendOtpForm.processing"
+                            @click="resendOtp"
+                            class="text-xs"
+                        >
+                            <LoaderCircle v-if="resendOtpForm.processing" class="mr-2 h-3 w-3 animate-spin" />
+                            Kirim Ulang OTP
+                        </Button>
+                    </div>
+                </div>
+
+>>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
                 <div class="grid gap-2">
                     <Label for="password">Password</Label>
                     <div class="group relative">
@@ -270,6 +399,7 @@ const submit = () => {
                     tabindex="4"
                     :disabled="
                         form.processing ||
+<<<<<<< HEAD
                         !isPasswordValid ||
                         !passwordsMatch ||
                         (recaptchaSiteKey && recaptchaSiteKey.trim() !== '' && !recaptchaVerified)
@@ -277,6 +407,14 @@ const submit = () => {
                 >
                     <LoaderCircle v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
                     Daftar
+=======
+                        (!showOtpField && (!isPasswordValid || !passwordsMatch || (recaptchaSiteKey && recaptchaSiteKey.trim() !== '' && !recaptchaVerified))) ||
+                        (showOtpField && form.otp.length !== 6)
+                    "
+                >
+                    <LoaderCircle v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
+                    {{ showOtpField ? 'Verifikasi OTP' : 'Daftar' }}
+>>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
                 </Button>
             </div>
 

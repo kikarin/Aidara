@@ -57,6 +57,11 @@ class User extends Authenticatable implements HasMedia
         'name',
         'email',
         'email_verified_at',
+<<<<<<< HEAD
+=======
+        'email_otp',
+        'email_otp_expires_at',
+>>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
         'password',
         'remember_token',
         'tanggal_lahir',
@@ -85,6 +90,10 @@ class User extends Authenticatable implements HasMedia
     {
         return [
             'email_verified_at' => 'datetime',
+<<<<<<< HEAD
+=======
+            'email_otp_expires_at' => 'datetime',
+>>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
             'password'          => 'hashed',
         ];
     }
