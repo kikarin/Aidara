@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
+use App\Http\Controllers\Auth\EmailOtpVerificationController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
@@ -36,6 +37,17 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    // Email OTP Verification Routes
+    Route::get('email/otp/verify', [EmailOtpVerificationController::class, 'show'])
+        ->name('email.otp.verify');
+
+    Route::post('email/otp/verify', [EmailOtpVerificationController::class, 'verify'])
+        ->name('email.otp.verify');
+
+    Route::post('email/otp/resend', [EmailOtpVerificationController::class, 'resend'])
+        ->middleware('throttle:6,1')
+        ->name('email.otp.resend');
+
     Route::get('verify-email', EmailVerificationPromptController::class)
         ->name('verification.notice');
 

@@ -35,16 +35,45 @@ class LoginController extends Controller
 
         if (Auth::attempt($credentials, $remember)) {
             $user = Auth::user();
-            if ($user->verification_token != null) {
-                Auth::logout();
-
-                return redirect('login')->withError('Account has not been verified!');
-            }
+            
             if ($user->is_active == 0) {
                 Auth::logout();
 
                 return redirect('login')->withError('Your account is not active!');
             }
+            
+            // Cek apakah email sudah verified
+            // Jika belum verified, redirect ke halaman OTP verification (tidak logout)
+            if (!$user->email_verified_at) {
+                activity()->event('Login')->performedOn(User::find($user->id))->log('Auth');
+                User::where('id', $user->id)->update(['last_login' => now()]);
+                
+                // Jika belum ada OTP, kirim OTP baru
+                if (!$user->email_otp || !$user->email_otp_expires_at) {
+                    $otpCode = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+                    
+                    $user->update([
+                        'email_otp' => bcrypt($otpCode),
+                        'email_otp_expires_at' => now()->addMinutes(10),
+                    ]);
+
+                    // Kirim email OTP
+                    $user->notify(new \App\Notifications\EmailOtpNotification($otpCode));
+                    
+                    // Simpan waktu terakhir OTP dikirim untuk cooldown
+                    $request->session()->put('otp_last_sent', now());
+                }
+                
+                return redirect()->route('email.otp.verify')
+                    ->with('warning', 'Email Anda belum diverifikasi. Silakan masukkan kode OTP yang telah dikirim ke email Anda.');
+            }
+            
+            if ($user->verification_token != null) {
+                Auth::logout();
+
+                return redirect('login')->withError('Account has not been verified!');
+            }
+            
             activity()->event('Login')->performedOn(User::find($user->id))->log('Auth');
             User::where('id', $user->id)->update(['last_login' => now()]);
             // return redirect('dashboard')->withSuccess("Login Successful");
