@@ -35,22 +35,12 @@ class LoginController extends Controller
 
         if (Auth::attempt($credentials, $remember)) {
             $user = Auth::user();
-<<<<<<< HEAD
-            if ($user->verification_token != null) {
-                Auth::logout();
-
-                return redirect('login')->withError('Account has not been verified!');
-            }
-=======
             
->>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
             if ($user->is_active == 0) {
                 Auth::logout();
 
                 return redirect('login')->withError('Your account is not active!');
             }
-<<<<<<< HEAD
-=======
             
             // Cek apakah email sudah verified
             // Jika belum verified, redirect ke halaman OTP verification (tidak logout)
@@ -84,7 +74,6 @@ class LoginController extends Controller
                 return redirect('login')->withError('Account has not been verified!');
             }
             
->>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
             activity()->event('Login')->performedOn(User::find($user->id))->log('Auth');
             User::where('id', $user->id)->update(['last_login' => now()]);
             // return redirect('dashboard')->withSuccess("Login Successful");

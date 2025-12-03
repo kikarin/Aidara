@@ -82,11 +82,7 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
 
-<<<<<<< HEAD
-Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified', 'check.registration.status'])->name('dashboard');
-=======
 Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'ensure.email.verified', 'check.registration.status'])->name('dashboard');
->>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
 
 // =====================
 // REGISTRATION (Multi-step)

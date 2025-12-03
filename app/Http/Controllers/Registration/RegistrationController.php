@@ -5,10 +5,7 @@ namespace App\Http\Controllers\Registration;
 use App\Http\Controllers\Controller;
 use App\Http\Helpers\RecaptchaHelper;
 use App\Models\User;
-<<<<<<< HEAD
-=======
 use App\Notifications\EmailOtpNotification;
->>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
 use App\Repositories\RegistrationRepository;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rules;
@@ -69,11 +66,7 @@ class RegistrationController extends Controller
     public function store(Request $request)
     {
         $rules = [
-<<<<<<< HEAD
-            'email'    => 'required|string|lowercase|email|max:255|unique:'.User::class,
-=======
             'email'    => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class, new \App\Rules\NotDisposableEmail()],
->>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ];
 
@@ -101,23 +94,12 @@ class RegistrationController extends Controller
                 'name'     => $request->email, // Temporary, akan diupdate di step 2
             ]);
 
-<<<<<<< HEAD
-            // Login user untuk session (tapi is_active = 0, jadi tidak bisa akses dashboard)
-=======
             // Login user untuk session
->>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
             auth()->login($user);
 
             // Clear any intended URL to prevent redirect to dashboard
             session()->forget('url.intended');
 
-<<<<<<< HEAD
-            Log::info('RegistrationController: User registered, redirecting to steps', [
-                'user_id' => $user->id,
-            ]);
-
-            return redirect()->route('registration.steps', ['step' => 1])->with('success', 'Registrasi berhasil! Silakan lengkapi data Anda.');
-=======
             // IMPORTANT: Cek apakah user sudah verified (untuk backward compatibility)
             if ($user->email_verified_at) {
                 // User sudah verified, langsung lanjut ke steps
@@ -152,7 +134,6 @@ class RegistrationController extends Controller
                 'otp_sent' => true,
                 'message' => 'Kode OTP telah dikirim ke email Anda. Silakan cek inbox email Anda.',
             ]);
->>>>>>> 6a0e4138e2c341ff3cc4532f6a55f113fcfaf520
         } catch (\Exception $e) {
             Log::error('RegistrationController: Error creating registration user', [
                 'error' => $e->getMessage(),
