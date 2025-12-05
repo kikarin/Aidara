@@ -138,7 +138,7 @@ watch(
 const formInputs = computed(() => [
     {
         name: 'nik',
-        label: 'NIK/NISN',
+        label: 'NIK',
         type: 'text' as const,
         placeholder: 'Masukkan NIK',
         required: false,

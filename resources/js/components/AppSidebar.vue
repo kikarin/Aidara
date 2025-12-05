@@ -5,7 +5,13 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, Sid
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
-import * as LucideIcons from 'lucide-vue-next';
+import {
+  LayoutGrid, Flag, FolderKanban, FileStack, Users, Settings, FileText, Folder,
+  Shield, User, List, Plus, Edit, Trash, Search, Filter, Download, Upload, Menu,
+  Home, BarChart, PieChart, Calendar, ShieldCheck, ClipboardList, UserCircle2,
+  CalendarCheck, CalendarSync, ClipboardCheck, HeartHandshake, HandHeart,
+  Ungroup, Stethoscope, Wrench, Trophy, CircleCheckBig, UserRoundCheck
+} from 'lucide-vue-next';
 import { onMounted, onUnmounted, ref } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -17,44 +23,13 @@ const pemeriksaanNavItems = ref<NavItem[]>([]);
 const settingNavItems = ref<NavItem[]>([]);
 const isLoading = ref(false);
 const iconMap: Record<string, any> = {
-    LayoutGrid: LucideIcons.LayoutGrid,
-    Flag: LucideIcons.Flag,
-    FolderKanban: LucideIcons.FolderKanban,
-    FileStack: LucideIcons.FileStack,
-    Users: LucideIcons.Users,
-    Settings: LucideIcons.Settings,
-    FileText: LucideIcons.FileText,
-    Folder: LucideIcons.Folder,
-    Shield: LucideIcons.Shield,
-    User: LucideIcons.User,
-    List: LucideIcons.List,
-    Plus: LucideIcons.Plus,
-    Edit: LucideIcons.Edit,
-    Trash: LucideIcons.Trash,
-    Search: LucideIcons.Search,
-    Filter: LucideIcons.Filter,
-    Download: LucideIcons.Download,
-    Upload: LucideIcons.Upload,
-    Menu: LucideIcons.Menu,
-    Home: LucideIcons.Home,
-    BarChart: LucideIcons.BarChart,
-    PieChart: LucideIcons.PieChart,
-    Calendar: LucideIcons.Calendar,
-    ShieldCheck: LucideIcons.ShieldCheck,
-    ClipboardList: LucideIcons.ClipboardList,
-    UserCircle2: LucideIcons.UserCircle2,
-    CalendarCheck: LucideIcons.CalendarCheck,
-    CalendarSync: LucideIcons.CalendarSync,
-    ClipboardCheck: LucideIcons.ClipboardCheck,
-    HeartHandshake: LucideIcons.HeartHandshake,
-    HandHeart: LucideIcons.HandHeart,
-    Ungroup: LucideIcons.Ungroup,
-    Stethoscope: LucideIcons.Stethoscope,
-    Wrench: LucideIcons.Wrench,
-    Trophy: LucideIcons.Trophy,
-    CircleCheckBig: LucideIcons.CircleCheckBig,
-    UserRoundCheck: LucideIcons.UserRoundCheck,
+  LayoutGrid, Flag, FolderKanban, FileStack, Users, Settings, FileText, Folder,
+  Shield, User, List, Plus, Edit, Trash, Search, Filter, Download, Upload, Menu,
+  Home, BarChart, PieChart, Calendar, ShieldCheck, ClipboardList, UserCircle2,
+  CalendarCheck, CalendarSync, ClipboardCheck, HeartHandshake, HandHeart,
+  Ungroup, Stethoscope, Wrench, Trophy, CircleCheckBig, UserRoundCheck
 };
+
 
 const fetchMenus = async () => {
     if (isLoading.value) return;
@@ -137,18 +112,13 @@ const fetchMenus = async () => {
     }
 };
 
-const refreshInterval = 5 * 60 * 1000;
-let intervalId: ReturnType<typeof setInterval> | null = null;
 
 onMounted(() => {
     fetchMenus();
-    intervalId = setInterval(fetchMenus, refreshInterval);
 });
 
 onUnmounted(() => {
-    if (intervalId) {
-        clearInterval(intervalId);
-    }
+
 });
 </script>
 
