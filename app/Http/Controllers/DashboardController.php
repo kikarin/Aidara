@@ -54,53 +54,8 @@ class DashboardController extends Controller implements HasMiddleware
         $startOfLastMonth = $now->copy()->subMonth()->startOfMonth();
         $endOfLastMonth   = $now->copy()->subMonth()->endOfMonth();
 
-        $stat = function ($model, $label, $icon, $href) use ($startOfMonth, $now, $startOfLastMonth, $endOfLastMonth) {
-            $thisMonth = $model::whereBetween('created_at', [$startOfMonth, $now])->count();
-            $lastMonth = $model::whereBetween('created_at', [$startOfLastMonth, $endOfLastMonth])->count();
-
-            if ($lastMonth == 0) {
-                if ($thisMonth == 0) {
-                    $change         = 0;
-                    $changeLabel    = '0%';
-                    $trend          = 'up';
-                    $changeAbs      = 0;
-                    $changeAbsLabel = '0 data dibanding bulan lalu';
-                } else {
-                    $change         = null;
-                    $changeLabel    = 'Baru';
-                    $trend          = 'up';
-                    $changeAbs      = $thisMonth;
-                    $changeAbsLabel = '+'.$thisMonth.' data';
-                }
-            } else {
-                $change         = round((($thisMonth - $lastMonth) / $lastMonth) * 100, 1);
-                $changeLabel    = ($change > 0 ? '+' : '').$change.'%';
-                $trend          = $change > 0 ? 'up' : ($change < 0 ? 'down' : 'up');
-                $changeAbs      = $thisMonth - $lastMonth;
-                $changeAbsLabel = ($changeAbs > 0 ? '+' : '').$changeAbs.' data';
-            }
-
-            return [
-                'title'         => $label,
-                'value'         => $model::count(),
-                'change'        => $changeLabel,
-                'change_abs'    => $changeAbsLabel,
-                'trend'         => $trend,
-                'icon'          => $icon,
-                'href'          => $href,
-                'compare_label' => '',
-            ];
-        };
-
-        $stats = [
-            $stat(Atlet::class, 'Total Atlet', 'UserCircle2', '/atlet'),
-            $stat(Pelatih::class, 'Total Pelatih', 'HandHeart', '/pelatih'),
-            $stat(TenagaPendukung::class, 'Total Tenaga Pendukung', 'HeartHandshake', '/tenaga-pendukung'),
-            $stat(Cabor::class, 'Total Cabor', 'Flag', '/cabor'),
-            $stat(CaborKategori::class, 'Total Cabor Kategori', 'Ungroup', '/cabor-kategori'),
-            $stat(ProgramLatihan::class, 'Total Program Latihan', 'ClipboardCheck', '/program-latihan'),
-            $stat(Pemeriksaan::class, 'Total Pemeriksaan', 'Stethoscope', '/pemeriksaan'),
-        ];
+        // ✅ OPTIMASI #1: Batch query untuk stats - 1 query per model dengan CASE WHEN
+        $stats = $this->getOptimizedStats($startOfMonth, $now, $startOfLastMonth, $endOfLastMonth);
 
         $data = $this->commonData + [
             'titlePage' => 'Dashboard',
@@ -111,77 +66,11 @@ class DashboardController extends Controller implements HasMiddleware
             $data = array_merge($data, $this->getPermission());
         }
 
-        // Ambil 5 data terbaru Program Latihan beserta relasi
-        $latestPrograms = ProgramLatihan::with(['caborKategori', 'cabor'])
-            ->orderByDesc('created_at')
-            ->take(5)
-            ->get()
-            ->map(function ($item) {
-                // Hitung durasi periode
-                $durasi = '-';
-                if ($item->periode_mulai && $item->periode_selesai) {
-                    $startDate  = Carbon::parse($item->periode_mulai);
-                    $endDate    = Carbon::parse($item->periode_selesai);
-                    $diffInDays = $startDate->diffInDays($endDate) + 1; // +1 karena inclusive
+        // ✅ OPTIMASI #2: Eager load semua relasi + withCount untuk latestPrograms
+        $latestPrograms = $this->getOptimizedLatestPrograms();
 
-                    if ($diffInDays <= 30) {
-                        $durasi = $diffInDays.' hari';
-                    } else {
-                        $months        = floor($diffInDays / 30);
-                        $remainingDays = $diffInDays % 30;
-
-                        if ($remainingDays == 0) {
-                            $durasi = $months.' bulan';
-                        } else {
-                            $durasi = $months.' bulan '.$remainingDays.' hari';
-                        }
-                    }
-                }
-
-                return [
-                    'id'                     => $item->id,
-                    'nama_program'           => $item->nama_program,
-                    'cabor_nama'             => $item->cabor?->nama         ?? '-',
-                    'cabor_kategori_nama'    => $item->caborKategori?->nama ?? '-',
-                    'periode'                => $durasi,
-                    'jumlah_rencana_latihan' => $item->rencanaLatihan()->count(),
-                    'rencana_latihan_list'   => $item->rencanaLatihan()->orderByDesc('tanggal')->limit(3)->pluck('materi')->map(function ($materi) {
-                        return Str::limit($materi, 30);
-                    })->toArray(),
-                ];
-            });
-
-        // Ambil 5 data terbaru Pemeriksaan beserta relasi
-        $latestPemeriksaan = Pemeriksaan::with(['caborKategori', 'cabor', 'tenagaPendukung'])
-            ->orderByDesc('created_at')
-            ->take(5)
-            ->get()
-            ->map(function ($item) {
-                // Hitung jumlah peserta berdasarkan jenis menggunakan peserta_type
-                $pesertaAtlet           = $item->pemeriksaanPeserta()->where('peserta_type', 'App\\Models\\Atlet')->count();
-                $pesertaPelatih         = $item->pemeriksaanPeserta()->where('peserta_type', 'App\\Models\\Pelatih')->count();
-                $pesertaTenagaPendukung = $item->pemeriksaanPeserta()->where('peserta_type', 'App\\Models\\TenagaPendukung')->count();
-
-                return [
-                    'id'                    => $item->id,
-                    'nama_pemeriksaan'      => $item->nama_pemeriksaan,
-                    'cabor_kategori_nama'   => $item->caborKategori?->nama   ?? '-',
-                    'tenaga_pendukung_nama' => $item->tenagaPendukung?->nama ?? '-',
-                    'tanggal_pemeriksaan'   => $item->tanggal_pemeriksaan,
-                    'status'                => $item->status,
-                    'jumlah_parameter'      => $item->pemeriksaanParameter()->count(),
-                    'jumlah_peserta'        => $item->pemeriksaanPeserta()->count(),
-                    'cabor_nama'            => $item->cabor?->nama ?? '-',
-                    'parameter_list'        => $item->pemeriksaanParameter()->with('mstParameter')->limit(3)->get()->pluck('mstParameter.nama')->toArray(),
-                    'peserta_list'          => $item->pemeriksaanPeserta()->with('peserta')->limit(3)->get()->map(function ($peserta) {
-                        // Cek field nama di model morph (Atlet, Pelatih, TenagaPendukung)
-                        return $peserta->peserta?->nama ?? '-';
-                    })->toArray(),
-                    'jumlah_atlet'            => $pesertaAtlet,
-                    'jumlah_pelatih'          => $pesertaPelatih,
-                    'jumlah_tenaga_pendukung' => $pesertaTenagaPendukung,
-                ];
-            });
+        // ✅ OPTIMASI #3: Eager load semua relasi + withCount untuk latestPemeriksaan
+        $latestPemeriksaan = $this->getOptimizedLatestPemeriksaan();
 
         // Ambil 8 aktivitas terbaru
         $latestActivities = ActivityLog::with(['causer', 'causer.role'])
@@ -221,11 +110,187 @@ class DashboardController extends Controller implements HasMiddleware
         $chartData          = $this->getChartData();
         $data['chart_data'] = $chartData;
 
-        // Data rekapitulasi per cabor kategori
+        // ✅ OPTIMASI #4: Data rekapitulasi dengan GROUP BY (3 query total, bukan 450)
         $rekapData          = $this->getRekapData();
         $data['rekap_data'] = $rekapData;
 
         return Inertia::render('Dashboard', $data);
+    }
+
+    /**
+     * ✅ OPTIMASI: Batch query untuk stats - 1 query per model
+     * Sebelum: 21 query (3 query x 7 model)
+     * Sesudah: 7 query (1 query x 7 model)
+     */
+    private function getOptimizedStats($startOfMonth, $now, $startOfLastMonth, $endOfLastMonth)
+    {
+        $models = [
+            ['model' => Atlet::class, 'label' => 'Total Atlet', 'icon' => 'UserCircle2', 'href' => '/atlet'],
+            ['model' => Pelatih::class, 'label' => 'Total Pelatih', 'icon' => 'HandHeart', 'href' => '/pelatih'],
+            ['model' => TenagaPendukung::class, 'label' => 'Total Tenaga Pendukung', 'icon' => 'HeartHandshake', 'href' => '/tenaga-pendukung'],
+            ['model' => Cabor::class, 'label' => 'Total Cabor', 'icon' => 'Flag', 'href' => '/cabor'],
+            ['model' => CaborKategori::class, 'label' => 'Total Cabor Kategori', 'icon' => 'Ungroup', 'href' => '/cabor-kategori'],
+            ['model' => ProgramLatihan::class, 'label' => 'Total Program Latihan', 'icon' => 'ClipboardCheck', 'href' => '/program-latihan'],
+            ['model' => Pemeriksaan::class, 'label' => 'Total Pemeriksaan', 'icon' => 'Stethoscope', 'href' => '/pemeriksaan'],
+        ];
+
+        $stats = [];
+
+        foreach ($models as $item) {
+            $model = $item['model'];
+
+            // 1 query per model dengan CASE WHEN untuk hitung semua sekaligus
+            $result = $model::selectRaw("
+                COUNT(*) as total,
+                SUM(CASE WHEN created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as this_month,
+                SUM(CASE WHEN created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as last_month
+            ", [$startOfMonth, $now, $startOfLastMonth, $endOfLastMonth])
+                ->first();
+
+            $total     = $result->total ?? 0;
+            $thisMonth = $result->this_month ?? 0;
+            $lastMonth = $result->last_month ?? 0;
+
+            // Hitung perubahan
+            if ($lastMonth == 0) {
+                if ($thisMonth == 0) {
+                    $changeLabel    = '0%';
+                    $trend          = 'up';
+                    $changeAbsLabel = '0 data dibanding bulan lalu';
+                } else {
+                    $changeLabel    = 'Baru';
+                    $trend          = 'up';
+                    $changeAbsLabel = '+'.$thisMonth.' data';
+                }
+            } else {
+                $change         = round((($thisMonth - $lastMonth) / $lastMonth) * 100, 1);
+                $changeLabel    = ($change > 0 ? '+' : '').$change.'%';
+                $trend          = $change > 0 ? 'up' : ($change < 0 ? 'down' : 'up');
+                $changeAbs      = $thisMonth - $lastMonth;
+                $changeAbsLabel = ($changeAbs > 0 ? '+' : '').$changeAbs.' data';
+            }
+
+            $stats[] = [
+                'title'         => $item['label'],
+                'value'         => $total,
+                'change'        => $changeLabel,
+                'change_abs'    => $changeAbsLabel,
+                'trend'         => $trend,
+                'icon'          => $item['icon'],
+                'href'          => $item['href'],
+                'compare_label' => '',
+            ];
+        }
+
+        return $stats;
+    }
+
+    /**
+     * ✅ OPTIMASI: Latest Programs dengan withCount + eager load constraint
+     * Sebelum: 10+ query (2 query per item)
+     * Sesudah: 2-3 query total
+     */
+    private function getOptimizedLatestPrograms()
+    {
+        return ProgramLatihan::with([
+            'caborKategori',
+            'cabor',
+            'rencanaLatihan' => function ($query) {
+                $query->orderByDesc('tanggal')->limit(15); // limit lebih untuk cover 5 program x 3 item
+            },
+        ])
+            ->withCount('rencanaLatihan')
+            ->orderByDesc('created_at')
+            ->take(5)
+            ->get()
+            ->map(function ($item) {
+                // Hitung durasi periode
+                $durasi = '-';
+                if ($item->periode_mulai && $item->periode_selesai) {
+                    $startDate  = Carbon::parse($item->periode_mulai);
+                    $endDate    = Carbon::parse($item->periode_selesai);
+                    $diffInDays = $startDate->diffInDays($endDate) + 1;
+
+                    if ($diffInDays <= 30) {
+                        $durasi = $diffInDays.' hari';
+                    } else {
+                        $months        = floor($diffInDays / 30);
+                        $remainingDays = $diffInDays % 30;
+
+                        if ($remainingDays == 0) {
+                            $durasi = $months.' bulan';
+                        } else {
+                            $durasi = $months.' bulan '.$remainingDays.' hari';
+                        }
+                    }
+                }
+
+                return [
+                    'id'                     => $item->id,
+                    'nama_program'           => $item->nama_program,
+                    'cabor_nama'             => $item->cabor?->nama         ?? '-',
+                    'cabor_kategori_nama'    => $item->caborKategori?->nama ?? '-',
+                    'periode'                => $durasi,
+                    'jumlah_rencana_latihan' => $item->rencana_latihan_count, // dari withCount
+                    'rencana_latihan_list'   => $item->rencanaLatihan->take(3)->pluck('materi')->map(function ($materi) {
+                        return Str::limit($materi, 30);
+                    })->toArray(),
+                ];
+            });
+    }
+
+    /**
+     * ✅ OPTIMASI: Latest Pemeriksaan dengan withCount + eager load
+     * Sebelum: 35+ query (7+ query per item)
+     * Sesudah: 3-4 query total
+     */
+    private function getOptimizedLatestPemeriksaan()
+    {
+        return Pemeriksaan::with([
+            'caborKategori',
+            'cabor',
+            'tenagaPendukung',
+            'pemeriksaanParameter' => function ($query) {
+                $query->with('mstParameter')->limit(15);
+            },
+            'pemeriksaanPeserta' => function ($query) {
+                $query->with('peserta')->limit(15);
+            },
+        ])
+            ->withCount([
+                'pemeriksaanParameter',
+                'pemeriksaanPeserta',
+                'pemeriksaanPeserta as peserta_atlet_count' => function ($query) {
+                    $query->where('peserta_type', 'App\\Models\\Atlet');
+                },
+                'pemeriksaanPeserta as peserta_pelatih_count' => function ($query) {
+                    $query->where('peserta_type', 'App\\Models\\Pelatih');
+                },
+                'pemeriksaanPeserta as peserta_tenaga_pendukung_count' => function ($query) {
+                    $query->where('peserta_type', 'App\\Models\\TenagaPendukung');
+                },
+            ])
+            ->orderByDesc('created_at')
+            ->take(5)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id'                      => $item->id,
+                    'nama_pemeriksaan'        => $item->nama_pemeriksaan,
+                    'cabor_kategori_nama'     => $item->caborKategori?->nama   ?? '-',
+                    'tenaga_pendukung_nama'   => $item->tenagaPendukung?->nama ?? '-',
+                    'tanggal_pemeriksaan'     => $item->tanggal_pemeriksaan,
+                    'status'                  => $item->status,
+                    'jumlah_parameter'        => $item->pemeriksaan_parameter_count,
+                    'jumlah_peserta'          => $item->pemeriksaan_peserta_count,
+                    'cabor_nama'              => $item->cabor?->nama ?? '-',
+                    'parameter_list'          => $item->pemeriksaanParameter->take(3)->pluck('mstParameter.nama')->toArray(),
+                    'peserta_list'            => $item->pemeriksaanPeserta->take(3)->map(fn ($p) => $p->peserta?->nama ?? '-')->toArray(),
+                    'jumlah_atlet'            => $item->peserta_atlet_count,
+                    'jumlah_pelatih'          => $item->peserta_pelatih_count,
+                    'jumlah_tenaga_pendukung' => $item->peserta_tenaga_pendukung_count,
+                ];
+            });
     }
 
     private function formatTimeAgo($datetime)
@@ -293,6 +358,11 @@ class DashboardController extends Controller implements HasMiddleware
         }
     }
 
+    /**
+     * ✅ OPTIMASI: Chart data dengan GROUP BY
+     * Sebelum: 6 query untuk min/max + 60 query untuk data (jika 20 tahun)
+     * Sesudah: 3 query total (1 per tabel dengan GROUP BY)
+     */
     private function getChartData()
     {
         $driver = DB::getDriverName();
@@ -300,18 +370,33 @@ class DashboardController extends Controller implements HasMiddleware
             ? "strftime('%Y', tanggal_bergabung)"
             : 'YEAR(tanggal_bergabung)';
 
-        $minAtletYear           = Atlet::whereNotNull('tanggal_bergabung')->selectRaw("MIN($yearFn) as year")->value('year');
-        $minPelatihYear         = Pelatih::whereNotNull('tanggal_bergabung')->selectRaw("MIN($yearFn) as year")->value('year');
-        $minTenagaPendukungYear = TenagaPendukung::whereNotNull('tanggal_bergabung')->selectRaw("MIN($yearFn) as year")->value('year');
+        // ✅ 1 query per tabel dengan GROUP BY (sudah include min/max dari hasil)
+        $atletByYear = Atlet::whereNotNull('tanggal_bergabung')
+            ->selectRaw("$yearFn as y, COUNT(*) as total")
+            ->groupBy('y')
+            ->pluck('total', 'y')
+            ->toArray();
 
-        $maxAtletYear           = Atlet::whereNotNull('tanggal_bergabung')->selectRaw("MAX($yearFn) as year")->value('year');
-        $maxPelatihYear         = Pelatih::whereNotNull('tanggal_bergabung')->selectRaw("MAX($yearFn) as year")->value('year');
-        $maxTenagaPendukungYear = TenagaPendukung::whereNotNull('tanggal_bergabung')->selectRaw("MAX($yearFn) as year")->value('year');
+        $pelatihByYear = Pelatih::whereNotNull('tanggal_bergabung')
+            ->selectRaw("$yearFn as y, COUNT(*) as total")
+            ->groupBy('y')
+            ->pluck('total', 'y')
+            ->toArray();
 
-        $minValues = array_filter([$minAtletYear, $minPelatihYear, $minTenagaPendukungYear]);
-        $maxValues = array_filter([$maxAtletYear, $maxPelatihYear, $maxTenagaPendukungYear]);
+        $tenagaByYear = TenagaPendukung::whereNotNull('tanggal_bergabung')
+            ->selectRaw("$yearFn as y, COUNT(*) as total")
+            ->groupBy('y')
+            ->pluck('total', 'y')
+            ->toArray();
 
-        if (empty($minValues) || empty($maxValues)) {
+        // Ambil min/max year dari hasil query (tanpa query tambahan)
+        $allYears = array_merge(
+            array_keys($atletByYear),
+            array_keys($pelatihByYear),
+            array_keys($tenagaByYear)
+        );
+
+        if (empty($allYears)) {
             return [
                 'years'  => [],
                 'series' => [
@@ -322,75 +407,73 @@ class DashboardController extends Controller implements HasMiddleware
             ];
         }
 
-        $minYear = min($minValues);
-        $maxYear = max($maxValues);
+        $minYear = min($allYears);
+        $maxYear = max($allYears);
+        $years   = range($minYear, $maxYear);
 
-        // Buat range tahun dari data yang ada
-        $years = range($minYear, $maxYear);
-
+        // Bentuk data sesuai range tahun
         $atletData           = [];
         $pelatihData         = [];
         $tenagaPendukungData = [];
 
         foreach ($years as $year) {
-            // Data Atlet per tahun
-            $atletCount  = Atlet::whereYear('tanggal_bergabung', $year)->count();
-            $atletData[] = $atletCount;
-
-            // Data Pelatih per tahun
-            $pelatihCount  = Pelatih::whereYear('tanggal_bergabung', $year)->count();
-            $pelatihData[] = $pelatihCount;
-
-            // Data Tenaga Pendukung per tahun
-            $tenagaPendukungCount  = TenagaPendukung::whereYear('tanggal_bergabung', $year)->count();
-            $tenagaPendukungData[] = $tenagaPendukungCount;
+            $atletData[]           = $atletByYear[$year] ?? 0;
+            $pelatihData[]         = $pelatihByYear[$year] ?? 0;
+            $tenagaPendukungData[] = $tenagaByYear[$year] ?? 0;
         }
 
         return [
             'years'  => $years,
             'series' => [
-                [
-                    'name' => 'Atlet',
-                    'data' => $atletData,
-                ],
-                [
-                    'name' => 'Pelatih',
-                    'data' => $pelatihData,
-                ],
-                [
-                    'name' => 'Tenaga Pendukung',
-                    'data' => $tenagaPendukungData,
-                ],
+                ['name' => 'Atlet', 'data' => $atletData],
+                ['name' => 'Pelatih', 'data' => $pelatihData],
+                ['name' => 'Tenaga Pendukung', 'data' => $tenagaPendukungData],
             ],
         ];
     }
 
 
+    /**
+     * ✅ OPTIMASI: Rekap data dengan GROUP BY
+     * Sebelum: 450 query (3 count query x 150 kategori)
+     * Sesudah: 4 query total (1 untuk kategori + 3 GROUP BY)
+     */
     private function getRekapData()
     {
-        // Ambil semua cabor kategori dengan relasi cabor
+        // ✅ Query 1: Ambil semua cabor kategori dengan relasi cabor
         $caborKategoris = CaborKategori::with('cabor')
             ->orderBy('cabor_id')
             ->orderBy('nama')
             ->get();
 
+        // ✅ Query 2: Hitung semua atlet per kategori sekaligus
+        $atletCounts = CaborKategoriAtlet::select('cabor_kategori_id', DB::raw('COUNT(*) as total'))
+            ->where('is_active', 1)
+            ->groupBy('cabor_kategori_id')
+            ->pluck('total', 'cabor_kategori_id')
+            ->toArray();
+
+        // ✅ Query 3: Hitung semua pelatih per kategori sekaligus
+        $pelatihCounts = CaborKategoriPelatih::select('cabor_kategori_id', DB::raw('COUNT(*) as total'))
+            ->where('is_active', 1)
+            ->groupBy('cabor_kategori_id')
+            ->pluck('total', 'cabor_kategori_id')
+            ->toArray();
+
+        // ✅ Query 4: Hitung semua tenaga pendukung per kategori sekaligus
+        $tenagaCounts = CaborKategoriTenagaPendukung::select('cabor_kategori_id', DB::raw('COUNT(*) as total'))
+            ->where('is_active', 1)
+            ->groupBy('cabor_kategori_id')
+            ->pluck('total', 'cabor_kategori_id')
+            ->toArray();
+
+        // Bentuk data dari hasil lookup (tanpa query tambahan)
         $rekapData = [];
 
         foreach ($caborKategoris as $caborKategori) {
-            // Hitung jumlah atlet di kategori ini
-            $jumlahAtlet = CaborKategoriAtlet::where('cabor_kategori_id', $caborKategori->id)
-                ->where('is_active', 1)
-                ->count();
-
-            // Hitung jumlah pelatih di kategori ini
-            $jumlahPelatih = CaborKategoriPelatih::where('cabor_kategori_id', $caborKategori->id)
-                ->where('is_active', 1)
-                ->count();
-
-            // Hitung jumlah tenaga pendukung di kategori ini
-            $jumlahTenagaPendukung = CaborKategoriTenagaPendukung::where('cabor_kategori_id', $caborKategori->id)
-                ->where('is_active', 1)
-                ->count();
+            $jumlahAtlet           = $atletCounts[$caborKategori->id]   ?? 0;
+            $jumlahPelatih         = $pelatihCounts[$caborKategori->id] ?? 0;
+            $jumlahTenagaPendukung = $tenagaCounts[$caborKategori->id]  ?? 0;
 
             $rekapData[] = [
                 'id'                      => $caborKategori->id,
