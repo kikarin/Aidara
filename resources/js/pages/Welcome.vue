@@ -65,7 +65,7 @@ library.add(faFutbol, faBasketballBall, faTableTennis, faVolleyballBall, faRunni
                     </div>
 
                     <p class="mb-6 text-base text-[#706f6c] dark:text-[#A1A09A]">
-                        Portal manajemen cabang olahraga. Kelola atlet, pelatih, dan fasilitas olahraga dengan mudah dan efisien.
+                        Portal ANJING manajemen cabang olahraga. Kelola atlet, pelatih, dan fasilitas olahraga dengan mudah dan efisien.
                     </p>
 
                     <div class="mb-6">
