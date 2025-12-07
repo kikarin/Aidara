@@ -26,14 +26,9 @@ class PemeriksaanParameterRepository
         }
 
         // Filtering by kategori parameter
-        $jenisPeserta = request('jenis_peserta');
-        $query->whereHas('mstParameter', function ($q) use ($jenisPeserta) {
-            // Selalu exclude kategori 'umum' dari pemetaan pemeriksaan
+        $query->whereHas('mstParameter', function ($q) {
+            // Selalu exclude kategori 'umum' dari pemetaan pemeriksaan (kategori umum untuk atlet parameter umum, bukan pemeriksaan)
             $q->where('kategori', '!=', 'umum');
-            if ($jenisPeserta && $jenisPeserta !== 'atlet') {
-                // Untuk non-atlet, exclude juga kategori 'khusus'
-                $q->where('kategori', '!=', 'khusus');
-            }
         });
 
         if (request('search')) {

@@ -212,8 +212,7 @@ const chartTargetInfo = computed(() => {
             :participant="selectedParameter"
             :statistik-data="chartStatistikData"
             :rencana-list="chartRencanaList"
-            data-type="target-latihan"
-            :target-info="chartTargetInfo"
+            data-type="pemeriksaan"
             @close="closeModal"
         />
     </div>

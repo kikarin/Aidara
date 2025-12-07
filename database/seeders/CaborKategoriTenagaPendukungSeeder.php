@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Cabor;
 use App\Models\CaborKategori;
 use App\Models\MstJenisTenagaPendukung;
 use App\Models\TenagaPendukung;
@@ -12,16 +13,23 @@ class CaborKategoriTenagaPendukungSeeder extends Seeder
 {
     public function run(): void
     {
-        $kategoriList = CaborKategori::all();
-        $tenagaList   = TenagaPendukung::all();
-        $jenisList    = MstJenisTenagaPendukung::pluck('nama')->toArray();
+        $caborList  = Cabor::all();
+        $tenagaList = TenagaPendukung::all();
+        $jenisList  = MstJenisTenagaPendukung::pluck('nama')->toArray();
 
-        foreach ($kategoriList as $kategori) {
-            $randomTenaga = $tenagaList->random(rand(1, min(3, $tenagaList->count())));
-            foreach ($randomTenaga as $tenaga) {
+        // Tenaga pendukung bisa di beberapa cabor
+        foreach ($tenagaList as $tenaga) {
+            // Random pilih 1-3 cabor untuk setiap tenaga pendukung
+            $randomCabors = $caborList->random(rand(1, min(3, $caborList->count())));
+            
+            foreach ($randomCabors as $cabor) {
+                // Random pilih kategori dari cabor ini (atau null untuk langsung ke cabor)
+                $kategoriList = CaborKategori::where('cabor_id', $cabor->id)->get();
+                $kategori = $kategoriList->isNotEmpty() && rand(0, 1) ? $kategoriList->random() : null;
+                
                 DB::table('cabor_kategori_tenaga_pendukung')->updateOrInsert([
-                    'cabor_id'            => $kategori->cabor_id,
-                    'cabor_kategori_id'   => $kategori->id,
+                    'cabor_id'            => $cabor->id,
+                    'cabor_kategori_id'   => $kategori?->id,
                     'tenaga_pendukung_id' => $tenaga->id,
                 ], [
                     'is_active'              => rand(0, 1),

@@ -412,17 +412,6 @@ const chartOptions = {
                                     <span class="text-foreground text-sm">{{ row.periode }}</span>
                                 </div>
                                 <div class="flex flex-wrap gap-2 items-center">
-                                    <span class="font-medium min-w-[125px] text-sm">Rencana Latihan</span>
-                                    <div class="flex flex-wrap gap-2 items-center text-sm">
-                                        <Badge variant="secondary" class="text-foreground ">
-                                            {{ row.jumlah_rencana_latihan }}
-                                        </Badge>
-                                        <span v-if="row.rencana_latihan_list && row.rencana_latihan_list.length > 0"
-                                            class="text-muted-foreground">
-                                            {{ row.rencana_latihan_list.join(', ') }}
-                                        </span>
-                                        <span v-else class="text-muted-foreground">-</span>
-                                    </div>
                                 </div>
                             </div>
                         </div>

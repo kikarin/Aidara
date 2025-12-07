@@ -1,0 +1,767 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\PemeriksaanKhususAspekItemTesRequest;
+use App\Http\Requests\PemeriksaanKhususHasilTesRequest;
+use App\Http\Requests\PemeriksaanKhususRequest;
+use App\Models\CaborKategoriAtlet;
+use App\Models\CaborKategoriPelatih;
+use App\Models\CaborKategoriTenagaPendukung;
+use App\Models\MstTemplatePemeriksaanKhususAspek;
+use App\Models\PemeriksaanKhusus;
+use App\Models\PemeriksaanKhususAspek;
+use App\Models\PemeriksaanKhususItemTes;
+use App\Models\PemeriksaanKhususPeserta;
+use App\Repositories\PemeriksaanKhususRepository;
+use App\Traits\BaseTrait;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
+
+class PemeriksaanKhususController extends Controller implements HasMiddleware
+{
+    use BaseTrait;
+
+    private $repository;
+
+    private $request;
+
+    public function __construct(Request $request, PemeriksaanKhususRepository $repository)
+    {
+        $this->repository = $repository;
+        $this->request    = PemeriksaanKhususRequest::createFromBase($request);
+        $this->initialize();
+        $this->route                          = 'pemeriksaan-khusus';
+        $this->commonData['kode_first_menu']  = 'PEMERIKSAAN';
+        $this->commonData['kode_second_menu'] = 'PEMERIKSAAN_KHUSUS';
+    }
+
+    public static function middleware(): array
+    {
+        $className  = class_basename(__CLASS__);
+        $permission = str_replace('Controller', '', $className);
+        $permission = trim(implode(' ', preg_split('/(?=[A-Z])/', $permission)));
+
+        return [
+            new Middleware("can:$permission Show", only: ['index']),
+            new Middleware("can:$permission Add", only: ['create', 'store']),
+            new Middleware("can:$permission Detail", only: ['show']),
+            new Middleware("can:$permission Edit", only: ['edit', 'update']),
+            new Middleware("can:$permission Delete", only: ['destroy', 'destroy_selected']),
+            new Middleware("can:Pemeriksaan Khusus Setup", only: ['setup']),
+            new Middleware("can:Pemeriksaan Khusus Input Hasil Tes", only: ['inputHasilTes']),
+        ];
+    }
+
+    public function index()
+    {
+        $this->repository->customProperty(__FUNCTION__);
+        $data = $this->commonData + [];
+        if ($this->check_permission == true) {
+            $data = array_merge($data, $this->getPermission());
+        }
+        $data = $this->repository->customIndex($data);
+
+        return inertia('modules/pemeriksaan-khusus/Index', $data);
+    }
+
+    public function create()
+    {
+        $this->repository->customProperty(__FUNCTION__);
+        $data = $this->commonData + ['item' => null];
+        if ($this->check_permission == true) {
+            $data = array_merge($data, $this->getPermission());
+        }
+        $data = $this->repository->customCreateEdit($data);
+
+        return inertia('modules/pemeriksaan-khusus/Create', $data);
+    }
+
+    public function store(PemeriksaanKhususRequest $request)
+    {
+        $data = $this->repository->validateRequest($request);
+        $this->repository->create($data);
+
+        return redirect()->route('pemeriksaan-khusus.index')->with('success', 'Pemeriksaan khusus berhasil ditambahkan!');
+    }
+
+    public function show($id)
+    {
+        $item = $this->repository->getById($id);
+        
+        // Load relasi yang diperlukan untuk tab Informasi
+        $item->load([
+            'cabor',
+            'caborKategori',
+            'aspek.itemTes',
+            'pemeriksaanKhususPeserta.peserta',
+        ]);
+        
+        $itemArray = $item->toArray();
+
+        return Inertia::render('modules/pemeriksaan-khusus/Show', ['item' => $itemArray]);
+    }
+
+    public function setup($id)
+    {
+        $this->repository->customProperty(__FUNCTION__, ['id' => $id]);
+        $item = $this->repository->getById($id);
+        $data = $this->commonData + ['item' => $item];
+        if ($this->check_permission == true) {
+            $data = array_merge($data, $this->getPermission());
+        }
+
+        return inertia('modules/pemeriksaan-khusus/Setup', $data);
+    }
+
+    public function inputHasilTes($id)
+    {
+        $this->repository->customProperty(__FUNCTION__, ['id' => $id]);
+        $item = $this->repository->getById($id);
+        
+        // Load relasi yang diperlukan (pastikan ter-load dengan benar)
+        $item->loadMissing(['cabor', 'caborKategori']);
+        
+        // Convert to array dengan relasi
+        $itemArray = $item->toArray();
+        
+        // Pastikan caborKategori ada di array
+        if (!isset($itemArray['cabor_kategori']) && $item->caborKategori) {
+            $itemArray['cabor_kategori'] = $item->caborKategori->toArray();
+        }
+        // Juga pastikan key 'caborKategori' ada (camelCase untuk frontend)
+        if (!isset($itemArray['caborKategori']) && $item->caborKategori) {
+            $itemArray['caborKategori'] = $item->caborKategori->toArray();
+        }
+        
+        $data = $this->commonData + ['item' => $itemArray];
+        if ($this->check_permission == true) {
+            $data = array_merge($data, $this->getPermission());
+        }
+
+        return inertia('modules/pemeriksaan-khusus/InputHasilTes', $data);
+    }
+
+    public function edit($id = '')
+    {
+        $this->repository->customProperty(__FUNCTION__, ['id' => $id]);
+        $item = $this->repository->getById($id);
+        $data = $this->commonData + ['item' => $item];
+        if ($this->check_permission == true) {
+            $data = array_merge($data, $this->getPermission());
+        }
+        $data = $this->repository->customCreateEdit($data, $item);
+
+        return inertia('modules/pemeriksaan-khusus/Edit', $data);
+    }
+
+    public function update(PemeriksaanKhususRequest $request, $id)
+    {
+        $data = $this->repository->validateRequest($request);
+        $this->repository->update($id, $data);
+
+        return redirect()->route('pemeriksaan-khusus.index')->with('success', 'Pemeriksaan khusus berhasil diperbarui!');
+    }
+
+    public function destroy($id)
+    {
+        $this->repository->delete($id);
+
+        return redirect()->route('pemeriksaan-khusus.index')->with('success', 'Pemeriksaan khusus berhasil dihapus!');
+    }
+
+    public function destroy_selected(Request $request)
+    {
+        $request->validate([
+            'ids'   => 'required|array',
+            'ids.*' => 'required|numeric|exists:pemeriksaan_khusus,id',
+        ]);
+        $this->repository->delete_selected($request->ids);
+
+        return response()->json(['message' => 'Data pemeriksaan khusus berhasil dihapus!']);
+    }
+
+    public function apiIndex()
+    {
+        $data = $this->repository->customIndex([]);
+
+        return response()->json([
+            'data' => $data['pemeriksaan_khusus'],
+            'meta' => [
+                'total'        => $data['total'],
+                'current_page' => $data['currentPage'],
+                'per_page'     => $data['perPage'],
+                'search'       => $data['search'],
+                'sort'         => request('sort', ''),
+                'order'        => request('order', 'asc'),
+            ],
+        ]);
+    }
+
+    /**
+     * API untuk mendapatkan semua peserta (Atlet, Pelatih, Tenaga Pendukung) berdasarkan cabor kategori
+     * Digunakan untuk auto-load peserta saat create pemeriksaan khusus
+     */
+    public function apiPesertaByCaborKategori($cabor_kategori_id)
+    {
+        try {
+            // Get Atlet aktif di kategori ini
+            $atlet = CaborKategoriAtlet::with(['atlet'])
+                ->where('cabor_kategori_atlet.cabor_kategori_id', $cabor_kategori_id)
+                ->where('cabor_kategori_atlet.is_active', 1)
+                ->whereNull('cabor_kategori_atlet.deleted_at')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id'     => $item->atlet->id ?? null,
+                        'nama'   => $item->atlet->nama ?? '-',
+                        'posisi' => $item->posisi_atlet ?? '-',
+                    ];
+                })
+                ->filter(fn ($item) => $item['id'] !== null)
+                ->values();
+
+            // Get Pelatih aktif di kategori ini
+            $pelatih = CaborKategoriPelatih::with(['pelatih'])
+                ->where('cabor_kategori_pelatih.cabor_kategori_id', $cabor_kategori_id)
+                ->where('cabor_kategori_pelatih.is_active', 1)
+                ->whereNull('cabor_kategori_pelatih.deleted_at')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id'    => $item->pelatih->id ?? null,
+                        'nama'  => $item->pelatih->nama ?? '-',
+                        'jenis' => $item->jenis_pelatih ?? '-',
+                    ];
+                })
+                ->filter(fn ($item) => $item['id'] !== null)
+                ->values();
+
+            // Get Tenaga Pendukung aktif di kategori ini
+            $tenagaPendukung = CaborKategoriTenagaPendukung::with(['tenagaPendukung'])
+                ->where('cabor_kategori_tenaga_pendukung.cabor_kategori_id', $cabor_kategori_id)
+                ->where('cabor_kategori_tenaga_pendukung.is_active', 1)
+                ->whereNull('cabor_kategori_tenaga_pendukung.deleted_at')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id'    => $item->tenagaPendukung->id ?? null,
+                        'nama'  => $item->tenagaPendukung->nama ?? '-',
+                        'jenis' => $item->jenis_tenaga_pendukung ?? '-',
+                    ];
+                })
+                ->filter(fn ($item) => $item['id'] !== null)
+                ->values();
+
+            return response()->json([
+                'atlet'           => $atlet,
+                'pelatih'         => $pelatih,
+                'tenagaPendukung' => $tenagaPendukung,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiPesertaByCaborKategori: ' . $e->getMessage(), [
+                'cabor_kategori_id' => $cabor_kategori_id,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat mengambil data peserta',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * API untuk cek apakah template sudah ada untuk cabor tertentu
+     */
+    public function apiCheckTemplate($cabor_id)
+    {
+        try {
+            $template = MstTemplatePemeriksaanKhususAspek::where('cabor_id', $cabor_id)
+                ->with(['itemTes' => function ($q) {
+                    $q->orderBy('urutan');
+                }])
+                ->orderBy('urutan')
+                ->get();
+
+            $hasTemplate = $template->count() > 0;
+
+            return response()->json([
+                'has_template' => $hasTemplate,
+                'template' => $hasTemplate ? $template->map(function ($aspek) {
+                    return [
+                        'id' => $aspek->id,
+                        'nama' => $aspek->nama,
+                        'urutan' => $aspek->urutan,
+                        'item_tes' => $aspek->itemTes->map(function ($item) {
+                            return [
+                                'id' => $item->id,
+                                'nama' => $item->nama,
+                                'satuan' => $item->satuan,
+                                'target_laki_laki' => $item->target_laki_laki,
+                                'target_perempuan' => $item->target_perempuan,
+                                'performa_arah' => $item->performa_arah,
+                                'urutan' => $item->urutan,
+                            ];
+                        }),
+                    ];
+                }) : null,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiCheckTemplate: ' . $e->getMessage(), [
+                'cabor_id' => $cabor_id,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat mengambil data template',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * API untuk mendapatkan aspek & item tes dari pemeriksaan khusus
+     */
+    public function apiGetAspekItemTes($pemeriksaan_khusus_id)
+    {
+        try {
+            $pemeriksaan = PemeriksaanKhusus::with([
+                'aspek' => function ($q) {
+                    $q->whereNull('deleted_at')->orderBy('urutan');
+                },
+                'aspek.itemTes' => function ($q) {
+                    $q->whereNull('deleted_at')->orderBy('urutan');
+                },
+            ])
+                ->findOrFail($pemeriksaan_khusus_id);
+
+            $aspek = $pemeriksaan->aspek
+                ->filter(fn($a) => $a->deleted_at === null)
+                ->unique('id')
+                ->map(function ($aspek) {
+                    return [
+                        'id' => $aspek->id,
+                        'nama' => $aspek->nama,
+                        'urutan' => $aspek->urutan,
+                        'item_tes' => $aspek->itemTes
+                            ->filter(fn($it) => $it->deleted_at === null)
+                            ->unique('id')
+                            ->map(function ($item) {
+                                return [
+                                    'id' => $item->id,
+                                    'nama' => $item->nama,
+                                    'satuan' => $item->satuan,
+                                    'target_laki_laki' => $item->target_laki_laki,
+                                    'target_perempuan' => $item->target_perempuan,
+                                    'performa_arah' => $item->performa_arah,
+                                    'urutan' => $item->urutan,
+                                ];
+                            })
+                            ->values()
+                            ->toArray(),
+                    ];
+                })
+                ->values()
+                ->toArray();
+
+            return response()->json([
+                'aspek' => $aspek,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiGetAspekItemTes: ' . $e->getMessage(), [
+                'pemeriksaan_khusus_id' => $pemeriksaan_khusus_id,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat mengambil data aspek & item tes',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * API untuk clone template ke pemeriksaan khusus
+     */
+    public function apiCloneFromTemplate(Request $request)
+    {
+        try {
+            $request->validate([
+                'pemeriksaan_khusus_id' => 'required|exists:pemeriksaan_khusus,id',
+                'cabor_id'              => 'required|exists:cabor,id',
+            ]);
+
+            $this->repository->cloneFromTemplate(
+                $request->pemeriksaan_khusus_id,
+                $request->cabor_id
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Template berhasil di-clone ke pemeriksaan khusus',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiCloneFromTemplate: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Terjadi kesalahan saat clone template',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * API untuk save aspek-item tes (manual atau dari template)
+     */
+    public function apiSaveAspekItemTes(PemeriksaanKhususAspekItemTesRequest $request)
+    {
+        try {
+            $validated = $request->validated();
+
+            $this->repository->saveAspekItemTes(
+                $validated['pemeriksaan_khusus_id'],
+                $validated['aspek']
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Aspek & item tes berhasil disimpan',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiSaveAspekItemTes: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Terjadi kesalahan saat menyimpan aspek & item tes',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * API untuk save as template
+     */
+    public function apiSaveAsTemplate(Request $request)
+    {
+        try {
+            $request->validate([
+                'cabor_id' => 'required|exists:cabor,id',
+                'aspek'    => 'required|array|min:1',
+                'aspek.*.nama'         => 'required|string|max:200',
+                'aspek.*.urutan'       => 'nullable|integer',
+                'aspek.*.item_tes'     => 'required|array|min:1',
+                'aspek.*.item_tes.*.nama'             => 'required|string|max:200',
+                'aspek.*.item_tes.*.satuan'           => 'nullable|string|max:50',
+                'aspek.*.item_tes.*.target_laki_laki' => 'nullable|string',
+                'aspek.*.item_tes.*.target_perempuan' => 'nullable|string',
+                'aspek.*.item_tes.*.performa_arah'    => 'required|in:max,min',
+                'aspek.*.item_tes.*.urutan'           => 'nullable|integer',
+            ]);
+
+            $this->repository->saveAsTemplate(
+                $request->cabor_id,
+                $request->aspek
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Template berhasil disimpan untuk cabor ini',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiSaveAsTemplate: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Terjadi kesalahan saat menyimpan template',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * API untuk get peserta pemeriksaan khusus
+     */
+    public function apiGetPeserta($id)
+    {
+        try {
+            $pemeriksaanKhusus = $this->repository->getById($id);
+
+            // Get semua peserta
+            $pesertaList = PemeriksaanKhususPeserta::with(['peserta'])
+                ->where('pemeriksaan_khusus_id', $id)
+                ->whereNull('deleted_at')
+                ->get();
+
+            // Format data untuk frontend
+            $atlet = [];
+            $pelatih = [];
+            $tenagaPendukung = [];
+
+            foreach ($pesertaList as $peserta) {
+                $pesertaData = [
+                    'id' => $peserta->id, // pemeriksaan_khusus_peserta id
+                    'nama' => $peserta->peserta->nama ?? '-',
+                    'jenis_kelamin' => $peserta->peserta->jenis_kelamin ?? null,
+                ];
+
+                $modelType = $peserta->peserta_type;
+                if (str_contains($modelType, 'Atlet')) {
+                    $atlet[] = $pesertaData;
+                } elseif (str_contains($modelType, 'Pelatih')) {
+                    $pelatih[] = $pesertaData;
+                } elseif (str_contains($modelType, 'TenagaPendukung')) {
+                    $tenagaPendukung[] = $pesertaData;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'atlet' => $atlet,
+                'pelatih' => $pelatih,
+                'tenaga_pendukung' => $tenagaPendukung,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiGetPeserta: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Terjadi kesalahan saat mengambil peserta',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * API untuk get hasil tes per pemeriksaan khusus
+     */
+    public function apiGetHasilTes($id)
+    {
+        try {
+            $pemeriksaanKhusus = $this->repository->getById($id);
+
+            // Get semua peserta dengan hasil tes mereka
+            $pesertaList = PemeriksaanKhususPeserta::with([
+                'peserta',
+                'pemeriksaanKhususPesertaItemTes.itemTes',
+            ])
+                ->where('pemeriksaan_khusus_id', $id)
+                ->get();
+
+            // Format data untuk frontend
+            $data = [];
+            foreach ($pesertaList as $peserta) {
+                $pesertaData = [
+                    'peserta_id' => $peserta->id,
+                    'peserta'    => [
+                        'id'            => $peserta->peserta->id ?? null,
+                        'nama'          => $peserta->peserta->nama ?? '-',
+                        'jenis_kelamin' => $peserta->peserta->jenis_kelamin ?? null,
+                    ],
+                    'item_tes' => [],
+                ];
+
+                // Get hasil tes per item
+                foreach ($peserta->pemeriksaanKhususPesertaItemTes as $hasilTes) {
+                    $pesertaData['item_tes'][] = [
+                        'item_tes_id' => $hasilTes->pemeriksaan_khusus_item_tes_id,
+                        'nilai'       => $hasilTes->nilai,
+                        'persentase_performa' => $hasilTes->persentase_performa,
+                        'persentase_riil'     => $hasilTes->persentase_riil,
+                        'predikat'            => $hasilTes->predikat,
+                    ];
+                }
+
+                $data[] = $pesertaData;
+            }
+
+            return response()->json([
+                'success' => true,
+                'data'    => $data,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiGetHasilTes: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Terjadi kesalahan saat mengambil hasil tes',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * API untuk save hasil tes (bulk update)
+     */
+    public function apiSaveHasilTes(PemeriksaanKhususHasilTesRequest $request)
+    {
+        try {
+            $validated = $request->validated();
+
+            $this->repository->saveHasilTes(
+                $validated['pemeriksaan_khusus_id'],
+                $validated['data']
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Hasil tes berhasil disimpan',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiSaveHasilTes: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Terjadi kesalahan saat menyimpan hasil tes',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * API untuk get data visualisasi (aspek & nilai keseluruhan per peserta)
+     */
+    public function apiGetVisualisasi($id)
+    {
+        try {
+            $pemeriksaanKhusus = $this->repository->getById($id);
+
+            // Load aspek dengan urutan
+            $aspekList = PemeriksaanKhususAspek::where('pemeriksaan_khusus_id', $id)
+                ->whereNull('deleted_at')
+                ->orderBy('urutan')
+                ->get();
+
+            // Load semua item tes dengan aspek untuk mapping
+            $itemTesList = PemeriksaanKhususItemTes::with('aspek')
+                ->whereHas('aspek', function ($q) use ($id) {
+                    $q->where('pemeriksaan_khusus_id', $id)->whereNull('deleted_at');
+                })
+                ->whereNull('deleted_at')
+                ->orderBy('pemeriksaan_khusus_aspek_id')
+                ->orderBy('urutan')
+                ->get();
+
+            // Get semua peserta dengan hasil aspek, item tes, dan keseluruhan
+            $pesertaList = PemeriksaanKhususPeserta::with([
+                'peserta',
+                'hasilAspek.aspek',
+                'hasilKeseluruhan',
+                'pemeriksaanKhususPesertaItemTes.itemTes.aspek',
+            ])
+                ->where('pemeriksaan_khusus_id', $id)
+                ->get();
+
+            // Format data untuk visualisasi
+            $data = [];
+            foreach ($pesertaList as $peserta) {
+                // Get jenis kelamin untuk menentukan target
+                $jenisKelamin = $peserta->peserta->jenis_kelamin ?? null;
+                $isLakiLaki = ($jenisKelamin === 'L' || $jenisKelamin === 'Laki-laki');
+
+                $pesertaData = [
+                    'peserta_id' => $peserta->id,
+                    'peserta' => [
+                        'id' => $peserta->peserta->id ?? null,
+                        'nama' => $peserta->peserta->nama ?? '-',
+                        'jenis_kelamin' => $jenisKelamin,
+                    ],
+                    'aspek' => [],
+                    'item_tes' => [],
+                    'nilai_keseluruhan' => null,
+                    'predikat_keseluruhan' => null,
+                ];
+
+                // Map hasil aspek berdasarkan urutan aspek
+                foreach ($aspekList as $aspek) {
+                    $hasilAspek = $peserta->hasilAspek->firstWhere('pemeriksaan_khusus_aspek_id', $aspek->id);
+                    
+                    $pesertaData['aspek'][] = [
+                        'aspek_id' => $aspek->id,
+                        'nama' => $aspek->nama,
+                        'nilai_performa' => $hasilAspek ? (float) $hasilAspek->nilai_performa : null,
+                        'predikat' => $hasilAspek->predikat ?? null,
+                    ];
+                }
+
+                // Map hasil item tes berdasarkan aspek
+                foreach ($aspekList as $aspek) {
+                    $itemTesInAspek = $itemTesList->where('pemeriksaan_khusus_aspek_id', $aspek->id);
+                    
+                    foreach ($itemTesInAspek as $itemTes) {
+                        $hasilItemTes = $peserta->pemeriksaanKhususPesertaItemTes->firstWhere('pemeriksaan_khusus_item_tes_id', $itemTes->id);
+                        
+                        // Tentukan target berdasarkan jenis kelamin
+                        $target = $isLakiLaki ? $itemTes->target_laki_laki : $itemTes->target_perempuan;
+                        
+                        $pesertaData['item_tes'][] = [
+                            'item_tes_id' => $itemTes->id,
+                            'aspek_id' => $aspek->id,
+                            'aspek_nama' => $aspek->nama,
+                            'nama' => $itemTes->nama,
+                            'satuan' => $itemTes->satuan,
+                            'target' => $target,
+                            'target_laki_laki' => $itemTes->target_laki_laki,
+                            'target_perempuan' => $itemTes->target_perempuan,
+                            'performa_arah' => $itemTes->performa_arah,
+                            'urutan' => $itemTes->urutan,
+                            'nilai' => $hasilItemTes->nilai ?? null,
+                            'persentase_performa' => $hasilItemTes ? (float) $hasilItemTes->persentase_performa : null,
+                            'persentase_riil' => $hasilItemTes ? (float) $hasilItemTes->persentase_riil : null,
+                            'predikat' => $hasilItemTes->predikat ?? null,
+                        ];
+                    }
+                }
+
+                // Get nilai keseluruhan
+                if ($peserta->hasilKeseluruhan) {
+                    $pesertaData['nilai_keseluruhan'] = $peserta->hasilKeseluruhan->nilai_keseluruhan 
+                        ? (float) $peserta->hasilKeseluruhan->nilai_keseluruhan 
+                        : null;
+                    $pesertaData['predikat_keseluruhan'] = $peserta->hasilKeseluruhan->predikat;
+                }
+
+                $data[] = $pesertaData;
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'aspek_list' => $aspekList->map(fn($a) => [
+                    'id' => $a->id,
+                    'nama' => $a->nama,
+                    'urutan' => $a->urutan,
+                ])->toArray(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiGetVisualisasi: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Terjadi kesalahan saat mengambil data visualisasi',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+}
+

@@ -11,13 +11,6 @@ use Illuminate\Http\JsonResponse;
 
 class ParticipantProfileController extends Controller
 {
-    /**
-     * GET /api/rencana-latihan/{rencanaId}/peserta/{jenis}/{pesertaId}/profil
-     */
-    public function rencanaProfil(int $rencanaId, string $jenis, int $pesertaId): JsonResponse
-    {
-        return $this->showByJenisAndId($jenis, $pesertaId);
-    }
 
     /**
      * GET /api/pemeriksaan/{pemeriksaanId}/peserta/{jenis}/{pesertaId}/profil

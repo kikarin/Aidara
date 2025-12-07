@@ -13,7 +13,7 @@ class PemeriksaanRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        $rules = [
             'cabor_id'            => 'required|exists:cabor,id',
             'cabor_kategori_id'   => 'required|exists:cabor_kategori,id',
             'tenaga_pendukung_id' => 'required|exists:tenaga_pendukungs,id',
@@ -21,6 +21,14 @@ class PemeriksaanRequest extends FormRequest
             'tanggal_pemeriksaan' => 'required|date',
             'status'              => 'required|in:belum,sebagian,selesai',
         ];
+
+        // Validasi parameter_ids hanya untuk create (POST request)
+        if ($this->isMethod('post')) {
+            $rules['parameter_ids']   = 'required|array|min:1';
+            $rules['parameter_ids.*'] = 'required|exists:mst_parameter,id';
+        }
+
+        return $rules;
     }
 
     public function messages(): array
@@ -35,6 +43,10 @@ class PemeriksaanRequest extends FormRequest
             'nama_pemeriksaan.required'    => 'Nama pemeriksaan wajib diisi.',
             'tanggal_pemeriksaan.required' => 'Tanggal pemeriksaan wajib diisi.',
             'status.required'              => 'Status wajib dipilih.',
+            'parameter_ids.required'       => 'Parameter pemeriksaan wajib dipilih minimal 1.',
+            'parameter_ids.array'          => 'Parameter pemeriksaan harus berupa array.',
+            'parameter_ids.min'            => 'Parameter pemeriksaan wajib dipilih minimal 1.',
+            'parameter_ids.*.exists'       => 'Parameter yang dipilih tidak valid.',
         ];
     }
 }

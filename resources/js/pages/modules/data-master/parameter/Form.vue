@@ -46,7 +46,6 @@ const baseInputs = [
         type: 'select' as const,
         options: [
             { value: 'kesehatan', label: 'Kesehatan (untuk semua peserta)' },
-            { value: 'khusus', label: 'Khusus (hanya untuk atlet, dengan performa)' },
             { value: 'umum', label: 'Umum (untuk semua atlet, dengan performa)' },
         ],
         placeholder: 'Pilih kategori',
@@ -54,9 +53,9 @@ const baseInputs = [
     },
 ];
 
-// Dynamic inputs untuk kategori khusus/umum
+// Dynamic inputs untuk kategori umum
 const dynamicInputs = computed(() => {
-    if (kategori.value === 'khusus' || kategori.value === 'umum') {
+    if (kategori.value === 'umum') {
         return [
             {
                 name: 'nilai_target',
@@ -110,8 +109,8 @@ const handleSave = (form: any) => {
         kategori: form.kategori || 'kesehatan',
     };
 
-    // Hanya tambahkan nilai_target dan performa_arah jika kategori khusus atau umum
-    if (form.kategori === 'khusus' || form.kategori === 'umum') {
+    // Hanya tambahkan nilai_target dan performa_arah jika kategori umum
+    if (form.kategori === 'umum') {
         dataToSave.nilai_target = form.nilai_target || '';
         dataToSave.performa_arah = form.performa_arah || 'max';
     }

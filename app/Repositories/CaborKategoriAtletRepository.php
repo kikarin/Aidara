@@ -162,35 +162,22 @@ class CaborKategoriAtletRepository
         $userId     = Auth::id();
         $insertData = [];
 
-        // Restore data yang sudah soft deleted
-        if (! empty($data['atlet_ids'])) {
-            foreach ($data['atlet_ids'] as $atletId) {
-                $restore = $this->model->withTrashed()
-                    ->where('cabor_id', $data['cabor_id'])
-                    ->where('cabor_kategori_id', $data['cabor_kategori_id'])
-                    ->where('atlet_id', $atletId)
-                    ->whereNotNull('deleted_at')
-                    ->first();
-                if ($restore) {
-                    $restore->restore();
-                }
-            }
-        }
-
         foreach ($data['atlet_ids'] as $atletId) {
-            // Cek apakah sudah ada (termasuk soft deleted)
+            // Cek apakah atlet sudah ada di cabor ini (unique: cabor_id + atlet_id)
+            // Tidak peduli cabor_kategori_id nya apa
             $existing = $this->model->withTrashed()
                 ->where('cabor_id', $data['cabor_id'])
-                ->where('cabor_kategori_id', $data['cabor_kategori_id'])
                 ->where('atlet_id', $atletId)
                 ->first();
 
             if ($existing) {
-                // Jika soft deleted, restore
+                // Jika soft deleted, restore dulu
                 if ($existing->trashed()) {
                     $existing->restore();
                 }
-                // Update status aktif/nonaktif
+                
+                // Update cabor_kategori_id dan field lainnya
+                $existing->cabor_kategori_id = $data['cabor_kategori_id'];
                 $existing->is_active = (int) $data['is_active'];
                 if (isset($data['posisi_atlet'])) {
                     $existing->posisi_atlet = $data['posisi_atlet'];
@@ -198,8 +185,14 @@ class CaborKategoriAtletRepository
                 $existing->updated_by = $userId;
                 $existing->updated_at = now();
                 $existing->save();
+                
+                Log::info('Updated existing cabor-atlet relation', [
+                    'atlet_id' => $atletId,
+                    'cabor_id' => $data['cabor_id'],
+                    'cabor_kategori_id' => $data['cabor_kategori_id'],
+                ]);
             } else {
-                // Insert baru
+                // Insert baru hanya jika belum ada di cabor ini
                 $insertData[] = [
                     'cabor_id'          => $data['cabor_id'],
                     'cabor_kategori_id' => $data['cabor_kategori_id'],
@@ -213,16 +206,16 @@ class CaborKategoriAtletRepository
                 ];
             }
         }
-        if (! empty($insertData)) {
-            DB::table('cabor_kategori_atlet')->insert($insertData);
-        }
 
         try {
             DB::beginTransaction();
-            // Insert batch dengan ignore untuk menghindari duplicate entry
-            DB::table('cabor_kategori_atlet')->insertOrIgnore($insertData);
+            
+            if (! empty($insertData)) {
+                DB::table('cabor_kategori_atlet')->insert($insertData);
+                Log::info('Inserted new cabor-atlet relations', ['count' => count($insertData)]);
+            }
+            
             DB::commit();
-
             return true;
         } catch (\Exception $e) {
             DB::rollback();

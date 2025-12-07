@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Atlet;
+use App\Models\Cabor;
 use App\Models\CaborKategori;
 use App\Models\MstPosisiAtlet;
 use Illuminate\Database\Seeder;
@@ -12,55 +13,36 @@ class CaborKategoriAtletSeeder extends Seeder
 {
     public function run(): void
     {
-        $kategoriList = CaborKategori::with('cabor')->get();
-        $atletList    = Atlet::all();
-        $posisiList   = MstPosisiAtlet::pluck('nama')->toArray();
+        $caborList  = Cabor::all();
+        $atletList  = Atlet::all();
+        $posisiList = MstPosisiAtlet::pluck('nama')->toArray();
 
-        // track cabor yang sudah dimiliki setiap atlet
-        $atletCaborMap = [];
+        // Assign setiap atlet ke satu cabor saja (sesuai unique constraint baru)
+        foreach ($atletList as $atlet) {
+            // Random pilih satu cabor
+            $cabor = $caborList->random();
 
-        foreach ($kategoriList as $kategori) {
-            // filter atlet sesuai jenis kelamin kategori
-            $eligibleAtlets = $atletList->filter(function ($atlet) use ($kategori, $atletCaborMap) {
-                // cek gender
-                if ($kategori->jenis_kelamin === 'L' && $atlet->jenis_kelamin !== 'L') {
-                    return false;
-                }
-                if ($kategori->jenis_kelamin === 'P' && $atlet->jenis_kelamin !== 'P') {
-                    return false;
-                }
-                // 'C' berarti campuran → boleh semua
+            // Filter kategori berdasarkan jenis kelamin atlet
+            $kategoriList = CaborKategori::where('cabor_id', $cabor->id)
+                ->where(function ($q) use ($atlet) {
+                    $q->where('jenis_kelamin', $atlet->jenis_kelamin)
+                      ->orWhere('jenis_kelamin', 'C'); // Campuran
+                })
+                ->get();
 
-                // cek apakah atlet sudah punya cabor lain
-                if (isset($atletCaborMap[$atlet->id]) && $atletCaborMap[$atlet->id] != $kategori->cabor_id) {
-                    return false;
-                }
+            // Random pilih kategori dari cabor ini (atau null untuk langsung ke cabor)
+            $kategori = $kategoriList->isNotEmpty() && rand(0, 1) ? $kategoriList->random() : null;
 
-                return true;
-            });
-
-            if ($eligibleAtlets->isEmpty()) {
-                continue;
-            }
-
-            // pilih beberapa atlet untuk kategori ini
-            $selectedAtlets = $eligibleAtlets->random(min(3, $eligibleAtlets->count())); // ambil max 3 biar rapi
-
-            foreach ($selectedAtlets as $atlet) {
-                // set cabor utk atlet ini
-                $atletCaborMap[$atlet->id] = $kategori->cabor_id;
-
-                DB::table('cabor_kategori_atlet')->updateOrInsert([
-                    'cabor_id'          => $kategori->cabor_id,
-                    'cabor_kategori_id' => $kategori->id,
-                    'atlet_id'          => $atlet->id,
-                ], [
-                    'is_active'    => 1,
-                    'posisi_atlet' => $posisiList ? $posisiList[array_rand($posisiList)] : null,
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
-                ]);
-            }
+            DB::table('cabor_kategori_atlet')->updateOrInsert([
+                'cabor_id' => $cabor->id,
+                'atlet_id' => $atlet->id,
+            ], [
+                'cabor_kategori_id' => $kategori?->id,
+                'is_active'         => 1,
+                'posisi_atlet'      => $posisiList ? $posisiList[array_rand($posisiList)] : null,
+                'created_at'        => now(),
+                'updated_at'        => now(),
+            ]);
         }
     }
 }

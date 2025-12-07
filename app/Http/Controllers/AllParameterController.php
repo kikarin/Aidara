@@ -167,16 +167,13 @@ class AllParameterController extends Controller implements HasMiddleware
             )
             ->get();
 
-        // Get peserta list - untuk parameter khusus hanya atlet
+        // Get peserta list
         $pesertaList = collect();
         foreach ($statistikData as $data) {
             $pesertaType = $data->peserta_type;
             $pesertaId   = $data->peserta_id;
 
-            // Parameter khusus hanya untuk atlet
-            if ($parameter->kategori === 'khusus' && $pesertaType !== 'App\\Models\\Atlet') {
-                continue;
-            }
+            // Logic untuk kategori khusus sudah dihapus (module terpisah)
 
             switch ($pesertaType) {
                 case 'App\\Models\\Atlet':
@@ -232,16 +229,11 @@ class AllParameterController extends Controller implements HasMiddleware
             }
         }
 
-        // Hitung persentase performa untuk parameter khusus
-        $nilaiTarget  = $this->parseNumber($parameter->nilai_target);
-        $performaArah = $parameter->performa_arah ?? 'max';
-
-        // Transform data untuk menambahkan tanggal pemeriksaan dan persentase performa
-        $controller = $this;
-        $transformedData = $statistikData->map(function ($item) use ($pemeriksaanList, $parameter, $nilaiTarget, $performaArah, $controller) {
+        // Transform data untuk menambahkan tanggal pemeriksaan
+        $transformedData = $statistikData->map(function ($item) use ($pemeriksaanList) {
             $pemeriksaan = $pemeriksaanList->firstWhere('id', $item->pemeriksaan_id);
 
-            $data = [
+            return [
                 'peserta_id'             => $item->peserta_id,
                 'pemeriksaan_peserta_id' => $item->pemeriksaan_peserta_id,
                 'nilai'                  => $item->nilai,
@@ -249,24 +241,6 @@ class AllParameterController extends Controller implements HasMiddleware
                 'tanggal_pemeriksaan'    => $pemeriksaan->tanggal_pemeriksaan ?? null,
                 'pemeriksaan_id'         => $item->pemeriksaan_id,
             ];
-
-            // Hitung persentase performa untuk parameter khusus
-            if ($parameter->kategori === 'khusus' && $nilaiTarget !== null && $item->nilai !== null) {
-                $nilaiAktual        = $controller->parseNumber($item->nilai);
-                $persentasePerforma = null;
-
-                if ($nilaiTarget > 0) {
-                    if ($performaArah === 'min') {
-                        $persentasePerforma = ($nilaiTarget / $nilaiAktual) * 100;
-                    } else {
-                        $persentasePerforma = ($nilaiAktual / $nilaiTarget) * 100;
-                    }
-                }
-
-                $data['persentase_performa'] = $persentasePerforma !== null ? round($persentasePerforma, 2) : null;
-            }
-
-            return $data;
         });
 
         return response()->json([

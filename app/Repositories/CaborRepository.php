@@ -29,6 +29,34 @@ class CaborRepository
     {
         $query = $this->model->select('id', 'nama', 'deskripsi');
 
+        // Role-based filtering
+        $auth = Auth::user();
+        if ($auth && $auth->current_role_id == 35) { // Atlet
+            if ($auth->atlet && $auth->atlet->id) {
+                $query->whereHas('caborAtlet', function ($sub_query) use ($auth) {
+                    $sub_query->where('atlet_id', $auth->atlet->id)
+                        ->where('is_active', 1)
+                        ->whereNull('deleted_at');
+                });
+            }
+        } elseif ($auth && $auth->current_role_id == 36) { // Pelatih
+            if ($auth->pelatih && $auth->pelatih->id) {
+                $query->whereHas('caborPelatih', function ($sub_query) use ($auth) {
+                    $sub_query->where('pelatih_id', $auth->pelatih->id)
+                        ->where('is_active', 1)
+                        ->whereNull('deleted_at');
+                });
+            }
+        } elseif ($auth && $auth->current_role_id == 37) { // Tenaga Pendukung
+            if ($auth->tenagaPendukung && $auth->tenagaPendukung->id) {
+                $query->whereHas('caborTenagaPendukung', function ($sub_query) use ($auth) {
+                    $sub_query->where('tenaga_pendukung_id', $auth->tenagaPendukung->id)
+                        ->where('is_active', 1)
+                        ->whereNull('deleted_at');
+                });
+            }
+        }
+
         if (request('search')) {
             $search = request('search');
             $query->where(function ($q) use ($search) {

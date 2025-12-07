@@ -210,7 +210,7 @@ const handlePageChange = debounce((val: number) => {
     handleSearch({ page: val });
 }, 300);
 
-const slotCustomKeys = ['rencana_latihan', 'target_individu', 'target_kelompok', 'pemeriksaan-peserta', 'parameter_peserta'];
+const slotCustomKeys = ['pemeriksaan-peserta', 'parameter_peserta'];
 
 const rowsWithCustom = computed(() => {
     return tableRows.value.map((row) => {
@@ -301,15 +301,6 @@ defineExpose({ fetchData, handleFilterFromParent });
                     >
                         <template #cell-peserta="slotProps">
                             <slot name="cell-peserta" v-bind="slotProps" />
-                        </template>
-                        <template #cell-rencana_latihan="slotProps">
-                            <slot name="cell-rencana_latihan" v-bind="slotProps" />
-                        </template>
-                        <template #cell-target_individu="slotProps">
-                            <slot name="cell-target_individu" v-bind="slotProps" />
-                        </template>
-                        <template #cell-target_kelompok="slotProps">
-                            <slot name="cell-target_kelompok" v-bind="slotProps" />
                         </template>
                         <template #cell-parameter="slotProps">
                             <slot name="cell-parameter" v-bind="slotProps" />

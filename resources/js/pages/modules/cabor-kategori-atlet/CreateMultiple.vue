@@ -112,7 +112,7 @@ const columns = [
     },
 ];
 
-// Fetch atlet yang belum ada di kategori ini
+// Fetch atlet yang sudah terdaftar di cabor ini tapi belum ada di kategori ini
 const fetchAvailableAtlet = async () => {
     loading.value = true;
     try {
@@ -121,6 +121,7 @@ const fetchAvailableAtlet = async () => {
                 page: currentPage.value > 1 ? currentPage.value - 1 : 0,
                 per_page: perPage.value,
                 search: searchQuery.value,
+                cabor_id: props.caborKategori.cabor.id, // Filter berdasarkan cabor
                 exclude_cabor_kategori_id: props.caborKategori.id,
                 jenis_kelamin: props.caborKategori.jenis_kelamin !== 'C' ? props.caborKategori.jenis_kelamin : undefined,
             },

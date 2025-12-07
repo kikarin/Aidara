@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import permissionService from '@/services/permissionService';
-import { Activity, Bolt, CircleCheckBig, Edit, Eye, FileText, FolderKanban, MoreVertical, Trash2, X } from 'lucide-vue-next';
+import { Activity, Bolt, CircleCheckBig, Edit, Eye, FileText, FolderKanban, MoreVertical, Trash2, X , PictureInPicture, FormInput, Notebook} from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 
 const props = defineProps<{
@@ -89,26 +89,32 @@ const getAvailableActions = computed(() => {
                 actions.push({
                     label: action.label,
                     action: action.onClick,
-                    icon:
-                        action.label === 'Detail'
-                            ? Eye
-                            : action.label === 'Edit'
-                              ? Edit
-                              : action.label === 'Edit Posisi'
-                                ? Edit
-                                : action.label === 'Lihat'
-                                  ? FolderKanban
-                                  : action.label === 'Set Permissions'
-                                    ? Bolt
-                                    : action.label === 'Delete'
-                                      ? Trash2
-                                      : action.label === 'Riwayat Pemeriksaan'
-                                        ? Activity
-                                        : action.label === 'Setujui'
-                                          ? CircleCheckBig
-                                          : action.label === 'Tolak'
-                                            ? X
-                                            : FileText,
+                    icon
+                    :action.label === 'Detail'
+                        ? Eye
+                    : action.label === 'Edit'
+                        ? Edit
+                    : action.label === 'Edit Posisi'
+                        ? Edit
+                    : action.label === 'Input Hasil Tes'
+                        ? FormInput
+                    : action.label === 'Lihat'
+                        ? FolderKanban
+                    : action.label === 'Set Permissions'
+                        ? Bolt
+                    : action.label === 'Delete'
+                        ? Trash2
+                    : action.label === 'Riwayat Pemeriksaan'
+                        ? Activity
+                    : action.label === 'Setujui'
+                        ? CircleCheckBig
+                    : action.label === 'Tolak'                                            
+                        ? X
+                    : action.label === 'Setup'
+                        ? PictureInPicture
+                    : action.label === 'Rekap Absen'
+                        ? Notebook
+                    : FileText,
                 });
             }
         });

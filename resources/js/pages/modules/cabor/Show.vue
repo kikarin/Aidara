@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import AppTabs from '@/components/AppTabs.vue';
+import PerbandinganMultiTes from './PerbandinganMultiTes.vue';
+import Ranking from './Ranking.vue';
 import { useToast } from '@/components/ui/toast/useToast';
 import PageShow from '@/pages/modules/base-page/PageShow.vue';
-import { router } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
 
 const { toast } = useToast();
 
@@ -18,11 +21,53 @@ const props = defineProps<{
     };
 }>();
 
+// Tab management
+function getTabFromUrl(url: string, fallback = 'informasi-data') {
+    if (url.includes('tab=')) {
+        return new URLSearchParams(url.split('?')[1]).get('tab') || fallback;
+    }
+    return fallback;
+}
+
+const page = usePage();
+const initialTab = getTabFromUrl(page.url);
+const activeTab = ref(initialTab);
+
+watch(activeTab, (val) => {
+    const url = `/cabor/${props.item.id}?tab=${val}`;
+    router.visit(url, { replace: true, preserveState: true, preserveScroll: true, only: [] });
+});
+
+watch(
+    () => page.url,
+    (newUrl) => {
+        const tab = getTabFromUrl(newUrl);
+        if (tab !== activeTab.value) {
+            activeTab.value = tab;
+        }
+    },
+);
+
 const dataItem = computed(() => props.item);
 
 const breadcrumbs = [
     { title: 'Cabor', href: '/cabor' },
     { title: 'Detail Cabor', href: `/cabor/${props.item.id}` },
+];
+
+const tabsConfig = [
+    {
+        value: 'informasi-data',
+        label: 'Informasi',
+    },
+    {
+        value: 'perbandingan-multi-tes-data',
+        label: 'Perbandingan Multi-Tes',
+    },
+    {
+        value: 'ranking-data',
+        label: 'Ranking',
+    },
 ];
 
 const fields = computed(() => [
@@ -58,10 +103,22 @@ const handleDelete = () => {
     <PageShow
         title="Cabor"
         :breadcrumbs="breadcrumbs"
-        :fields="fields"
-        :actionFields="actionFields"
+        :fields="activeTab === 'informasi-data' ? fields : []"
+        :actionFields="activeTab === 'informasi-data' ? actionFields : []"
         :back-url="'/cabor'"
-        :on-edit="handleEdit"
-        :on-delete="handleDelete"
-    />
+        :on-edit="activeTab === 'informasi-data' ? handleEdit : undefined"
+        :on-delete="activeTab === 'informasi-data' ? handleDelete : undefined"
+    >
+        <template #tabs>
+            <AppTabs :tabs="tabsConfig" :default-value="'informasi-data'" v-model="activeTab" />
+        </template>
+        <template #custom>
+            <div v-if="activeTab === 'perbandingan-multi-tes-data'">
+                <PerbandinganMultiTes :cabor-id="props.item.id" :cabor-nama="props.item.nama" />
+            </div>
+            <div v-if="activeTab === 'ranking-data'">
+                <Ranking :cabor-id="props.item.id" :cabor-nama="props.item.nama" />
+            </div>
+        </template>
+    </PageShow>
 </template>

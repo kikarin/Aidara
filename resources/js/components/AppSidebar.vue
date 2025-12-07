@@ -10,7 +10,7 @@ import {
   Shield, User, List, Plus, Edit, Trash, Search, Filter, Download, Upload, Menu,
   Home, BarChart, PieChart, Calendar, ShieldCheck, ClipboardList, UserCircle2,
   CalendarCheck, CalendarSync, ClipboardCheck, HeartHandshake, HandHeart,
-  Ungroup, Stethoscope, Wrench, Trophy, CircleCheckBig, UserRoundCheck
+  Ungroup, Stethoscope, Wrench, Trophy, CircleCheckBig, UserRoundCheck, Activity
 } from 'lucide-vue-next';
 import { onMounted, onUnmounted, ref } from 'vue';
 import AppLogo from './AppLogo.vue';
@@ -27,7 +27,7 @@ const iconMap: Record<string, any> = {
   Shield, User, List, Plus, Edit, Trash, Search, Filter, Download, Upload, Menu,
   Home, BarChart, PieChart, Calendar, ShieldCheck, ClipboardList, UserCircle2,
   CalendarCheck, CalendarSync, ClipboardCheck, HeartHandshake, HandHeart,
-  Ungroup, Stethoscope, Wrench, Trophy, CircleCheckBig, UserRoundCheck
+  Ungroup, Stethoscope, Wrench, Trophy, CircleCheckBig, UserRoundCheck, Activity
 };
 
 

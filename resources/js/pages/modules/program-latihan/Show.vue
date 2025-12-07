@@ -15,15 +15,16 @@ const breadcrumbs = [
     { title: 'Detail Program Latihan', href: `/program-latihan/${props.item.id}` },
 ];
 
-const formatJenisPeriode = (jenis: string) => {
-    if (!jenis) return '-';
+const formatTahap = (tahap: string) => {
+    if (!tahap) return '-';
     const mapping: Record<string, string> = {
-        harian: 'Harian',
-        mingguan: 'Mingguan',
-        bulanan: 'Bulanan',
-        tahunan: 'Tahunan',
+        'persiapan umum': 'Persiapan Umum',
+        'persiapan khusus': 'Persiapan Khusus',
+        'prapertandingan': 'Prapertandingan',
+        'pertandingan': 'Pertandingan',
+        'transisi': 'Transisi',
     };
-    return mapping[jenis] || jenis;
+    return mapping[tahap] || tahap;
 };
 
 const fields = computed(() => [
@@ -38,23 +39,13 @@ const fields = computed(() => [
                 : '-',
     },
     {
-        label: 'Jenis Periode',
-        value: formatJenisPeriode(dataItem.value?.jenis_periode),
+        label: 'Durasi',
+        value: dataItem.value?.periode_hitung || '-',
     },
-    ...(dataItem.value?.file_url
-        ? [
-              {
-                  label: 'File Program',
-                  value: dataItem.value.file_url,
-                  type: 'file' as const,
-              },
-          ]
-        : [
-              {
-                  label: 'File Program',
-                  value: '-',
-              },
-          ]),
+    {
+        label: 'Tahap',
+        value: formatTahap(dataItem.value?.tahap),
+    },
     { label: 'Keterangan', value: dataItem.value?.keterangan || '-' },
 ]);
 

@@ -48,8 +48,6 @@ class DatabaseSeeder extends Seeder
         $this->call(MstJenisTenagaPendukungSeeder::class);
         $this->call(ProgramLatihanSeeder::class);
         $this->call(MstPosisiAtletSeeder::class);
-        $this->call(TargetLatihanSeeder::class);
-        $this->call(RencanaLatihanSeeder::class);
         $this->call(CaborKategoriAtletSeeder::class);
         $this->call(CaborKategoriPelatihSeeder::class);
         $this->call(CaborKategoriTenagaPendukungSeeder::class);

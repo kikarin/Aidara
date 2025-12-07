@@ -295,8 +295,6 @@ onMounted(async () => {
             :participant="selectedParticipant"
             :statistik-data="statistikData"
             :rencana-list="rencanaPemeriksaanList"
-            :data-type="isParameterKhusus ? 'target-latihan' : 'pemeriksaan'"
-            :target-info="isParameterKhusus ? parameterInfo : undefined"
             @close="closeModal"
         />
     </AppLayout>

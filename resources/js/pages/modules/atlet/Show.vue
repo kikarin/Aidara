@@ -10,9 +10,7 @@ import ShowPrestasi from './prestasi/ShowPrestasi.vue';
 import ShowSertifikat from './sertifikat/ShowSertifikat.vue';
 import ShowKesehatan from './ShowKesehatan.vue';
 import ShowOrangTua from './ShowOrangTua.vue';
-import ShowParameterKhusus from './ShowParameterKhusus.vue';
 import ShowParameterUmum from './ShowParameterUmum.vue';
-import ShowRekapLatihan from './ShowRekapLatihan.vue';
 
 const { toast } = useToast();
 
@@ -157,12 +155,8 @@ const dynamicTitle = computed(() => {
         return `Dokumen : ${props.item.nama}`;
     } else if (activeTab.value === 'kesehatan-data') {
         return `Kesehatan : ${props.item.nama}`;
-    } else if (activeTab.value === 'rekap-latihan-data') {
-        return `Rekap Latihan : ${props.item.nama}`;
     } else if (activeTab.value === 'parameter-umum-data') {
         return `Parameter Umum : ${props.item.nama}`;
-    } else if (activeTab.value === 'parameter-khusus-data') {
-        return `Parameter Khusus : ${props.item.nama}`;
     }
     return `Atlet: ${props.item.nama}`;
 });
@@ -321,16 +315,8 @@ const tabsConfig = [
         label: 'Kesehatan',
     },
     {
-        value: 'rekap-latihan-data',
-        label: 'Rekap Latihan',
-    },
-    {
         value: 'parameter-umum-data',
         label: 'Parameter Umum',
-    },
-    {
-        value: 'parameter-khusus-data',
-        label: 'Parameter Khusus',
     },
 ];
 
@@ -399,7 +385,7 @@ const currentOnEditHandler = computed(() => {
         return undefined;
     } else if (activeTab.value === 'kesehatan-data') {
         return handleEditKesehatan;
-    } else if (activeTab.value === 'rekap-latihan-data' || activeTab.value === 'parameter-umum-data' || activeTab.value === 'parameter-khusus-data') {
+    } else if (activeTab.value === 'parameter-umum-data') {
         return undefined;
     }
     return undefined;
@@ -418,7 +404,7 @@ const currentOnDeleteHandler = computed(() => {
         return undefined;
     } else if (activeTab.value === 'kesehatan-data') {
         return props.item.kesehatan ? handleDeleteKesehatan : undefined;
-    } else if (activeTab.value === 'rekap-latihan-data' || activeTab.value === 'parameter-umum-data' || activeTab.value === 'parameter-khusus-data') {
+    } else if (activeTab.value === 'parameter-umum-data') {
         return undefined;
     }
     return undefined;
@@ -451,9 +437,7 @@ function getLamaBergabung(tanggalBergabung: string) {
             activeTab === 'sertifikat-data' ||
             activeTab === 'prestasi-data' ||
             activeTab === 'dokumen-data' ||
-            activeTab === 'rekap-latihan-data' ||
-            activeTab === 'parameter-umum-data' ||
-            activeTab === 'parameter-khusus-data'
+            activeTab === 'parameter-umum-data'
                 ? []
                 : activeTab === 'atlet-data'
                   ? actionFields
@@ -467,14 +451,14 @@ function getLamaBergabung(tanggalBergabung: string) {
         :on-edit-label="
             (activeTab === 'orang-tua-data' && !props.item.atlet_orang_tua) || (activeTab === 'kesehatan-data' && !props.item.kesehatan)
                 ? 'Create'
-                : activeTab === 'rekap-latihan-data' || activeTab === 'parameter-umum-data' || activeTab === 'parameter-khusus-data'
+                : activeTab === 'parameter-umum-data'
                   ? undefined
                   : 'Edit'
         "
         :on-edit-icon="
             (activeTab === 'orang-tua-data' && !props.item.atlet_orang_tua) || (activeTab === 'kesehatan-data' && !props.item.kesehatan)
                 ? Plus
-                : activeTab === 'rekap-latihan-data' || activeTab === 'parameter-umum-data' || activeTab === 'parameter-khusus-data'
+                : activeTab === 'parameter-umum-data'
                   ? undefined
                   : Pencil
         "
@@ -525,14 +509,8 @@ function getLamaBergabung(tanggalBergabung: string) {
             <div v-if="activeTab === 'kesehatan-data'">
                 <ShowKesehatan :kesehatan="props.item.kesehatan || null" />
             </div>
-            <div v-if="activeTab === 'rekap-latihan-data'">
-                <ShowRekapLatihan :atlet-id="props.item.id" />
-            </div>
             <div v-if="activeTab === 'parameter-umum-data'">
                 <ShowParameterUmum :atlet-id="props.item.id" />
-            </div>
-            <div v-if="activeTab === 'parameter-khusus-data'">
-                <ShowParameterKhusus :atlet-id="props.item.id" />
             </div>
         </template>
     </PageShow>

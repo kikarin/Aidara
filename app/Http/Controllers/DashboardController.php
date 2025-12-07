@@ -195,11 +195,7 @@ class DashboardController extends Controller implements HasMiddleware
         return ProgramLatihan::with([
             'caborKategori',
             'cabor',
-            'rencanaLatihan' => function ($query) {
-                $query->orderByDesc('tanggal')->limit(15); // limit lebih untuk cover 5 program x 3 item
-            },
         ])
-            ->withCount('rencanaLatihan')
             ->orderByDesc('created_at')
             ->take(5)
             ->get()
@@ -231,10 +227,6 @@ class DashboardController extends Controller implements HasMiddleware
                     'cabor_nama'             => $item->cabor?->nama         ?? '-',
                     'cabor_kategori_nama'    => $item->caborKategori?->nama ?? '-',
                     'periode'                => $durasi,
-                    'jumlah_rencana_latihan' => $item->rencana_latihan_count, // dari withCount
-                    'rencana_latihan_list'   => $item->rencanaLatihan->take(3)->pluck('materi')->map(function ($materi) {
-                        return Str::limit($materi, 30);
-                    })->toArray(),
                 ];
             });
     }
