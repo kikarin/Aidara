@@ -177,7 +177,7 @@ class AtletRepository
      */
     protected function applyFilters($query)
     {
-        // Filter by cabor_id
+        // Filter by cabor_id (hanya tampilkan atlet yang sudah di cabor ini)
         if (request('cabor_id') && request('cabor_id') !== 'all') {
             $caborId = request('cabor_id');
             $query->whereExists(function ($sub) use ($caborId) {
@@ -185,6 +185,18 @@ class AtletRepository
                     ->from('cabor_kategori_atlet as cka')
                     ->whereColumn('cka.atlet_id', 'atlets.id')
                     ->where('cka.cabor_id', $caborId)
+                    ->whereNull('cka.deleted_at');
+            });
+        }
+
+        // Exclude atlet yang sudah ada di cabor tertentu
+        if (request('exclude_cabor_id')) {
+            $excludeCaborId = request('exclude_cabor_id');
+            $query->whereNotExists(function ($sub) use ($excludeCaborId) {
+                $sub->select(DB::raw(1))
+                    ->from('cabor_kategori_atlet as cka')
+                    ->whereColumn('cka.atlet_id', 'atlets.id')
+                    ->where('cka.cabor_id', $excludeCaborId)
                     ->whereNull('cka.deleted_at');
             });
         }
@@ -328,10 +340,24 @@ class AtletRepository
             // Backward compatibility
             $data['kategori_atlets'] = $kategoriPesertasIds;
             
+            // Load cabor data dari pivot (ambil yang pertama jika ada)
+            $item->load('caborKategoriAtlet.cabor');
+            $caborKategoriAtlet = $item->caborKategoriAtlet->first();
+            
             // Convert item ke array dan tambahkan kategori_pesertas
             $itemArray = $item->toArray();
             $itemArray['kategori_pesertas'] = $kategoriPesertasIds;
             $itemArray['kategori_atlets'] = $kategoriPesertasIds; // Backward compatibility
+            
+            // Tambahkan cabor data
+            if ($caborKategoriAtlet) {
+                $itemArray['cabor_id'] = $caborKategoriAtlet->cabor_id;
+                $itemArray['posisi_atlet'] = $caborKategoriAtlet->posisi_atlet;
+            } else {
+                $itemArray['cabor_id'] = null;
+                $itemArray['posisi_atlet'] = null;
+            }
+            
             $data['item'] = $itemArray;
         } else {
             $data['parameter_umum_values'] = [];
@@ -344,6 +370,9 @@ class AtletRepository
 
     // Property untuk menyimpan kategori_pesertas sebelum di-unset
     private $kategoriPesertasForCallback = null;
+    
+    // Property untuk menyimpan cabor data sebelum di-unset
+    private $caborDataForCallback = null;
 
     public function customDataCreateUpdate($data, $record = null)
     {
@@ -383,6 +412,14 @@ class AtletRepository
             }
             unset($data['kategori_atlets']);
         }
+
+        // Simpan cabor_id dan posisi_atlet untuk digunakan di callbackAfterStoreOrUpdate
+        $this->caborDataForCallback = [
+            'cabor_id' => $data['cabor_id'] ?? null,
+            'posisi_atlet' => $data['posisi_atlet'] ?? null,
+        ];
+        unset($data['cabor_id']);
+        unset($data['posisi_atlet']);
 
         // Convert empty strings to null for nullable fields
         $nullableFields = [
@@ -521,6 +558,51 @@ class AtletRepository
             // Handle Atlet Akun data
             if (isset($data['akun_email']) && $data['akun_email']) {
                 $this->handleAtletAkun($model, $data);
+            }
+
+            // Handle Cabor Assignment (langsung ke cabor tanpa kategori)
+            $caborData = $this->caborDataForCallback ?? [
+                'cabor_id' => request()->input('cabor_id'),
+                'posisi_atlet' => request()->input('posisi_atlet'),
+            ];
+            
+            if (!empty($caborData['cabor_id'])) {
+                $caborId = $caborData['cabor_id'];
+                $posisiAtlet = $caborData['posisi_atlet'] ?? null;
+                
+                // Cek apakah sudah ada relasi ke cabor ini
+                $existingRelation = \App\Models\CaborKategoriAtlet::where('cabor_id', $caborId)
+                    ->where('atlet_id', $model->id)
+                    ->first();
+                
+                if ($existingRelation) {
+                    // Update posisi jika sudah ada
+                    $existingRelation->update([
+                        'posisi_atlet' => $posisiAtlet,
+                        'updated_by' => Auth::id(),
+                    ]);
+                    Log::info('AtletRepository: Updated cabor assignment', [
+                        'atlet_id' => $model->id,
+                        'cabor_id' => $caborId,
+                        'posisi_atlet' => $posisiAtlet,
+                    ]);
+                } else {
+                    // Buat relasi baru tanpa kategori (cabor_kategori_id = null)
+                    \App\Models\CaborKategoriAtlet::create([
+                        'cabor_id' => $caborId,
+                        'cabor_kategori_id' => null, // Langsung ke cabor tanpa kategori
+                        'atlet_id' => $model->id,
+                        'posisi_atlet' => $posisiAtlet,
+                        'is_active' => 1,
+                        'created_by' => Auth::id(),
+                        'updated_by' => Auth::id(),
+                    ]);
+                    Log::info('AtletRepository: Created new cabor assignment', [
+                        'atlet_id' => $model->id,
+                        'cabor_id' => $caborId,
+                        'posisi_atlet' => $posisiAtlet,
+                    ]);
+                }
             }
 
             DB::commit();

@@ -19,17 +19,9 @@ class ProgramLatihanRequest extends FormRequest
             'cabor_kategori_id' => 'required|exists:cabor_kategori,id',
             'periode_mulai'     => 'required|date',
             'periode_selesai'   => 'required|date|after_or_equal:periode_mulai',
-            'jenis_periode'     => 'nullable|in:harian,mingguan,bulanan,tahunan',
+            'tahap'             => 'nullable|in:persiapan umum,persiapan khusus,prapertandingan,pertandingan,transisi',
             'keterangan'        => 'nullable|string',
         ];
-
-        // Untuk create, file wajib diisi (opsional)
-        // Untuk update, file opsional
-        if ($this->isMethod('post')) {
-            $rules['file'] = 'nullable|file|mimes:jpeg,png,gif,pdf,xls,xlsx,doc,docx|max:10240'; // max 10MB
-        } else {
-            $rules['file'] = 'nullable|file|mimes:jpeg,png,gif,pdf,xls,xlsx,doc,docx|max:10240';
-        }
 
         return $rules;
     }
@@ -47,10 +39,7 @@ class ProgramLatihanRequest extends FormRequest
             'periode_selesai.required'       => 'Periode selesai wajib diisi.',
             'periode_selesai.date'           => 'Periode selesai harus berupa tanggal.',
             'periode_selesai.after_or_equal' => 'Periode selesai harus setelah atau sama dengan periode mulai.',
-            'jenis_periode.in'               => 'Jenis periode harus salah satu dari: harian, mingguan, bulanan, tahunan.',
-            'file.file'                      => 'File harus berupa file yang valid.',
-            'file.mimes'                     => 'File harus berupa: jpeg, png, gif, pdf, xls, xlsx, doc, atau docx.',
-            'file.max'                       => 'Ukuran file maksimal 10MB.',
+            'tahap.in'                       => 'Tahap harus salah satu dari: persiapan umum, persiapan khusus, prapertandingan, pertandingan, transisi.',
         ];
     }
 }

@@ -5,7 +5,11 @@ namespace App\Imports;
 use App\Models\Atlet;
 use App\Models\AtletKesehatan;
 use App\Models\AtletOrangTua;
+use App\Models\Cabor;
+use App\Models\CaborKategoriAtlet;
+use App\Models\MstKategoriPeserta;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -35,22 +39,56 @@ class AtletImport implements ToCollection, WithBatchInserts, WithChunkReading, W
      */
     private function convertExcelDate($excelDate)
     {
+        // Kosong → null
         if (empty($excelDate)) {
             return null;
         }
-
-        if (is_string($excelDate) && strtotime($excelDate) !== false) {
-            return date('Y-m-d', strtotime($excelDate));
+    
+        // Jika string → trim biar tidak ada trailing/hidden space
+        if (is_string($excelDate)) {
+            $excelDate = trim($excelDate);
+    
+            // Jika kosong setelah trim
+            if ($excelDate === '') {
+                return null;
+            }
         }
-
+    
+        // Jika numeric → Excel serial number
         if (is_numeric($excelDate)) {
-            $unixTimestamp = ($excelDate - 25569) * 86400;
-
-            return date('Y-m-d', $unixTimestamp);
+            return \Carbon\Carbon::createFromTimestamp(($excelDate - 25569) * 86400)
+                ->format('Y-m-d');
         }
-
+    
+        // Jika format dd/mm/yyyy
+        if (is_string($excelDate) && preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $excelDate)) {
+            try {
+                return \Carbon\Carbon::createFromFormat('d/m/Y', $excelDate)
+                    ->format('Y-m-d');
+            } catch (\Exception $e) {
+                return null; // Tidak error, aman
+            }
+        }
+    
+        // Jika format dd-mm-yyyy
+        if (is_string($excelDate) && preg_match('/^\d{2}\-\d{2}\-\d{4}$/', $excelDate)) {
+            try {
+                return \Carbon\Carbon::createFromFormat('d-m-Y', $excelDate)
+                    ->format('Y-m-d');
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+    
+        // Fallback parse otomatis
+        $timestamp = strtotime($excelDate);
+        if ($timestamp !== false) {
+            return date('Y-m-d', $timestamp);
+        }
+    
         return null;
     }
+    
 
     public function collection(Collection $rows)
     {
@@ -196,6 +234,106 @@ class AtletImport implements ToCollection, WithBatchInserts, WithChunkReading, W
                 } else {
                     unset($kesehatanData['id']);
                     AtletKesehatan::create($kesehatanData);
+                }
+
+                // Handle Kategori Peserta (PPOPM, KONI, NPCI) dari Excel
+                // Baca kolom: kategori_peserta, jenis_peserta, atau kategori
+                // Bisa berisi satu nilai atau multiple (dipisahkan koma)
+                $kategoriPesertaInput = $row['kategori_peserta'] ?? $row['jenis_peserta'] ?? $row['kategori'] ?? $row['jenis'] ?? null;
+                
+                if ($kategoriPesertaInput && !empty(trim($kategoriPesertaInput))) {
+                    $kategoriPesertaInput = trim($kategoriPesertaInput);
+                    
+                    // Split jika ada multiple kategori (dipisahkan koma, semicolon, atau slash)
+                    $kategoriNames = preg_split('/[,;\/]+/', $kategoriPesertaInput);
+                    $kategoriIds = [];
+                    
+                    foreach ($kategoriNames as $kategoriName) {
+                        $kategoriName = strtoupper(trim($kategoriName));
+                        if (empty($kategoriName)) {
+                            continue;
+                        }
+                        
+                        // Cari kategori peserta berdasarkan nama (case insensitive)
+                        $kategoriPeserta = MstKategoriPeserta::whereRaw('UPPER(nama) = ?', [$kategoriName])->first();
+                        
+                        if ($kategoriPeserta) {
+                            $kategoriIds[] = $kategoriPeserta->id;
+                        } else {
+                            // Log warning jika kategori tidak ditemukan
+                            Log::warning('AtletImport: Kategori peserta tidak ditemukan', [
+                                'atlet_id' => $atletId,
+                                'kategori_name' => $kategoriName,
+                                'available' => MstKategoriPeserta::pluck('nama')->toArray(),
+                            ]);
+                        }
+                    }
+                    
+                    // Sync kategori peserta ke atlet (many-to-many)
+                    if (!empty($kategoriIds)) {
+                        $atlet->kategoriPesertas()->sync($kategoriIds);
+                        Log::info('AtletImport: Synced kategori peserta', [
+                            'atlet_id' => $atletId,
+                            'kategori_ids' => $kategoriIds,
+                        ]);
+                    }
+                }
+
+                // Handle Cabang Olahraga dan Posisi dari Excel
+                // Baca kolom: cabang_olahraga, cabor, atau cabang (untuk cabor)
+                // Baca kolom: nomor_kelas_posisi, posisi, atau posisi_atlet (untuk posisi)
+                $caborNama = $row['cabang_olahraga'] ?? $row['cabor'] ?? $row['cabang'] ?? null;
+                $posisiAtlet = $row['nomor_kelas_posisi'] ?? $row['posisi'] ?? $row['posisi_atlet'] ?? $row['kelas'] ?? $row['nomor'] ?? null;
+
+                if ($caborNama && !empty(trim($caborNama))) {
+                    $caborNama = trim($caborNama);
+                    
+                    // Cari atau buat cabor berdasarkan nama
+                    $cabor = Cabor::where('nama', $caborNama)->first();
+                    if (!$cabor) {
+                        // Buat cabor baru jika belum ada
+                        $cabor = Cabor::create([
+                            'nama' => $caborNama,
+                            'deskripsi' => 'Dibuat otomatis dari import',
+                            'created_by' => Auth::id(),
+                            'updated_by' => Auth::id(),
+                        ]);
+                        Log::info('AtletImport: Created new cabor', ['cabor_id' => $cabor->id, 'nama' => $caborNama]);
+                    }
+
+                    // Cek apakah sudah ada relasi atlet ke cabor ini
+                    $existingRelation = CaborKategoriAtlet::where('cabor_id', $cabor->id)
+                        ->where('atlet_id', $atletId)
+                        ->first();
+                    
+                    if ($existingRelation) {
+                        // Update posisi jika sudah ada
+                        $existingRelation->update([
+                            'posisi_atlet' => $posisiAtlet ? trim($posisiAtlet) : null,
+                            'updated_by' => Auth::id(),
+                        ]);
+                        Log::info('AtletImport: Updated cabor assignment', [
+                            'atlet_id' => $atletId,
+                            'cabor_id' => $cabor->id,
+                            'posisi_atlet' => $posisiAtlet,
+                        ]);
+                    } else {
+                        // Buat relasi baru tanpa kategori (cabor_kategori_id = null)
+                        CaborKategoriAtlet::create([
+                            'cabor_id' => $cabor->id,
+                            'cabor_kategori_id' => null, // Langsung ke cabor tanpa kategori
+                            'atlet_id' => $atletId,
+                            'posisi_atlet' => $posisiAtlet ? trim($posisiAtlet) : null,
+                            'is_active' => 1,
+                            'created_by' => Auth::id(),
+                            'updated_by' => Auth::id(),
+                        ]);
+                        Log::info('AtletImport: Created new cabor assignment', [
+                            'atlet_id' => $atletId,
+                            'cabor_id' => $cabor->id,
+                            'posisi_atlet' => $posisiAtlet,
+                        ]);
+                    }
                 }
 
                 DB::commit();

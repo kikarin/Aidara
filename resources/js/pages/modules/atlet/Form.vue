@@ -47,11 +47,15 @@ const formData = ref({
     id: props.initialData?.id || undefined,
     file: null,
     is_delete_foto: 0,
+    // Cabang Olahraga fields
+    cabor_id: props.initialData?.cabor_id || '',
+    posisi_atlet: props.initialData?.posisi_atlet || '',
 });
 
 const kecamatanOptions = ref<{ value: number; label: string }[]>([]);
 const kelurahanOptions = ref<{ value: number; label: string }[]>([]);
 const kategoriPesertaOptions = ref<{ value: number; label: string }[]>([]);
+const caborOptions = ref<{ value: number; label: string }[]>([]);
 
 onMounted(async () => {
     try {
@@ -65,6 +69,13 @@ onMounted(async () => {
 
         const kategoriPesertaRes = await axios.get('/api/kategori-peserta-list');
         kategoriPesertaOptions.value = (kategoriPesertaRes.data || []).map((item: { id: number; nama: string }) => ({
+            value: item.id,
+            label: item.nama,
+        }));
+
+        // Load cabor list
+        const caborRes = await axios.get('/api/cabor-list');
+        caborOptions.value = (caborRes.data || []).map((item: { id: number; nama: string }) => ({
             value: item.id,
             label: item.nama,
         }));
@@ -96,11 +107,25 @@ onMounted(async () => {
                 // Jika array kosong, tetap set untuk memastikan formData ter-update
                 formData.value.kategori_pesertas = [];
             }
+
+            // Load cabor data dari pivot jika ada
+            const existingCabor = props.initialData?.cabor_id 
+                || (page.props as any).item?.cabor_id;
+            const existingPosisi = props.initialData?.posisi_atlet 
+                || (page.props as any).item?.posisi_atlet;
+            
+            if (existingCabor) {
+                formData.value.cabor_id = existingCabor;
+            }
+            if (existingPosisi) {
+                formData.value.posisi_atlet = existingPosisi;
+            }
         }
     } catch (e) {
-        console.error('Gagal mengambil data kecamatan/kelurahan/kategori peserta', e);
+        console.error('Gagal mengambil data kecamatan/kelurahan/kategori peserta/cabor', e);
         kecamatanOptions.value = [];
         kategoriPesertaOptions.value = [];
+        caborOptions.value = [];
     }
 });
 
@@ -138,7 +163,7 @@ watch(
 const formInputs = computed(() => [
     {
         name: 'nik',
-        label: 'NIK/NISN',
+        label: 'NIK',
         type: 'text' as const,
         placeholder: 'Masukkan NIK',
         required: false,
@@ -184,6 +209,24 @@ const formInputs = computed(() => [
         options: kategoriPesertaOptions.value,
         help: 'Pilih satu atau lebih kategori peserta',
     },
+    // Cabang Olahraga Section
+    {
+        name: 'cabor_id',
+        label: 'Cabang Olahraga',
+        type: 'select' as const,
+        placeholder: 'Pilih Cabang Olahraga (Opsional)',
+        required: false,
+        options: caborOptions.value,
+        help: 'Pilih cabang olahraga jika atlet sudah ditentukan cabornya',
+    },
+    {
+        name: 'posisi_atlet',
+        label: 'Posisi / Nomor / Kelas',
+        type: 'text' as const,
+        placeholder: 'Contoh: Striker, 100m, Kelas 55kg',
+        required: false,
+        help: 'Masukkan posisi, nomor pertandingan, atau kelas atlet',
+    },
     {
         name: 'is_active',
         label: 'Status',
@@ -223,6 +266,9 @@ const handleSave = (dataFromFormInput: any, setFormErrors: (errors: Record<strin
         kategori_pesertas: kategoriPesertaIds,
         // Backward compatibility
         kategori_atlets: kategoriPesertaIds,
+        // Cabang Olahraga fields
+        cabor_id: dataFromFormInput.cabor_id || formData.value.cabor_id || null,
+        posisi_atlet: dataFromFormInput.posisi_atlet || formData.value.posisi_atlet || null,
     };
 
     // Jika user masih pending, jangan kirim is_active (biarkan tetap 0 sampai di-approve)

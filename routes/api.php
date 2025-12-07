@@ -4,17 +4,14 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\CsrfController;
 use App\Http\Controllers\Api\ProgramLatihanController;
-use App\Http\Controllers\Api\RencanaLatihanController as ApiRencanaLatihanController;
 use App\Http\Controllers\Api\PemeriksaanController;
 use App\Http\Controllers\Api\PemeriksaanParameterController as ApiPemeriksaanParameterController;
 use App\Http\Controllers\Api\TurnamenController;
 use App\Http\Controllers\Api\TurnamenCrudController;
 use App\Http\Controllers\Api\TurnamenFormController;
 use App\Http\Controllers\Api\TurnamenPesertaController;
-use App\Http\Controllers\Api\TargetLatihanController as ApiTargetLatihanController;
 use App\Http\Controllers\Api\PemeriksaanPesertaController as ApiPemeriksaanPesertaController;
 use App\Http\Controllers\Api\PemeriksaanPesertaParameterController;
-use App\Http\Controllers\Api\RencanaLatihanTargetController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ParticipantProfileController;
 use App\Http\Controllers\RefStatusPemeriksaanController;
@@ -70,51 +67,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/program-latihan/{id}', [ProgramLatihanController::class, 'destroy']);
     });
 
-    // Rencana Latihan (Mobile)
-    Route::get('/program-latihan/{programId}/rencana-latihan', [ApiRencanaLatihanController::class, 'index']);
-    Route::get('/rencana-latihan/{id}', [ApiRencanaLatihanController::class, 'show']);
-    Route::get('/rencana-latihan/{rencanaId}/peserta', [ApiRencanaLatihanController::class, 'participants']);
-
-    // Rencana Latihan - Form Support Endpoints
-    Route::get('/program-latihan/{programId}/target-latihan-list', [ApiRencanaLatihanController::class, 'getTargetLatihanList']);
-    Route::get('/cabor-kategori/{caborKategoriId}/atlet-list', [ApiRencanaLatihanController::class, 'getAtletList']);
-    Route::get('/cabor-kategori/{caborKategoriId}/pelatih-list', [ApiRencanaLatihanController::class, 'getPelatihList']);
-    Route::get('/cabor-kategori/{caborKategoriId}/tenaga-pendukung-list', [ApiRencanaLatihanController::class, 'getTenagaPendukungList']);
-
-    // Rencana Latihan CRUD (Restricted to Superadmin, Admin, and Pelatih)
-    Route::middleware('program.latihan.permission')->group(function () {
-        Route::post('/rencana-latihan', [ApiRencanaLatihanController::class, 'store']);
-        Route::put('/rencana-latihan/{id}', [ApiRencanaLatihanController::class, 'update']);
-        Route::delete('/rencana-latihan/{id}', [ApiRencanaLatihanController::class, 'destroy']);
-    });
-
-    // Target Latihan (Mobile)
-    Route::get('/rencana-latihan/{rencanaId}/targets', [ApiRencanaLatihanController::class, 'targets']);
-    Route::get('/rencana-latihan/{rencanaId}/targets/{targetId}', [ApiRencanaLatihanController::class, 'targetDetail']);
-    // Rencana Latihan Peserta - Bulk set kehadiran
-    Route::post('/rencana-latihan/{rencanaId}/peserta/{jenisPeserta}/bulk-kehadiran', [ApiRencanaLatihanController::class, 'bulkSetKehadiran']);
-
-    // Target Latihan Peserta (Mobile)
-    Route::get('/program-latihan/{programId}/rencana/{rencanaId}/peserta/{pesertaId}/targets/{pesertaType?}', [ApiRencanaLatihanController::class, 'participantTargets']);
-    Route::get('/program-latihan/{programId}/rencana/{rencanaId}/peserta/{pesertaId}/target/{targetId}/grafik/{pesertaType?}', [ApiRencanaLatihanController::class, 'participantTargetChart']);
-
-    // Rencana Latihan Target Mapping (Mobile)
-    Route::get('/rencana-latihan/{rencanaId}/target-mapping/participant', [RencanaLatihanTargetController::class, 'getParticipantTargetMapping']);
-    Route::get('/program-latihan/{programId}/target-mapping/group', [RencanaLatihanTargetController::class, 'getGroupTargetMapping']);
-    Route::post('/rencana-latihan/{rencanaId}/target-mapping/participant/bulk-update', [RencanaLatihanTargetController::class, 'bulkUpdateParticipantTargets']);
-    Route::post('/program-latihan/{programId}/target-mapping/group/bulk-update', [RencanaLatihanTargetController::class, 'bulkUpdateGroupTargets']);
-
-    // Target Latihan (Mobile + CRUD)
-    Route::get('/program-latihan/{programId}/target-latihan', [ApiTargetLatihanController::class, 'index']);
-    Route::get('/target-latihan/{id}', [ApiTargetLatihanController::class, 'show']);
-
-    // Target Latihan CRUD (Restricted to Superadmin, Admin, and Pelatih)
-    Route::middleware('target.latihan.permission')->group(function () {
-        Route::post('/target-latihan', [ApiTargetLatihanController::class, 'store']);
-        Route::put('/target-latihan/{id}', [ApiTargetLatihanController::class, 'update']);
-        Route::delete('/target-latihan/{id}', [ApiTargetLatihanController::class, 'destroy']);
-    });
-
     // Pemeriksaan (Mobile)
     Route::get('/pemeriksaan/mobile', [PemeriksaanController::class, 'index']);
     Route::get('/pemeriksaan/{id}', [PemeriksaanController::class, 'show']);
@@ -163,7 +115,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/turnamen/cabor/list', [TurnamenController::class, 'getCaborList']);
     Route::get('/turnamen/{turnamenId}/peserta', [TurnamenController::class, 'peserta']);
     // Profil peserta by-id dari listing
-    Route::get('/rencana-latihan/{rencanaId}/peserta/{jenis}/profil/{pesertaId}', [ParticipantProfileController::class, 'rencanaProfil']);
     Route::get('/pemeriksaan/{pemeriksaanId}/peserta/{jenis}/profil/{pesertaId}', [ParticipantProfileController::class, 'pemeriksaanProfil']);
     Route::get('/turnamen/{turnamenId}/peserta/{jenis}/profil/{pesertaId}', [ParticipantProfileController::class, 'turnamenProfil']);
 

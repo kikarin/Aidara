@@ -148,7 +148,7 @@ class TenagaPendukungRepository
      */
     protected function applyFilters($query)
     {
-        // Filter by cabor_id
+        // Filter by cabor_id (hanya tampilkan tenaga pendukung yang sudah di cabor ini)
         if (request('cabor_id') && request('cabor_id') !== 'all') {
             $caborId = request('cabor_id');
             $query->whereExists(function ($sub) use ($caborId) {
@@ -156,6 +156,18 @@ class TenagaPendukungRepository
                     ->from('cabor_kategori_tenaga_pendukung as cktp')
                     ->whereColumn('cktp.tenaga_pendukung_id', 'tenaga_pendukungs.id')
                     ->where('cktp.cabor_id', $caborId)
+                    ->whereNull('cktp.deleted_at');
+            });
+        }
+
+        // Exclude tenaga pendukung yang sudah ada di cabor tertentu
+        if (request('exclude_cabor_id')) {
+            $excludeCaborId = request('exclude_cabor_id');
+            $query->whereNotExists(function ($sub) use ($excludeCaborId) {
+                $sub->select(DB::raw(1))
+                    ->from('cabor_kategori_tenaga_pendukung as cktp')
+                    ->whereColumn('cktp.tenaga_pendukung_id', 'tenaga_pendukungs.id')
+                    ->where('cktp.cabor_id', $excludeCaborId)
                     ->whereNull('cktp.deleted_at');
             });
         }
@@ -276,13 +288,26 @@ class TenagaPendukungRepository
     {
         // Load kategori peserta yang sudah ada (multiple)
         if ($item && isset($item->id)) {
-            $item->load('kategoriPesertas');
+            $item->load(['kategoriPesertas', 'caborKategoriTenagaPendukung.cabor']);
             $kategoriPesertasIds = $item->kategoriPesertas->pluck('id')->toArray();
             $data['kategori_pesertas'] = $kategoriPesertasIds;
+            
+            // Load cabor data dari pivot (ambil yang pertama jika ada)
+            $caborKategoriTenagaPendukung = $item->caborKategoriTenagaPendukung->first();
             
             // Convert item ke array dan tambahkan kategori_pesertas
             $itemArray = $item->toArray();
             $itemArray['kategori_pesertas'] = $kategoriPesertasIds;
+            
+            // Tambahkan cabor data
+            if ($caborKategoriTenagaPendukung) {
+                $itemArray['cabor_id'] = $caborKategoriTenagaPendukung->cabor_id;
+                $itemArray['jenis_tenaga_pendukung'] = $caborKategoriTenagaPendukung->jenis_tenaga_pendukung;
+            } else {
+                $itemArray['cabor_id'] = null;
+                $itemArray['jenis_tenaga_pendukung'] = null;
+            }
+            
             $data['item'] = $itemArray;
         } else {
             $data['item'] = $item;
@@ -294,6 +319,9 @@ class TenagaPendukungRepository
 
     // Property untuk menyimpan kategori_pesertas sebelum di-unset
     private $kategoriPesertasForCallback = null;
+    
+    // Property untuk menyimpan cabor data sebelum di-unset
+    private $caborDataForCallback = null;
 
     public function customDataCreateUpdate($data, $record = null)
     {
@@ -325,6 +353,14 @@ class TenagaPendukungRepository
         } else {
             $this->kategoriPesertasForCallback = null;
         }
+
+        // Simpan cabor_id dan jenis_tenaga_pendukung untuk digunakan di callbackAfterStoreOrUpdate
+        $this->caborDataForCallback = [
+            'cabor_id' => $data['cabor_id'] ?? null,
+            'jenis_tenaga_pendukung' => $data['jenis_tenaga_pendukung'] ?? null,
+        ];
+        unset($data['cabor_id']);
+        unset($data['jenis_tenaga_pendukung']);
 
         Log::info('TenagaPendukungRepository: customDataCreateUpdate', [
             'data'   => $data,
@@ -408,6 +444,51 @@ class TenagaPendukungRepository
                 Log::info('TenagaPendukungRepository: Updated KategoriPesertas', ['tenaga_pendukung_id' => $model->id, 'kategori_ids' => $kategoriIds]);
             } else {
                 Log::warning('TenagaPendukungRepository: kategori_pesertas not set in data or request', ['data_keys' => array_keys($data)]);
+            }
+
+            // Handle Cabor Assignment (langsung ke cabor tanpa kategori)
+            $caborData = $this->caborDataForCallback ?? [
+                'cabor_id' => request()->input('cabor_id'),
+                'jenis_tenaga_pendukung' => request()->input('jenis_tenaga_pendukung'),
+            ];
+            
+            if (!empty($caborData['cabor_id'])) {
+                $caborId = $caborData['cabor_id'];
+                $jenisTenagaPendukung = $caborData['jenis_tenaga_pendukung'] ?? null;
+                
+                // Cek apakah sudah ada relasi ke cabor ini
+                $existingRelation = \App\Models\CaborKategoriTenagaPendukung::where('cabor_id', $caborId)
+                    ->where('tenaga_pendukung_id', $model->id)
+                    ->first();
+                
+                if ($existingRelation) {
+                    // Update jenis jika sudah ada
+                    $existingRelation->update([
+                        'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
+                        'updated_by' => Auth::id(),
+                    ]);
+                    Log::info('TenagaPendukungRepository: Updated cabor assignment', [
+                        'tenaga_pendukung_id' => $model->id,
+                        'cabor_id' => $caborId,
+                        'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
+                    ]);
+                } else {
+                    // Buat relasi baru tanpa kategori (cabor_kategori_id = null)
+                    \App\Models\CaborKategoriTenagaPendukung::create([
+                        'cabor_id' => $caborId,
+                        'cabor_kategori_id' => null, // Langsung ke cabor tanpa kategori
+                        'tenaga_pendukung_id' => $model->id,
+                        'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
+                        'is_active' => 1,
+                        'created_by' => Auth::id(),
+                        'updated_by' => Auth::id(),
+                    ]);
+                    Log::info('TenagaPendukungRepository: Created new cabor assignment', [
+                        'tenaga_pendukung_id' => $model->id,
+                        'cabor_id' => $caborId,
+                        'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
+                    ]);
+                }
             }
 
             Log::info('TenagaPendukungRepository: callbackAfterStoreOrUpdate completed successfully');

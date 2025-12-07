@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { router } from '@inertiajs/vue3';
+import { Plus } from 'lucide-vue-next';
 
 interface Peserta {
     id: number;
@@ -14,13 +16,14 @@ interface Props {
     show: boolean;
     data: Peserta[];
     tipe: string;
+    caborId: number | null;
 }
 
 interface Emits {
     (e: 'close'): void;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const getTipeLabel = (tipe: string) => {
@@ -50,13 +53,25 @@ const getJenisKelaminLabel = (jenisKelamin: string) => {
 const handleClose = () => {
     emit('close');
 };
+
+const handleAddPeserta = () => {
+    if (props.caborId && props.tipe) {
+        router.visit(`/cabor/${props.caborId}/peserta/${props.tipe}/create`);
+    }
+};
 </script>
 
 <template>
     <Dialog :open="show" @update:open="handleClose">
         <DialogContent class="max-h-[80vh] max-w-4xl overflow-y-auto">
             <DialogHeader>
-                <DialogTitle class="text-xl font-semibold"> Daftar {{ getTipeLabel(tipe) }} </DialogTitle>
+                <div class="flex items-center justify-between">
+                    <DialogTitle class="text-xl font-semibold"> Daftar {{ getTipeLabel(tipe) }} </DialogTitle>
+                    <Button @click="handleAddPeserta" size="sm" class="mr-8">
+                        <Plus class="mr-1 h-4 w-4" />
+                        Tambah {{ getTipeLabel(tipe) }}
+                    </Button>
+                </div>
             </DialogHeader>
 
             <div class="mt-6">

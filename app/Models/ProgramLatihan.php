@@ -29,14 +29,14 @@ class ProgramLatihan extends Model implements HasMedia
         'cabor_kategori_id',
         'periode_mulai',
         'periode_selesai',
-        'jenis_periode',
+        'tahap',
         'keterangan',
         'created_by',
         'updated_by',
         'deleted_by',
     ];
 
-    protected $appends = ['file_url'];
+    protected $appends = ['periode_hitung'];
 
     public function cabor()
     {
@@ -48,14 +48,9 @@ class ProgramLatihan extends Model implements HasMedia
         return $this->belongsTo(CaborKategori::class, 'cabor_kategori_id');
     }
 
-    public function targetLatihan()
+    public function rekapAbsen()
     {
-        return $this->hasMany(TargetLatihan::class, 'program_latihan_id');
-    }
-
-    public function rencanaLatihan()
-    {
-        return $this->hasMany(RencanaLatihan::class, 'program_latihan_id');
+        return $this->hasMany(RekapAbsenProgramLatihan::class, 'program_latihan_id');
     }
 
     public function getActivitylogOptions(): LogOptions
@@ -81,9 +76,44 @@ class ProgramLatihan extends Model implements HasMedia
             ->performOnCollections('program_files');
     }
 
-    public function getFileUrlAttribute()
+    public function getPeriodeHitungAttribute()
     {
-        $media = $this->getFirstMedia('program_files');
-        return $media ? $media->getUrl() : null;
+        if (!$this->periode_mulai || !$this->periode_selesai) {
+            return null;
+        }
+
+        $start = new \DateTime($this->periode_mulai);
+        $end = new \DateTime($this->periode_selesai);
+        $diff = $start->diff($end);
+        
+        $result = [];
+        
+        if ($diff->y > 0) {
+            $result[] = $diff->y . ' tahun';
+        }
+        if ($diff->m > 0) {
+            $result[] = $diff->m . ' bulan';
+        }
+        if ($diff->d > 0) {
+            $result[] = $diff->d . ' hari';
+        }
+        
+        // Jika hanya hari saja (kurang dari 1 bulan)
+        if ($diff->y == 0 && $diff->m == 0 && $diff->d > 0) {
+            return $diff->d . ' hari';
+        }
+        
+        // Jika hanya bulan saja (kurang dari 1 tahun)
+        if ($diff->y == 0 && $diff->m > 0 && $diff->d == 0) {
+            return $diff->m . ' bulan';
+        }
+        
+        // Jika hanya tahun saja
+        if ($diff->y > 0 && $diff->m == 0 && $diff->d == 0) {
+            return $diff->y . ' tahun';
+        }
+        
+        // Kombinasi
+        return implode(' ', $result);
     }
 }

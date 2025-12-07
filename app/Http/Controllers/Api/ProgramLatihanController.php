@@ -92,7 +92,6 @@ class ProgramLatihanController extends Controller
                         'formatted' => $this->formatPeriode($program->periode_mulai, $program->periode_selesai),
                     ],
                     'keterangan'             => $program->keterangan,
-                    'jumlah_rencana_latihan' => $program->rencanaLatihan()->count(),
                     'created_at'             => $program->created_at,
                     'updated_at'             => $program->updated_at,
                 ],

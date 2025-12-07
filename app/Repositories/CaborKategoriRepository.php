@@ -39,6 +39,34 @@ class CaborKategoriRepository
         // Apply filters
         $this->applyFilters($query);
 
+        // Role-based filtering
+        $auth = Auth::user();
+        if ($auth && $auth->current_role_id == 35) { // Atlet
+            if ($auth->atlet && $auth->atlet->id) {
+                $query->whereHas('caborKategoriAtlet', function ($sub_query) use ($auth) {
+                    $sub_query->where('atlet_id', $auth->atlet->id)
+                        ->where('is_active', 1)
+                        ->whereNull('deleted_at');
+                });
+            }
+        } elseif ($auth && $auth->current_role_id == 36) { // Pelatih
+            if ($auth->pelatih && $auth->pelatih->id) {
+                $query->whereHas('caborKategoriPelatih', function ($sub_query) use ($auth) {
+                    $sub_query->where('pelatih_id', $auth->pelatih->id)
+                        ->where('is_active', 1)
+                        ->whereNull('deleted_at');
+                });
+            }
+        } elseif ($auth && $auth->current_role_id == 37) { // Tenaga Pendukung
+            if ($auth->tenagaPendukung && $auth->tenagaPendukung->id) {
+                $query->whereHas('tenagaPendukung', function ($sub_query) use ($auth) {
+                    $sub_query->where('tenaga_pendukung_id', $auth->tenagaPendukung->id)
+                        ->where('is_active', 1)
+                        ->whereNull('deleted_at');
+                });
+            }
+        }
+
         if (request('sort')) {
             $order        = request('order', 'asc');
             $sortField    = request('sort');

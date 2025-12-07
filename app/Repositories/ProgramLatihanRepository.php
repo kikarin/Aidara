@@ -25,8 +25,7 @@ class ProgramLatihanRepository
 
     public function customIndex($data)
     {
-        $query = $this->model->with(['caborKategori', 'cabor', 'media'])
-            ->withCount(['rencanaLatihan']);
+        $query = $this->model->with(['caborKategori', 'cabor', 'media']);
 
         if (request('search')) {
             $search = request('search');
@@ -92,10 +91,9 @@ class ProgramLatihanRepository
                     'cabor_kategori_nama'    => $item->caborKategori?->nama,
                     'periode_mulai'          => $item->periode_mulai,
                     'periode_selesai'        => $item->periode_selesai,
-                    'jenis_periode'          => $item->jenis_periode,
+                    'periode_hitung'         => $item->periode_hitung,
+                    'tahap'                  => $item->tahap,
                     'keterangan'             => $item->keterangan,
-                    'file_url'               => $item->file_url,
-                    'jumlah_rencana_latihan' => $item->rencana_latihan_count,
                 ];
             });
             $data += [
@@ -122,15 +120,9 @@ class ProgramLatihanRepository
                 'cabor_kategori_nama'            => $item->caborKategori?->nama,
                 'periode_mulai'                  => $item->periode_mulai,
                 'periode_selesai'                => $item->periode_selesai,
-                'jenis_periode'                  => $item->jenis_periode,
+                'periode_hitung'                 => $item->periode_hitung,
+                'tahap'                          => $item->tahap,
                 'keterangan'                     => $item->keterangan,
-                'file_url'                       => $item->file_url,
-                'jumlah_target_individu'         => $item->targetLatihan()->where('jenis_target', 'individu')->count(),
-                'jumlah_target_kelompok'         => $item->targetLatihan()->where('jenis_target', 'kelompok')->count(),
-                'jumlah_target_atlet'            => $item->targetLatihan()->where('peruntukan', 'atlet')->count(),
-                'jumlah_target_pelatih'          => $item->targetLatihan()->where('peruntukan', 'pelatih')->count(),
-                'jumlah_target_tenaga_pendukung' => $item->targetLatihan()->where('peruntukan', 'tenaga-pendukung')->count(),
-                'jumlah_rencana_latihan'         => $item->rencana_latihan_count,
             ];
         });
         $data += [
@@ -190,17 +182,10 @@ class ProgramLatihanRepository
 
     public function create(array $data)
     {
-        $file = $data['file'] ?? null;
         unset($data['file']);
         
         $data = $this->customDataCreateUpdate($data);
         $model = $this->model->create($data);
-        
-        if ($file) {
-            $model->addMedia($file)
-                ->usingName($data['nama_program'] ?? 'Program Latihan')
-                ->toMediaCollection('program_files');
-        }
 
         return $model;
     }
@@ -208,18 +193,10 @@ class ProgramLatihanRepository
     public function update($id, array $data)
     {
         $record = $this->getById($id);
-        $file = $data['file'] ?? null;
         unset($data['file']);
         
         $processedData = $this->customDataCreateUpdate($data, $record);
         $record->update($processedData);
-        
-        if ($file) {
-            $record->clearMediaCollection('program_files');
-            $record->addMedia($file)
-                ->usingName($data['nama_program'] ?? 'Program Latihan')
-                ->toMediaCollection('program_files');
-        }
 
         return $record;
     }
@@ -244,8 +221,7 @@ class ProgramLatihanRepository
      */
     public function getForMobile($request)
     {
-        $query = $this->model->with(['caborKategori', 'cabor', 'media'])
-            ->withCount(['rencanaLatihan']);
+        $query = $this->model->with(['caborKategori', 'cabor', 'media']);
         $this->applyRoleBasedFiltering($query);
 
         // Search functionality
@@ -286,10 +262,9 @@ class ProgramLatihanRepository
                 'cabor'                  => $item->cabor?->nama         ?? '-',
                 'kategori'               => $item->caborKategori?->nama ?? '-',
                 'periode'                => $this->formatPeriodeForMobile($item->periode_mulai, $item->periode_selesai),
-                'jenis_periode'          => $item->jenis_periode,
+                'periode_hitung'         => $item->periode_hitung,
+                'tahap'                  => $item->tahap,
                 'keterangan'             => $item->keterangan,
-                'file_url'               => $item->file_url,
-                'jumlah_rencana_latihan' => $item->rencana_latihan_count,
                 'created_at'             => $item->created_at,
                 'updated_at'             => $item->updated_at,
             ];

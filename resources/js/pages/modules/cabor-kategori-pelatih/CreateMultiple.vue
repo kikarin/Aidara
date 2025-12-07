@@ -106,7 +106,7 @@ const columns = [
     },
 ];
 
-// Fetch pelatih yang belum ada di kategori ini
+// Fetch pelatih yang sudah terdaftar di cabor ini tapi belum ada di kategori ini
 const fetchAvailablePelatih = async () => {
     loading.value = true;
     try {
@@ -115,6 +115,7 @@ const fetchAvailablePelatih = async () => {
                 page: currentPage.value > 1 ? currentPage.value - 1 : 0,
                 per_page: perPage.value,
                 search: searchQuery.value,
+                cabor_id: props.caborKategori.cabor.id, // Filter berdasarkan cabor
                 exclude_cabor_kategori_id: props.caborKategori.id,
             },
         });

@@ -12,29 +12,14 @@ const props = defineProps<{
 }>();
 
 const caborOptions = ref<{ value: number; label: string }[]>([]);
-const kategoriPesertaOptions = ref<{ value: number; label: string }[]>([]);
 
 const fetchCaborOptions = async () => {
     const res = await axios.get('/api/cabor-list');
     caborOptions.value = (res.data || []).map((item: any) => ({ value: item.id, label: item.nama }));
 };
 
-const fetchKategoriPesertaOptions = async () => {
-    try {
-        const res = await axios.get('/api/kategori-peserta-list');
-        kategoriPesertaOptions.value = (res.data || []).map((item: any) => ({ 
-            value: item.id, 
-            label: item.nama 
-        }));
-    } catch (error) {
-        console.error('Gagal mengambil data kategori peserta:', error);
-        kategoriPesertaOptions.value = [];
-    }
-};
-
 onMounted(() => {
     fetchCaborOptions();
-    fetchKategoriPesertaOptions();
 });
 
 const formData = computed(() => {
@@ -42,7 +27,6 @@ const formData = computed(() => {
         cabor_id: props.initialData?.cabor_id || '',
         nama: props.initialData?.nama || '',
         jenis_kelamin: props.initialData?.jenis_kelamin || '',
-        kategori_peserta_id: props.initialData?.kategori_peserta_id || '',
         deskripsi: props.initialData?.deskripsi || '',
         id: props.initialData?.id || undefined,
     };
@@ -78,14 +62,6 @@ const formInputs = computed(() => [
         required: true,
     },
     {
-        name: 'kategori_peserta_id',
-        label: 'Jenis',
-        type: 'select' as const,
-        options: kategoriPesertaOptions.value,
-        placeholder: 'Pilih Jenis (Opsional)',
-        required: false,
-    },
-    {
         name: 'deskripsi',
         label: 'Deskripsi',
         type: 'textarea' as const,
@@ -99,7 +75,6 @@ const handleSave = (form: any) => {
         cabor_id: form.cabor_id,
         nama: form.nama,
         jenis_kelamin: form.jenis_kelamin,
-        kategori_peserta_id: form.kategori_peserta_id || null,
         deskripsi: form.deskripsi,
     };
     if (props.mode === 'edit' && props.initialData?.id) {

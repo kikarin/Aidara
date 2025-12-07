@@ -16,6 +16,8 @@ class ProgramLatihanSeeder extends Seeder
         if (empty($kategoriIds) || ! $caborId) {
             return;
         }
+        $tahapOptions = ['persiapan umum', 'persiapan khusus', 'prapertandingan', 'pertandingan', 'transisi'];
+        
         $data = [
             [
                 'cabor_id'          => $caborId,
@@ -23,6 +25,7 @@ class ProgramLatihanSeeder extends Seeder
                 'cabor_kategori_id' => $kategoriIds[0],
                 'periode_mulai'     => '2025-08-01',
                 'periode_selesai'   => '2025-08-31',
+                'tahap'            => $tahapOptions[0], // persiapan umum
                 'keterangan'        => 'Fokus pada penguatan fisik dan stamina.',
             ],
             [
@@ -31,6 +34,7 @@ class ProgramLatihanSeeder extends Seeder
                 'cabor_kategori_id' => $kategoriIds[0],
                 'periode_mulai'     => '2025-09-01',
                 'periode_selesai'   => '2025-09-30',
+                'tahap'            => $tahapOptions[1], // persiapan khusus
                 'keterangan'        => 'Pendalaman teknik dan strategi.',
             ],
             [
@@ -39,7 +43,26 @@ class ProgramLatihanSeeder extends Seeder
                 'cabor_kategori_id' => $kategoriIds[0],
                 'periode_mulai'     => '2025-10-01',
                 'periode_selesai'   => '2025-10-15',
+                'tahap'            => $tahapOptions[2], // prapertandingan
                 'keterangan'        => 'Simulasi pertandingan dan evaluasi akhir.',
+            ],
+            [
+                'cabor_id'          => $caborId,
+                'nama_program'      => 'Program Pertandingan Nasional',
+                'cabor_kategori_id' => $kategoriIds[0] ?? null,
+                'periode_mulai'     => '2025-11-01',
+                'periode_selesai'   => '2025-11-30',
+                'tahap'            => $tahapOptions[3], // pertandingan
+                'keterangan'        => 'Program latihan selama periode pertandingan.',
+            ],
+            [
+                'cabor_id'          => $caborId,
+                'nama_program'      => 'Program Transisi Pasca Pertandingan',
+                'cabor_kategori_id' => $kategoriIds[0] ?? null,
+                'periode_mulai'     => '2025-12-01',
+                'periode_selesai'   => '2025-12-31',
+                'tahap'            => $tahapOptions[4], // transisi
+                'keterangan'        => 'Program pemulihan dan evaluasi pasca pertandingan.',
             ],
         ];
         foreach ($data as $item) {

@@ -205,20 +205,6 @@ class CategoryPermissionSeeder extends Seeder
                 'permission' => 'CRUD',
             ],
             [
-                'name'       => 'Target Latihan',
-                'permission' => 'CRUD',
-            ],
-            [
-                'name'              => 'Rencana Latihan',
-                'permission'        => 'CRUD',
-                'permission_common' => ['Rencana Latihan Kelola'],
-            ],
-            [
-                'name'              => 'Rencana Latihan Peserta',
-                'permission'        => 'CRUD',
-                'permission_common' => ['Rencana Latihan Set Kehadiran'],
-            ],
-            [
                 'name'       => 'Pemeriksaan',
                 'permission' => 'CRUD',
             ],
@@ -234,6 +220,11 @@ class CategoryPermissionSeeder extends Seeder
             [
                 'name'       => 'Pemeriksaan Peserta Parameter',
                 'permission' => 'CRUD',
+            ],
+            [
+                'name'              => 'Pemeriksaan Khusus',
+                'permission'        => 'CRUD',
+                'permission_common' => ['Pemeriksaan Khusus Setup', 'Pemeriksaan Khusus Input Hasil Tes'],
             ],
             [
                 'name'      => 'Turnamen',

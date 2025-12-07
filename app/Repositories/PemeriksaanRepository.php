@@ -26,6 +26,9 @@ class PemeriksaanRepository
 
     protected $request;
 
+    // Temp storage untuk parameter_ids (karena harus dihapus dari $data sebelum create)
+    protected $pendingParameterIds = [];
+
     public function __construct(Pemeriksaan $model)
     {
         $this->model   = $model;
@@ -216,7 +219,94 @@ class PemeriksaanRepository
         }
         $data['updated_by'] = $userId;
 
+        // Simpan parameter_ids ke property sebelum dihapus (untuk diproses di callback)
+        if (isset($data['parameter_ids']) && is_array($data['parameter_ids'])) {
+            $this->pendingParameterIds = $data['parameter_ids'];
+        }
+
+        // Hapus parameter_ids dari data karena tidak ada kolom ini di tabel pemeriksaan
+        unset($data['parameter_ids']);
+
         return $data;
+    }
+
+    /**
+     * Callback setelah pemeriksaan dibuat/diupdate
+     * Untuk mode create: otomatis tambahkan parameter dan peserta
+     */
+    public function callbackAfterStoreOrUpdate($model, $data, $method = 'store', $record_sebelumnya = null)
+    {
+        $userId = Auth::id();
+
+        // Hanya proses untuk create (store), bukan update
+        if ($method === 'store') {
+            // 1. Simpan parameter pemeriksaan (ambil dari property yang disimpan sebelumnya)
+            if (! empty($this->pendingParameterIds)) {
+                foreach ($this->pendingParameterIds as $parameterId) {
+                    PemeriksaanParameter::create([
+                        'pemeriksaan_id'   => $model->id,
+                        'mst_parameter_id' => $parameterId,
+                        'created_by'       => $userId,
+                        'updated_by'       => $userId,
+                    ]);
+                }
+                // Reset setelah digunakan
+                $this->pendingParameterIds = [];
+            }
+
+            // 2. Simpan peserta dari cabor kategori (otomatis)
+            $caborKategoriId = $model->cabor_kategori_id;
+
+            // Get Atlet aktif di kategori ini
+            $atletIds = \App\Models\CaborKategoriAtlet::where('cabor_kategori_id', $caborKategoriId)
+                ->where('is_active', 1)
+                ->pluck('atlet_id')
+                ->unique();
+
+            foreach ($atletIds as $atletId) {
+                PemeriksaanPeserta::create([
+                    'pemeriksaan_id' => $model->id,
+                    'peserta_id'     => $atletId,
+                    'peserta_type'   => 'App\\Models\\Atlet',
+                    'created_by'     => $userId,
+                    'updated_by'     => $userId,
+                ]);
+            }
+
+            // Get Pelatih aktif di kategori ini
+            $pelatihIds = \App\Models\CaborKategoriPelatih::where('cabor_kategori_id', $caborKategoriId)
+                ->where('is_active', 1)
+                ->pluck('pelatih_id')
+                ->unique();
+
+            foreach ($pelatihIds as $pelatihId) {
+                PemeriksaanPeserta::create([
+                    'pemeriksaan_id' => $model->id,
+                    'peserta_id'     => $pelatihId,
+                    'peserta_type'   => 'App\\Models\\Pelatih',
+                    'created_by'     => $userId,
+                    'updated_by'     => $userId,
+                ]);
+            }
+
+            // Get Tenaga Pendukung aktif di kategori ini
+            $tenagaIds = \App\Models\CaborKategoriTenagaPendukung::where('cabor_kategori_id', $caborKategoriId)
+                ->where('is_active', 1)
+                ->pluck('tenaga_pendukung_id')
+                ->unique();
+
+            foreach ($tenagaIds as $tenagaId) {
+                PemeriksaanPeserta::create([
+                    'pemeriksaan_id' => $model->id,
+                    'peserta_id'     => $tenagaId,
+                    'peserta_type'   => 'App\\Models\\TenagaPendukung',
+                    'created_by'     => $userId,
+                    'updated_by'     => $userId,
+                ]);
+            }
+        }
+
+        return $model;
     }
 
     public function validateRequest($request)

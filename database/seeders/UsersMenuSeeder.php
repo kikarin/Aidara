@@ -106,6 +106,15 @@ class UsersMenuSeeder extends Seeder
                 'permission_id' => 'Pemeriksaan Show',
             ],
             [
+                'nama'          => 'Pemeriksaan Khusus',
+                'kode'          => 'PEMERIKSAAN-KHUSUS',
+                'url'           => '/pemeriksaan-khusus',
+                'icon'          => 'Activity',
+                'rel'           => 0,
+                'urutan'        => 25,
+                'permission_id' => 'Pemeriksaan Khusus Show',
+            ],
+            [
                 'nama'         => 'Turnamen',
                 'kode'         => 'TURNAMEN',
                 'url'          => '/turnamen',

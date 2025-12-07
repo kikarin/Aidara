@@ -18,6 +18,9 @@ class CustomPathGenerator extends DefaultPathGenerator
         if ($media->model_type == 'App\\Models\\AtletSertifikat') {
             return 'atlet_sertifikat/'.$media->getKey().'/';
         }
+        if ($media->model_type == 'App\\Models\\RekapAbsenProgramLatihan') {
+            return 'rekap_absen_program_latihan/'.$media->model_id.'/';
+        }
 
         return $media->id.'/';
     }
