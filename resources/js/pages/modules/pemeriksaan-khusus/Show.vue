@@ -8,9 +8,11 @@ import { useToast } from '@/components/ui/toast/useToast';
 import PageShow from '@/pages/modules/base-page/PageShow.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { Activity, BarChart3, Info, Loader2, Users } from 'lucide-vue-next';
+import { Activity, BarChart3, Info, Loader2, Users, Download } from 'lucide-vue-next';
 import permissionService from '@/services/permissionService';
 import { computed, onMounted, ref, watch } from 'vue';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const { toast } = useToast();
 
@@ -207,6 +209,19 @@ const getPredikatColor = (predikat: string | null): string => {
     return colors[predikat] || 'bg-gray-500 text-white';
 };
 
+// Helper: Get predikat color for PDF (RGB array)
+const getPredikatColorRGB = (predikat: string | null): number[] => {
+    if (!predikat) return [156, 163, 175]; // gray-400
+    const colors: Record<string, number[]> = {
+        sangat_kurang: [239, 68, 68], // red-500
+        kurang: [249, 115, 22], // orange-500
+        sedang: [234, 179, 8], // yellow-500
+        mendekati_target: [74, 222, 128], // green-400
+        target: [22, 163, 74], // green-600
+    };
+    return colors[predikat] || [107, 114, 128]; // gray-500
+};
+
 // Radar chart options untuk aspek
 const radarChartOptions = computed(() => {
     const isDark = document.documentElement.classList.contains('dark');
@@ -386,6 +401,403 @@ const pesertaCount = computed(() => {
     return { atlet, pelatih, tenagaPendukung, total: peserta.length };
 });
 
+// Export PDF function
+const exportToPDF = () => {
+    if (!selectedPeserta.value) {
+        toast({
+            title: 'Pilih peserta terlebih dahulu',
+            variant: 'destructive',
+        });
+        return;
+    }
+
+    try {
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const peserta = selectedPeserta.value;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 15;
+        let yPos = margin;
+
+        // Helper function untuk menambahkan halaman baru jika diperlukan
+        const checkNewPage = (requiredSpace: number) => {
+            if (yPos + requiredSpace > doc.internal.pageSize.getHeight() - margin) {
+                doc.addPage();
+                yPos = margin;
+            }
+        };
+
+        // Header
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Laporan Hasil Pemeriksaan Khusus', pageWidth / 2, yPos, { align: 'center' });
+        yPos += 10;
+
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'normal');
+        doc.text(props.item.nama_pemeriksaan || 'Pemeriksaan Khusus', pageWidth / 2, yPos, { align: 'center' });
+        yPos += 15;
+
+        // Informasi Atlet
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Informasi Atlet', margin, yPos);
+        yPos += 8;
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        const infoData = [
+            ['Nama', peserta.peserta.nama || '-'],
+            ['Posisi', peserta.peserta.posisi || '-'],
+            ['Umur', peserta.peserta.umur !== '-' ? `${peserta.peserta.umur} tahun` : '-'],
+            [
+                'Jenis Kelamin',
+                peserta.peserta.jenis_kelamin === 'L' || peserta.peserta.jenis_kelamin === 'Laki-laki'
+                    ? 'Laki-laki'
+                    : peserta.peserta.jenis_kelamin === 'P' || peserta.peserta.jenis_kelamin === 'Perempuan'
+                      ? 'Perempuan'
+                      : '-',
+            ],
+            ['Cabor', peserta.peserta.cabor || '-'],
+        ];
+
+        autoTable(doc, {
+            startY: yPos,
+            head: [],
+            body: infoData,
+            theme: 'plain',
+            styles: { fontSize: 10 },
+            columnStyles: {
+                0: { fontStyle: 'bold', cellWidth: 50 },
+                1: { cellWidth: 120 },
+            },
+            margin: { left: margin, right: margin },
+        });
+
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+        checkNewPage(20);
+
+        // Detail Nilai Item Tes
+        if (peserta.item_tes && peserta.item_tes.length > 0) {
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Detail Nilai Item Tes', margin, yPos);
+            yPos += 8;
+
+            // Group item tes by aspek
+            const itemTesByAspek: Record<string, any[]> = {};
+            aspekList.value.forEach((aspek) => {
+                const items = getItemTesByAspek(peserta.item_tes, aspek.id);
+                if (items.length > 0) {
+                    itemTesByAspek[aspek.nama] = items;
+                }
+            });
+
+            Object.keys(itemTesByAspek).forEach((aspekNama) => {
+                checkNewPage(30);
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.text(aspekNama, margin, yPos);
+                yPos += 6;
+
+                const items = itemTesByAspek[aspekNama];
+                const tableData = items.map((item) => [
+                    item.nama || '-',
+                    item.satuan || '-',
+                    item.target || '-',
+                    item.nilai || '-',
+                    formatPersentase(item.persentase_performa),
+                    getPredikatLabel(item.predikat),
+                ]);
+
+                autoTable(doc, {
+                    startY: yPos,
+                    head: [['Item Tes', 'Satuan', 'Target', 'Nilai', 'Persentase', 'Predikat']],
+                    body: tableData,
+                    theme: 'striped',
+                    styles: { fontSize: 9 },
+                    headStyles: { fontStyle: 'bold' },
+                    didParseCell: (data: any) => {
+                        // Add color to predikat column (index 5) - only for body rows, not header
+                        if (data.column.index === 5 && data.row.index >= 0 && data.section !== 'head') {
+                            const item = items[data.row.index];
+                            const color = getPredikatColorRGB(item.predikat);
+                            data.cell.styles.fillColor = color;
+                            data.cell.styles.textColor = [255, 255, 255];
+                        }
+                    },
+                    margin: { left: margin, right: margin },
+                });
+
+                yPos = (doc as any).lastAutoTable.finalY + 8;
+            });
+        }
+
+        checkNewPage(30);
+
+        // Detail Nilai Per Aspek
+        if (peserta.aspek && peserta.aspek.length > 0) {
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Detail Nilai Per Aspek', margin, yPos);
+            yPos += 8;
+
+            const aspekData = peserta.aspek.map((a: any) => [
+                a.nama || '-',
+                formatPersentase(a.nilai_performa),
+                getPredikatLabel(a.predikat),
+            ]);
+
+            autoTable(doc, {
+                startY: yPos,
+                head: [['Aspek', 'Nilai Performa', 'Predikat']],
+                body: aspekData,
+                theme: 'striped',
+                styles: { fontSize: 10 },
+                headStyles: { fontStyle: 'bold' },
+                didParseCell: (data: any) => {
+                    // Add color to predikat column (index 2) - only for body rows, not header
+                    if (data.column.index === 2 && data.row.index >= 0 && data.section !== 'head') {
+                        const aspek = peserta.aspek[data.row.index];
+                        const color = getPredikatColorRGB(aspek.predikat);
+                        data.cell.styles.fillColor = color;
+                        data.cell.styles.textColor = [255, 255, 255];
+                    }
+                },
+                margin: { left: margin, right: margin },
+            });
+
+            yPos = (doc as any).lastAutoTable.finalY + 10;
+        }
+
+        checkNewPage(80);
+
+        // Performa Aspek - Radar Chart
+        if (peserta.aspek && peserta.aspek.length > 0) {
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Performa Aspek (Radar Chart)', margin, yPos);
+            yPos += 10;
+
+            // Draw radar chart
+            const chartCenterX = pageWidth / 2;
+            const chartCenterY = yPos + 50;
+            const chartRadius = 40;
+            const numAspek = peserta.aspek.length;
+
+            // Draw grid circles (0%, 25%, 50%, 75%, 100%)
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.1);
+            for (let i = 1; i <= 5; i++) {
+                const radius = (chartRadius * i) / 5;
+                doc.circle(chartCenterX, chartCenterY, radius, 'S');
+            }
+
+            // Draw grid lines (spokes)
+            for (let i = 0; i < numAspek; i++) {
+                const angle = (i * 2 * Math.PI) / numAspek - Math.PI / 2;
+                const x1 = chartCenterX + chartRadius * Math.cos(angle);
+                const y1 = chartCenterY + chartRadius * Math.sin(angle);
+                doc.line(chartCenterX, chartCenterY, x1, y1);
+            }
+
+            // Draw data polygon
+            const points: number[][] = [];
+            peserta.aspek.forEach((a: any, index: number) => {
+                const angle = (index * 2 * Math.PI) / numAspek - Math.PI / 2;
+                const nilai = toNumber(a.nilai_performa) || 0;
+                const radius = (chartRadius * nilai) / 100;
+                const x = chartCenterX + radius * Math.cos(angle);
+                const y = chartCenterY + radius * Math.sin(angle);
+                points.push([x, y]);
+            });
+
+            // Draw polygon outline and fill effect
+            if (points.length > 0) {
+                // Draw filled polygon by drawing triangles from center
+                doc.setFillColor(59, 130, 246);
+                doc.setDrawColor(59, 130, 246);
+                
+                // Draw filled area using lines from center (creates visual fill effect)
+                doc.setLineWidth(0.3);
+                for (let i = 0; i < points.length; i++) {
+                    const nextIndex = (i + 1) % points.length;
+                    const p1 = points[i];
+                    const p2 = points[nextIndex];
+                    
+                    // Draw lines to create filled triangle effect
+                    // Draw line from center to point 1
+                    doc.line(chartCenterX, chartCenterY, p1[0], p1[1]);
+                    // Draw line from center to point 2
+                    doc.line(chartCenterX, chartCenterY, p2[0], p2[1]);
+                    // Draw line connecting the two points
+                    doc.line(p1[0], p1[1], p2[0], p2[1]);
+                }
+                
+                // Draw polygon outline (thicker lines)
+                doc.setDrawColor(59, 130, 246);
+                doc.setLineWidth(2);
+                for (let i = 0; i < points.length; i++) {
+                    const nextIndex = (i + 1) % points.length;
+                    doc.line(points[i][0], points[i][1], points[nextIndex][0], points[nextIndex][1]);
+                }
+            }
+
+            // Draw data points
+            doc.setFillColor(59, 130, 246);
+            points.forEach((point) => {
+                doc.circle(point[0], point[1], 2, 'F');
+            });
+
+            // Draw labels with clearer positioning
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0, 0, 0);
+            peserta.aspek.forEach((a: any, index: number) => {
+                const angle = (index * 2 * Math.PI) / numAspek - Math.PI / 2;
+                const labelRadius = chartRadius + 18;
+                const x = chartCenterX + labelRadius * Math.cos(angle);
+                const y = chartCenterY + labelRadius * Math.sin(angle);
+                const nilai = toNumber(a.nilai_performa) || 0;
+                const nilaiText = formatPersentase(a.nilai_performa);
+                
+                // Draw aspek name (bold)
+                doc.text(a.nama || '-', x, y - 5, { align: 'center' });
+                // Draw nilai below (smaller, but clear)
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'normal');
+                doc.text(nilaiText, x, y + 2, { align: 'center' });
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'bold');
+            });
+
+            // Draw scale labels more clearly - 0% at center, 100% at outer edge
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(100, 100, 100);
+            // 0% at center (tengah chart)
+            doc.text('0%', chartCenterX, chartCenterY, { align: 'center' });
+            // 25% at first circle
+            doc.text('20%', chartCenterX, chartCenterY - (chartRadius * 0.20) , { align: 'center' });
+            // 50% at second circle
+            doc.text('40%', chartCenterX, chartCenterY - (chartRadius * 0.40) , { align: 'center' });
+            // 75% at third circle
+            doc.text('60%', chartCenterX, chartCenterY - (chartRadius * 0.60) , { align: 'center' });
+            // 100% at outer edge (outermost circle)
+            doc.text('80%', chartCenterX, chartCenterY - (chartRadius * 0.80) , { align: 'center' });
+            doc.text('100%', chartCenterX, chartCenterY - (chartRadius * 1) , { align: 'center' });
+            doc.setTextColor(0, 0, 0);
+
+            yPos = chartCenterY + chartRadius + 25;
+            
+            // Add table with detailed data below chart for clarity
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Detail Data Performa Aspek:', margin, yPos);
+            yPos += 6;
+            
+            const chartTableData = peserta.aspek.map((a: any) => [
+                a.nama || '-',
+                formatPersentase(a.nilai_performa),
+                getPredikatLabel(a.predikat),
+            ]);
+            
+            autoTable(doc, {
+                startY: yPos,
+                head: [['Aspek', 'Nilai Performa', 'Predikat']],
+                body: chartTableData,
+                theme: 'striped',
+                styles: { fontSize: 9 },
+                headStyles: { fontStyle: 'bold' },
+                didParseCell: (data: any) => {
+                    // Add color to predikat column (index 2) - only for body rows, not header
+                    if (data.column.index === 2 && data.row.index >= 0 && data.section !== 'head') {
+                        const aspek = peserta.aspek[data.row.index];
+                        const color = getPredikatColorRGB(aspek.predikat);
+                        data.cell.styles.fillColor = color;
+                        data.cell.styles.textColor = [255, 255, 255];
+                    }
+                },
+                margin: { left: margin, right: margin },
+            });
+            
+            yPos = (doc as any).lastAutoTable.finalY + 10;
+        }
+
+        checkNewPage(30);
+
+        // Nilai Keseluruhan dan Predikat
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Nilai Keseluruhan', margin, yPos);
+        yPos += 8;
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        const nilaiKeseluruhan = formatPersentase(peserta.nilai_keseluruhan);
+        const predikatKeseluruhan = getPredikatLabel(peserta.predikat_keseluruhan);
+
+        const predikatColor = getPredikatColorRGB(peserta.predikat_keseluruhan);
+        autoTable(doc, {
+            startY: yPos,
+            head: [],
+            body: [
+                ['Nilai Keseluruhan', nilaiKeseluruhan],
+                ['Predikat', predikatKeseluruhan],
+            ],
+            theme: 'plain',
+            styles: { fontSize: 11 },
+            columnStyles: {
+                0: { fontStyle: 'bold', cellWidth: 60 },
+                1: { cellWidth: 110, fontSize: 12, fontStyle: 'bold' },
+            },
+            didParseCell: (data: any) => {
+                // Add color to predikat row, second column
+                if (data.row.index === 1 && data.column.index === 1) {
+                    data.cell.styles.fillColor = predikatColor;
+                    data.cell.styles.textColor = [255, 255, 255];
+                }
+            },
+            margin: { left: margin, right: margin },
+        });
+
+        // Footer
+        const totalPages = doc.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'italic');
+            doc.text(
+                `Halaman ${i} dari ${totalPages}`,
+                pageWidth / 2,
+                doc.internal.pageSize.getHeight() - 10,
+                { align: 'center' },
+            );
+            doc.text(
+                `Dicetak pada: ${new Date().toLocaleString('id-ID')}`,
+                pageWidth - margin,
+                doc.internal.pageSize.getHeight() - 10,
+                { align: 'right' },
+            );
+        }
+
+        // Save PDF
+        const fileName = `Laporan_Pemeriksaan_${peserta.peserta.nama?.replace(/\s+/g, '_') || 'Peserta'}_${new Date().getTime()}.pdf`;
+        doc.save(fileName);
+
+        toast({
+            title: 'PDF berhasil diunduh',
+            variant: 'success',
+        });
+    } catch (error: any) {
+        console.error('Error exporting PDF:', error);
+        toast({
+            title: 'Gagal mengekspor PDF',
+            description: error.message || 'Terjadi kesalahan saat mengekspor PDF',
+            variant: 'destructive',
+        });
+    }
+};
+
 onMounted(() => {
     if (activeTab.value === 'visualisasi-data') {
         loadVisualisasi();
@@ -408,14 +820,24 @@ onMounted(() => {
         </template>
 
         <template #custom-action>
-            <Button
-                v-if="activeTab === 'visualisasi-data' && canInputHasilTes"
-                variant="outline"
-                @click="() => router.visit(`/pemeriksaan-khusus/${props.item.id}/input-hasil-tes`)"
-            >
-                <Activity class="h-4 w-4 mr-2" />
-                Input Hasil Tes
-            </Button>
+            <div v-if="activeTab === 'visualisasi-data'" class="flex gap-2">
+                <Button
+                    v-if="selectedPeserta && !loadingVisualisasi"
+                    variant="default"
+                    @click="exportToPDF"
+                >
+                    <Download class="h-4 w-4 mr-2" />
+                    Export PDF
+                </Button>
+                <Button
+                    v-if="canInputHasilTes"
+                    variant="outline"
+                    @click="() => router.visit(`/pemeriksaan-khusus/${props.item.id}/input-hasil-tes`)"
+                >
+                    <Activity class="h-4 w-4 mr-2" />
+                    Input Hasil Tes
+                </Button>
+            </div>
         </template>
 
         <template #custom>
@@ -612,7 +1034,7 @@ onMounted(() => {
                                 <div class="space-y-4">
                                     <ApexChart :options="gaugeChartOptions" :series="gaugeChartSeries" />
                                     <div class="text-center">
-                                        <Badge :class="getPredikatColor(selectedPeserta.predikat_keseluruhan)" class="text-sm">
+                                        <Badge :class="`${getPredikatColor(selectedPeserta.predikat_keseluruhan)} text-sm`">
                                             {{ getPredikatLabel(selectedPeserta.predikat_keseluruhan) }}
                                         </Badge>
                                     </div>
