@@ -303,9 +303,11 @@ class TenagaPendukungRepository
             if ($caborKategoriTenagaPendukung) {
                 $itemArray['cabor_id'] = $caborKategoriTenagaPendukung->cabor_id;
                 $itemArray['jenis_tenaga_pendukung'] = $caborKategoriTenagaPendukung->jenis_tenaga_pendukung;
+                $itemArray['posisi_atlet'] = $caborKategoriTenagaPendukung->posisi_atlet;
             } else {
                 $itemArray['cabor_id'] = null;
                 $itemArray['jenis_tenaga_pendukung'] = null;
+                $itemArray['posisi_atlet'] = null;
             }
             
             $data['item'] = $itemArray;
@@ -354,13 +356,15 @@ class TenagaPendukungRepository
             $this->kategoriPesertasForCallback = null;
         }
 
-        // Simpan cabor_id dan jenis_tenaga_pendukung untuk digunakan di callbackAfterStoreOrUpdate
+        // Simpan cabor_id, jenis_tenaga_pendukung, dan posisi_atlet untuk digunakan di callbackAfterStoreOrUpdate
         $this->caborDataForCallback = [
             'cabor_id' => $data['cabor_id'] ?? null,
             'jenis_tenaga_pendukung' => $data['jenis_tenaga_pendukung'] ?? null,
+            'posisi_atlet' => $data['posisi_atlet'] ?? null,
         ];
         unset($data['cabor_id']);
         unset($data['jenis_tenaga_pendukung']);
+        unset($data['posisi_atlet']);
 
         Log::info('TenagaPendukungRepository: customDataCreateUpdate', [
             'data'   => $data,
@@ -450,11 +454,13 @@ class TenagaPendukungRepository
             $caborData = $this->caborDataForCallback ?? [
                 'cabor_id' => request()->input('cabor_id'),
                 'jenis_tenaga_pendukung' => request()->input('jenis_tenaga_pendukung'),
+                'posisi_atlet' => request()->input('posisi_atlet'),
             ];
             
             if (!empty($caborData['cabor_id'])) {
                 $caborId = $caborData['cabor_id'];
                 $jenisTenagaPendukung = $caborData['jenis_tenaga_pendukung'] ?? null;
+                $posisiAtlet = $caborData['posisi_atlet'] ?? null;
                 
                 // Cek apakah sudah ada relasi ke cabor ini
                 $existingRelation = \App\Models\CaborKategoriTenagaPendukung::where('cabor_id', $caborId)
@@ -462,15 +468,17 @@ class TenagaPendukungRepository
                     ->first();
                 
                 if ($existingRelation) {
-                    // Update jenis jika sudah ada
+                    // Update jenis dan posisi jika sudah ada
                     $existingRelation->update([
                         'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
+                        'posisi_atlet' => $posisiAtlet,
                         'updated_by' => Auth::id(),
                     ]);
                     Log::info('TenagaPendukungRepository: Updated cabor assignment', [
                         'tenaga_pendukung_id' => $model->id,
                         'cabor_id' => $caborId,
                         'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
+                        'posisi_atlet' => $posisiAtlet,
                     ]);
                 } else {
                     // Buat relasi baru tanpa kategori (cabor_kategori_id = null)
@@ -479,6 +487,7 @@ class TenagaPendukungRepository
                         'cabor_kategori_id' => null, // Langsung ke cabor tanpa kategori
                         'tenaga_pendukung_id' => $model->id,
                         'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
+                        'posisi_atlet' => $posisiAtlet,
                         'is_active' => 1,
                         'created_by' => Auth::id(),
                         'updated_by' => Auth::id(),
@@ -487,6 +496,7 @@ class TenagaPendukungRepository
                         'tenaga_pendukung_id' => $model->id,
                         'cabor_id' => $caborId,
                         'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
+                        'posisi_atlet' => $posisiAtlet,
                     ]);
                 }
             }

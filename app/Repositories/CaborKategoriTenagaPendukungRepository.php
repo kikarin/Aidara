@@ -155,12 +155,25 @@ class CaborKategoriTenagaPendukungRepository
                 ->where('cabor_kategori_id', $data['cabor_kategori_id'])
                 ->where('tenaga_pendukung_id', $tpId)
                 ->first();
+
+            // Ambil jenis_tenaga_pendukung dari data yang sudah ada di cabor (tanpa kategori) jika tidak ada di input
+            $jenisTenagaPendukung = $data['jenis_tenaga_pendukung'] ?? null;
+            if (empty($jenisTenagaPendukung)) {
+                $existingCabor = $this->model->where('cabor_id', $data['cabor_id'])
+                    ->whereNull('cabor_kategori_id')
+                    ->where('tenaga_pendukung_id', $tpId)
+                    ->first();
+                if ($existingCabor && $existingCabor->jenis_tenaga_pendukung) {
+                    $jenisTenagaPendukung = $existingCabor->jenis_tenaga_pendukung;
+                }
+            }
+
             if ($existing) {
                 if ($existing->trashed()) {
                     $existing->restore();
                 }
                 $existing->is_active            = (int) $data['is_active'];
-                $existing->jenis_tenaga_pendukung = $data['jenis_tenaga_pendukung'] ?? null;
+                $existing->jenis_tenaga_pendukung = $jenisTenagaPendukung;
                 $existing->cabor_id             = $data['cabor_id'];
                 $existing->updated_by           = $userId;
                 $existing->updated_at           = now();
@@ -168,14 +181,14 @@ class CaborKategoriTenagaPendukungRepository
                 Log::info('Updated existing tenaga pendukung', [
                     'tenaga_pendukung_id'    => $tpId,
                     'is_active'              => $data['is_active'],
-                    'jenis_tenaga_pendukung' => $data['jenis_tenaga_pendukung'] ?? null,
+                    'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
                 ]);
             } else {
                 $insertData[] = [
                     'cabor_id'                => $data['cabor_id'],
                     'cabor_kategori_id'      => $data['cabor_kategori_id'],
                     'tenaga_pendukung_id'    => $tpId,
-                    'jenis_tenaga_pendukung' => $data['jenis_tenaga_pendukung'] ?? null,
+                    'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
                     'is_active'              => (int) $data['is_active'],
                     'created_by'             => $userId,
                     'updated_by'             => $userId,
@@ -185,7 +198,7 @@ class CaborKategoriTenagaPendukungRepository
                 Log::info('Will insert new tenaga pendukung', [
                     'tenaga_pendukung_id'    => $tpId,
                     'is_active'              => $data['is_active'],
-                    'jenis_tenaga_pendukung' => $data['jenis_tenaga_pendukung'] ?? null,
+                    'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
                 ]);
             }
         }

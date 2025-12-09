@@ -232,7 +232,7 @@ class CaborKategoriTenagaPendukungController extends Controller implements HasMi
 
             Log::info('Batch insert successful');
 
-            return redirect()->route('cabor-kategori-tenaga-pendukung.tenaga-pendukung-by-kategori', $caborKategoriId)
+            return redirect()->route('cabor-kategori-tenaga-pendukung.tenaga-by-kategori', $caborKategoriId)
                 ->with('success', 'Tenaga Pendukung berhasil ditambahkan ke kategori!');
         } catch (\Exception $e) {
             Log::error('Error in storeMultiple', [

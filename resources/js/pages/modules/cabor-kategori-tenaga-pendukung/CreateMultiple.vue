@@ -137,6 +137,7 @@ const fetchAvailableTenagaPendukung = async () => {
 };
 
 
+
 // Toggle selection tenaga pendukung
 const toggleSelect = (tenagaPendukungId: number) => {
     const index = selectedTenagaPendukungIds.value.indexOf(tenagaPendukungId);
@@ -237,7 +238,6 @@ const getPageNumbers = () => {
 
 // Load data saat komponen dimount
 fetchAvailableTenagaPendukung();
-fetchJenisTenagaPendukung();
 </script>
 
 <!-- Template tetap, hanya pastikan binding dan variabel konsisten dengan pelatih -->
@@ -259,21 +259,12 @@ fetchJenisTenagaPendukung();
                 </div>
             </div>
 
-            <!-- Jenis Tenaga Pendukung Selection -->
-            <div class="ml-120 flex items-center gap-4">
-                <Select
-                    :model-value="selectedJenisTenagaPendukungId"
-                    @update:model-value="(val: any) => (selectedJenisTenagaPendukungId = val as number | null)"
-                >
-                    <SelectTrigger>
-                        <SelectValue placeholder="Pilih Jenis Tenaga Pendukung" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem v-for="jenis in jenisTenagaPendukungList" :key="jenis.id" :value="jenis.id">
-                            {{ jenis.nama }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
+            <!-- Input Jenis Tenaga Pendukung (opsional) -->
+            <div class="flex items-center gap-4">
+                <div class="w-64">
+                    <label class="mb-2 block text-sm font-medium">Jenis Tenaga Pendukung (Opsional)</label>
+                    <Input v-model="jenisTenagaPendukung" placeholder="Masukkan jenis tenaga pendukung" />
+                </div>
             </div>
 
             <!-- Selection Counter -->

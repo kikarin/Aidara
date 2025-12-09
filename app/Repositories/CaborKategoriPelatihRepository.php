@@ -164,6 +164,18 @@ class CaborKategoriPelatihRepository
                 ->where('pelatih_id', $pelatihId)
                 ->first();
 
+            // Ambil jenis_pelatih dari data yang sudah ada di cabor (tanpa kategori) jika tidak ada di input
+            $jenisPelatih = $data['jenis_pelatih'] ?? null;
+            if (empty($jenisPelatih)) {
+                $existingCabor = $this->model->where('cabor_id', $data['cabor_id'])
+                    ->whereNull('cabor_kategori_id')
+                    ->where('pelatih_id', $pelatihId)
+                    ->first();
+                if ($existingCabor && $existingCabor->jenis_pelatih) {
+                    $jenisPelatih = $existingCabor->jenis_pelatih;
+                }
+            }
+
             if ($existing) {
                 // Jika soft deleted, restore
                 if ($existing->trashed()) {
@@ -171,7 +183,7 @@ class CaborKategoriPelatihRepository
                 }
                 // Update status aktif/nonaktif dan jenis pelatih
                 $existing->is_active     = (int) $data['is_active'];
-                $existing->jenis_pelatih = $data['jenis_pelatih'] ?? null;
+                $existing->jenis_pelatih = $jenisPelatih;
                 $existing->cabor_id      = $data['cabor_id'];
                 $existing->updated_by    = $userId;
                 $existing->updated_at    = now();
@@ -180,7 +192,7 @@ class CaborKategoriPelatihRepository
                 Log::info('Updated existing pelatih', [
                     'pelatih_id'    => $pelatihId,
                     'is_active'     => $data['is_active'],
-                    'jenis_pelatih' => $data['jenis_pelatih'] ?? null,
+                    'jenis_pelatih' => $jenisPelatih,
                 ]);
             } else {
                 // Insert baru
@@ -188,7 +200,7 @@ class CaborKategoriPelatihRepository
                     'cabor_id'          => $data['cabor_id'],
                     'cabor_kategori_id' => $data['cabor_kategori_id'],
                     'pelatih_id'        => $pelatihId,
-                    'jenis_pelatih'    => $data['jenis_pelatih'] ?? null,
+                    'jenis_pelatih'    => $jenisPelatih,
                     'is_active'         => (int) $data['is_active'],
                     'created_by'        => $userId,
                     'updated_by'        => $userId,
@@ -199,7 +211,7 @@ class CaborKategoriPelatihRepository
                 Log::info('Will insert new pelatih', [
                     'pelatih_id'    => $pelatihId,
                     'is_active'     => $data['is_active'],
-                    'jenis_pelatih' => $data['jenis_pelatih'] ?? null,
+                    'jenis_pelatih' => $jenisPelatih,
                 ]);
             }
         }

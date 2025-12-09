@@ -309,9 +309,11 @@ class PelatihRepository
             if ($caborKategoriPelatih) {
                 $itemArray['cabor_id'] = $caborKategoriPelatih->cabor_id;
                 $itemArray['jenis_pelatih'] = $caborKategoriPelatih->jenis_pelatih;
+                $itemArray['posisi_atlet'] = $caborKategoriPelatih->posisi_atlet;
             } else {
                 $itemArray['cabor_id'] = null;
                 $itemArray['jenis_pelatih'] = null;
+                $itemArray['posisi_atlet'] = null;
             }
             
             $data['item'] = $itemArray;
@@ -360,13 +362,15 @@ class PelatihRepository
             $this->kategoriPesertasForCallback = null;
         }
 
-        // Simpan cabor_id dan jenis_pelatih untuk digunakan di callbackAfterStoreOrUpdate
+        // Simpan cabor_id, jenis_pelatih, dan posisi_atlet untuk digunakan di callbackAfterStoreOrUpdate
         $this->caborDataForCallback = [
             'cabor_id' => $data['cabor_id'] ?? null,
             'jenis_pelatih' => $data['jenis_pelatih'] ?? null,
+            'posisi_atlet' => $data['posisi_atlet'] ?? null,
         ];
         unset($data['cabor_id']);
         unset($data['jenis_pelatih']);
+        unset($data['posisi_atlet']);
 
         Log::info('PelatihRepository: customDataCreateUpdate', [
             'data'   => $data,
@@ -470,11 +474,13 @@ class PelatihRepository
             $caborData = $this->caborDataForCallback ?? [
                 'cabor_id' => request()->input('cabor_id'),
                 'jenis_pelatih' => request()->input('jenis_pelatih'),
+                'posisi_atlet' => request()->input('posisi_atlet'),
             ];
             
             if (!empty($caborData['cabor_id'])) {
                 $caborId = $caborData['cabor_id'];
                 $jenisPelatih = $caborData['jenis_pelatih'] ?? null;
+                $posisiAtlet = $caborData['posisi_atlet'] ?? null;
                 
                 // Cek apakah sudah ada relasi ke cabor ini
                 $existingRelation = \App\Models\CaborKategoriPelatih::where('cabor_id', $caborId)
@@ -482,15 +488,17 @@ class PelatihRepository
                     ->first();
                 
                 if ($existingRelation) {
-                    // Update jenis jika sudah ada
+                    // Update jenis dan posisi jika sudah ada
                     $existingRelation->update([
                         'jenis_pelatih' => $jenisPelatih,
+                        'posisi_atlet' => $posisiAtlet,
                         'updated_by' => Auth::id(),
                     ]);
                     Log::info('PelatihRepository: Updated cabor assignment', [
                         'pelatih_id' => $model->id,
                         'cabor_id' => $caborId,
                         'jenis_pelatih' => $jenisPelatih,
+                        'posisi_atlet' => $posisiAtlet,
                     ]);
                 } else {
                     // Buat relasi baru tanpa kategori (cabor_kategori_id = null)
@@ -499,6 +507,7 @@ class PelatihRepository
                         'cabor_kategori_id' => null, // Langsung ke cabor tanpa kategori
                         'pelatih_id' => $model->id,
                         'jenis_pelatih' => $jenisPelatih,
+                        'posisi_atlet' => $posisiAtlet,
                         'is_active' => 1,
                         'created_by' => Auth::id(),
                         'updated_by' => Auth::id(),
@@ -507,6 +516,7 @@ class PelatihRepository
                         'pelatih_id' => $model->id,
                         'cabor_id' => $caborId,
                         'jenis_pelatih' => $jenisPelatih,
+                        'posisi_atlet' => $posisiAtlet,
                     ]);
                 }
             }
