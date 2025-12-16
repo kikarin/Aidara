@@ -28,6 +28,7 @@ class PelatihPrestasi extends Model
         'tanggal',
         'peringkat',
         'keterangan',
+        'bonus',
         'created_by',
         'updated_by',
         'deleted_by',

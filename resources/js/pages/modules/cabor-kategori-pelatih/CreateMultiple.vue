@@ -121,6 +121,17 @@ const fetchAvailablePelatih = async () => {
         });
         pelatihList.value = response.data.data || [];
         total.value = response.data.meta?.total || 0;
+        
+        // Auto-select semua pelatih dari cabor (tidak peduli gender)
+        if (pelatihList.value.length > 0) {
+            const allPelatihIds = pelatihList.value.map((pelatih: any) => pelatih.id);
+            // Merge dengan yang sudah ter-select (jangan overwrite)
+            allPelatihIds.forEach((id: number) => {
+                if (!selectedPelatihIds.value.includes(id)) {
+                    selectedPelatihIds.value.push(id);
+                }
+            });
+        }
     } catch (error) {
         console.error('Gagal mengambil data pelatih:', error);
         toast({ title: 'Gagal mengambil data pelatih', variant: 'destructive' });

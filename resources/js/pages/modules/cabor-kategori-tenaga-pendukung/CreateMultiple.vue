@@ -128,6 +128,17 @@ const fetchAvailableTenagaPendukung = async () => {
         });
         tenagaPendukungList.value = response.data.data || [];
         total.value = response.data.meta?.total || 0;
+        
+        // Auto-select semua tenaga pendukung dari cabor (tidak peduli gender)
+        if (tenagaPendukungList.value.length > 0) {
+            const allTenagaPendukungIds = tenagaPendukungList.value.map((tenagaPendukung: any) => tenagaPendukung.id);
+            // Merge dengan yang sudah ter-select (jangan overwrite)
+            allTenagaPendukungIds.forEach((id: number) => {
+                if (!selectedTenagaPendukungIds.value.includes(id)) {
+                    selectedTenagaPendukungIds.value.push(id);
+                }
+            });
+        }
     } catch (error) {
         console.error('Gagal mengambil data tenaga pendukung:', error);
         toast({ title: 'Gagal mengambil data tenaga pendukung', variant: 'destructive' });

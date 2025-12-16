@@ -500,16 +500,15 @@ class PemeriksaanKhususController extends Controller implements HasMiddleware
         try {
             $pemeriksaanKhusus = $this->repository->getById($id);
 
-            // Get semua peserta
+            // Get hanya atlet (pelatih dan tenaga pendukung tidak dinilai dalam pemeriksaan khusus)
             $pesertaList = PemeriksaanKhususPeserta::with(['peserta'])
                 ->where('pemeriksaan_khusus_id', $id)
+                ->where('peserta_type', 'App\\Models\\Atlet')
                 ->whereNull('deleted_at')
                 ->get();
 
-            // Format data untuk frontend
+            // Format data untuk frontend - HANYA ATLET
             $atlet = [];
-            $pelatih = [];
-            $tenagaPendukung = [];
 
             foreach ($pesertaList as $peserta) {
                 $pesertaData = [
@@ -518,21 +517,14 @@ class PemeriksaanKhususController extends Controller implements HasMiddleware
                     'jenis_kelamin' => $peserta->peserta->jenis_kelamin ?? null,
                 ];
 
-                $modelType = $peserta->peserta_type;
-                if (str_contains($modelType, 'Atlet')) {
-                    $atlet[] = $pesertaData;
-                } elseif (str_contains($modelType, 'Pelatih')) {
-                    $pelatih[] = $pesertaData;
-                } elseif (str_contains($modelType, 'TenagaPendukung')) {
-                    $tenagaPendukung[] = $pesertaData;
-                }
+                $atlet[] = $pesertaData;
             }
 
             return response()->json([
                 'success' => true,
                 'atlet' => $atlet,
-                'pelatih' => $pelatih,
-                'tenaga_pendukung' => $tenagaPendukung,
+                'pelatih' => [], // Pelatih tidak dinilai dalam pemeriksaan khusus
+                'tenaga_pendukung' => [], // Tenaga pendukung tidak dinilai dalam pemeriksaan khusus
             ]);
         } catch (\Exception $e) {
             Log::error('Error in apiGetPeserta: ' . $e->getMessage(), [
@@ -555,12 +547,13 @@ class PemeriksaanKhususController extends Controller implements HasMiddleware
         try {
             $pemeriksaanKhusus = $this->repository->getById($id);
 
-            // Get semua peserta dengan hasil tes mereka
+            // Get hanya atlet dengan hasil tes mereka (pelatih dan tenaga pendukung tidak dinilai)
             $pesertaList = PemeriksaanKhususPeserta::with([
                 'peserta',
                 'pemeriksaanKhususPesertaItemTes.itemTes',
             ])
                 ->where('pemeriksaan_khusus_id', $id)
+                ->where('peserta_type', 'App\\Models\\Atlet')
                 ->get();
 
             // Format data untuk frontend
@@ -661,7 +654,7 @@ class PemeriksaanKhususController extends Controller implements HasMiddleware
                 ->orderBy('urutan')
                 ->get();
 
-            // Get semua peserta dengan hasil aspek, item tes, dan keseluruhan
+            // Get hanya atlet dengan hasil aspek, item tes, dan keseluruhan (pelatih dan tenaga pendukung tidak dinilai)
             $pesertaList = PemeriksaanKhususPeserta::with([
                 'peserta',
                 'hasilAspek.aspek',
@@ -669,6 +662,7 @@ class PemeriksaanKhususController extends Controller implements HasMiddleware
                 'pemeriksaanKhususPesertaItemTes.itemTes.aspek',
             ])
                 ->where('pemeriksaan_khusus_id', $id)
+                ->where('peserta_type', 'App\\Models\\Atlet')
                 ->get();
 
             // Format data untuk visualisasi

@@ -22,12 +22,12 @@ class CaborRepository
     {
         $this->model   = $model;
         $this->request = CaborRequest::createFromBase(request());
-        $this->with    = ['created_by_user', 'updated_by_user', 'kategori'];
+        $this->with    = ['created_by_user', 'updated_by_user', 'kategori', 'kategoriPeserta'];
     }
 
     public function customIndex($data)
     {
-        $query = $this->model->select('id', 'nama', 'deskripsi');
+        $query = $this->model->select('id', 'nama', 'deskripsi', 'kategori_peserta_id')->with('kategoriPeserta');
 
         // Role-based filtering
         $auth = Auth::user();
@@ -54,6 +54,14 @@ class CaborRepository
                         ->where('is_active', 1)
                         ->whereNull('deleted_at');
                 });
+            }
+        }
+
+        // Filter by kategori_peserta_id (Jenis)
+        if (request('kategori_peserta_id')) {
+            $kategoriPesertaId = request('kategori_peserta_id');
+            if ($kategoriPesertaId !== 'all') {
+                $query->where('kategori_peserta_id', $kategoriPesertaId);
             }
         }
 
@@ -87,23 +95,30 @@ class CaborRepository
                 // Hitung jumlah peserta unik per cabor
                 $jumlahAtlet = DB::table('cabor_kategori_atlet')
                     ->where('cabor_id', $item->id)
-                    ->distinct('atlet_id')
-                    ->count('atlet_id');
+                    ->whereNull('deleted_at') // Filter soft deleted
+                    ->selectRaw('COUNT(DISTINCT atlet_id) as count')
+                    ->value('count') ?? 0;
 
                 $jumlahPelatih = DB::table('cabor_kategori_pelatih')
                     ->where('cabor_id', $item->id)
-                    ->distinct('pelatih_id')
-                    ->count('pelatih_id');
+                    ->whereNull('deleted_at') // Filter soft deleted
+                    ->selectRaw('COUNT(DISTINCT pelatih_id) as count')
+                    ->value('count') ?? 0;
 
                 $jumlahTenagaPendukung = DB::table('cabor_kategori_tenaga_pendukung')
                     ->where('cabor_id', $item->id)
-                    ->distinct('tenaga_pendukung_id')
-                    ->count('tenaga_pendukung_id');
+                    ->whereNull('deleted_at') // Filter soft deleted
+                    ->selectRaw('COUNT(DISTINCT tenaga_pendukung_id) as count')
+                    ->value('count') ?? 0;
 
                 return [
                     'id'                      => $item->id,
                     'nama'                    => $item->nama,
                     'deskripsi'               => $item->deskripsi,
+                    'kategori_peserta'        => $item->kategoriPeserta ? [
+                        'id' => $item->kategoriPeserta->id,
+                        'nama' => $item->kategoriPeserta->nama,
+                    ] : null,
                     'jumlah_atlet'            => $jumlahAtlet,
                     'jumlah_pelatih'          => $jumlahPelatih,
                     'jumlah_tenaga_pendukung' => $jumlahTenagaPendukung,
@@ -129,23 +144,30 @@ class CaborRepository
             // Hitung jumlah peserta unik per cabor
             $jumlahAtlet = DB::table('cabor_kategori_atlet')
                 ->where('cabor_id', $item->id)
-                ->distinct('atlet_id')
-                ->count('atlet_id');
+                ->whereNull('deleted_at') // Filter soft deleted
+                ->selectRaw('COUNT(DISTINCT atlet_id) as count')
+                ->value('count') ?? 0;
 
             $jumlahPelatih = DB::table('cabor_kategori_pelatih')
                 ->where('cabor_id', $item->id)
-                ->distinct('pelatih_id')
-                ->count('pelatih_id');
+                ->whereNull('deleted_at') // Filter soft deleted
+                ->selectRaw('COUNT(DISTINCT pelatih_id) as count')
+                ->value('count') ?? 0;
 
             $jumlahTenagaPendukung = DB::table('cabor_kategori_tenaga_pendukung')
                 ->where('cabor_id', $item->id)
-                ->distinct('tenaga_pendukung_id')
-                ->count('tenaga_pendukung_id');
+                ->whereNull('deleted_at') // Filter soft deleted
+                ->selectRaw('COUNT(DISTINCT tenaga_pendukung_id) as count')
+                ->value('count') ?? 0;
 
             return [
                 'id'                      => $item->id,
                 'nama'                    => $item->nama,
                 'deskripsi'               => $item->deskripsi,
+                'kategori_peserta'        => $item->kategoriPeserta ? [
+                    'id' => $item->kategoriPeserta->id,
+                    'nama' => $item->kategoriPeserta->nama,
+                ] : null,
                 'jumlah_atlet'            => $jumlahAtlet,
                 'jumlah_pelatih'          => $jumlahPelatih,
                 'jumlah_tenaga_pendukung' => $jumlahTenagaPendukung,
@@ -185,7 +207,7 @@ class CaborRepository
     public function getDetailWithUserTrack($id)
     {
         return $this->model
-            ->with(['created_by_user', 'updated_by_user', 'kategori'])
+            ->with(['created_by_user', 'updated_by_user', 'kategori', 'kategoriPeserta'])
             ->where('id', $id)
             ->first();
     }
@@ -220,6 +242,7 @@ class CaborRepository
                 return DB::table('cabor_kategori_atlet as cka')
                     ->join('atlets as a', 'cka.atlet_id', '=', 'a.id')
                     ->where('cka.cabor_id', $caborId)
+                    ->whereNull('cka.deleted_at') // Filter soft deleted
                     ->select('a.id', 'a.nama', 'a.foto', 'a.jenis_kelamin', 'a.tanggal_lahir')
                     ->distinct()
                     ->get()
@@ -243,6 +266,7 @@ class CaborRepository
                 return DB::table('cabor_kategori_pelatih as ckp')
                     ->join('pelatihs as p', 'ckp.pelatih_id', '=', 'p.id')
                     ->where('ckp.cabor_id', $caborId)
+                    ->whereNull('ckp.deleted_at') // Filter soft deleted
                     ->select('p.id', 'p.nama', 'p.foto', 'p.jenis_kelamin', 'p.tanggal_lahir')
                     ->distinct()
                     ->get()
@@ -266,6 +290,7 @@ class CaborRepository
                 return DB::table('cabor_kategori_tenaga_pendukung as cktp')
                     ->join('tenaga_pendukungs as tp', 'cktp.tenaga_pendukung_id', '=', 'tp.id')
                     ->where('cktp.cabor_id', $caborId)
+                    ->whereNull('cktp.deleted_at') // Filter soft deleted
                     ->select('tp.id', 'tp.nama', 'tp.foto', 'tp.jenis_kelamin', 'tp.tanggal_lahir')
                     ->distinct()
                     ->get()

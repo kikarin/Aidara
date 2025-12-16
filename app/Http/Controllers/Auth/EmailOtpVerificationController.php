@@ -19,8 +19,13 @@ class EmailOtpVerificationController extends Controller
     {
         $user = auth()->user();
         
-        // IMPORTANT: Jika user sudah verified (users existing), skip OTP verification
+        // IMPORTANT: Jika user sudah verified, cek apakah masih dalam proses registrasi
         if ($user->email_verified_at) {
+            // Jika user belum punya peserta_id atau masih pending, redirect ke registration steps
+            if (!$user->peserta_id || !$user->peserta_type || $user->registration_status === 'pending') {
+                return redirect()->route('registration.steps', ['step' => 1]);
+            }
+            // Jika sudah approved, redirect ke dashboard
             return redirect()->route('dashboard');
         }
 
@@ -36,8 +41,13 @@ class EmailOtpVerificationController extends Controller
     {
         $user = auth()->user();
 
-        // IMPORTANT: Jika user sudah verified, tidak perlu kirim OTP lagi
+        // IMPORTANT: Jika user sudah verified, cek apakah masih dalam proses registrasi
         if ($user->email_verified_at) {
+            // Jika user belum punya peserta_id atau masih pending, redirect ke registration steps
+            if (!$user->peserta_id || !$user->peserta_type || $user->registration_status === 'pending') {
+                return redirect()->route('registration.steps', ['step' => 1]);
+            }
+            // Jika sudah approved, redirect ke dashboard
             return redirect()->route('dashboard');
         }
 
@@ -79,8 +89,13 @@ class EmailOtpVerificationController extends Controller
 
         $user = auth()->user();
 
-        // IMPORTANT: Jika user sudah verified, langsung redirect
+        // IMPORTANT: Jika user sudah verified, cek apakah masih dalam proses registrasi
         if ($user->email_verified_at) {
+            // Jika user belum punya peserta_id atau masih pending, redirect ke registration steps
+            if (!$user->peserta_id || !$user->peserta_type || $user->registration_status === 'pending') {
+                return redirect()->route('registration.steps', ['step' => 1]);
+            }
+            // Jika sudah approved, redirect ke dashboard
             return redirect()->route('dashboard');
         }
 

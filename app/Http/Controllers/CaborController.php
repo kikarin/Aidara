@@ -181,8 +181,14 @@ class CaborController extends Controller implements HasMiddleware
             return redirect()->back()->with('error', 'Cabor tidak ditemukan!');
         }
 
+        // Pastikan kategori_peserta_id ter-include
+        $caborArray = $cabor->toArray();
+        if (!isset($caborArray['kategori_peserta_id'])) {
+            $caborArray['kategori_peserta_id'] = $cabor->kategori_peserta_id;
+        }
+
         $data = $this->commonData + [
-            'cabor' => $cabor,
+            'cabor' => $caborArray,
             'tipe'  => $tipe,
         ];
 

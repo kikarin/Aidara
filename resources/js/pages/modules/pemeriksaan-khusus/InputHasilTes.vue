@@ -180,12 +180,11 @@ const loadData = async () => {
         
         aspekList.value = Array.from(uniqueAspekMap.values());
 
-        // Load peserta dari pemeriksaan khusus
+        // Load peserta dari pemeriksaan khusus - HANYA ATLET (pelatih dan tenaga pendukung tidak dinilai)
         const pesertaRes = await axios.get(`/api/pemeriksaan-khusus/${props.item.id}/peserta`);
         pesertaList.value = [
             ...(pesertaRes.data.atlet || []).map((a: any) => ({ ...a, jenis_peserta: 'atlet' })),
-            ...(pesertaRes.data.pelatih || []).map((p: any) => ({ ...p, jenis_peserta: 'pelatih' })),
-            ...(pesertaRes.data.tenaga_pendukung || []).map((t: any) => ({ ...t, jenis_peserta: 'tenaga_pendukung' })),
+            // Pelatih dan tenaga pendukung tidak dinilai dalam pemeriksaan khusus
         ];
 
         // Load hasil tes yang sudah ada

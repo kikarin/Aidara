@@ -80,6 +80,20 @@ const deleteSelected = async () => {
     }
 };
 
+const bukaFilterModal = () => {
+    showFilterModal.value = true;
+};
+
+const handleFilter = (filters: any) => {
+    currentFilters.value = filters;
+    showFilterModal.value = false;
+    
+    // Apply filters to PageIndex
+    if (pageIndex.value) {
+        pageIndex.value.handleFilterFromParent(filters);
+    }
+    toast({ title: 'Filter berhasil diterapkan', variant: 'success' });
+};
 
 </script>
 
@@ -98,6 +112,8 @@ const deleteSelected = async () => {
         ref="pageIndex"
         :showImport="false"
         :showDelete="false"
+        :showFilter="true"
+        @filter="bukaFilterModal"
     >       
         <template #cell-peserta="{ row }">
             <BadgeGroup

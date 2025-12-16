@@ -7,6 +7,7 @@ import TabsList from '@/components/ui/tabs/TabsList.vue';
 
 import ApexChart from '@/components/ApexChart.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import PrestasiPreview from '@/pages/modules/prestasi/PrestasiPreview.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import { ClipboardCheck, Flag, HandHeart, HeartHandshake, Stethoscope, Ungroup, UserCircle2 } from 'lucide-vue-next';
@@ -386,6 +387,24 @@ const chartOptions = {
                             </Table>
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            <!-- Prestasi Section -->
+            <Card>
+                <CardHeader>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Prestasi Peserta</CardTitle>
+                            <p class="text-muted-foreground text-sm mt-1">Daftar prestasi semua peserta</p>
+                        </div>
+                        <Button variant="secondary" @click="router.visit('/prestasi')">
+                            Lihat Semua
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <PrestasiPreview />
                 </CardContent>
             </Card>
 

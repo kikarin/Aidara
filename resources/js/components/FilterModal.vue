@@ -23,7 +23,7 @@ interface FilterData {
 
 interface Props {
     open: boolean;
-    moduleType: 'cabor-kategori' | 'program-latihan' | 'pemeriksaan' | 'atlet' | 'pelatih' | 'tenaga-pendukung';
+    moduleType: 'cabor-kategori' | 'program-latihan' | 'pemeriksaan' | 'pemeriksaan-khusus' | 'atlet' | 'pelatih' | 'tenaga-pendukung' | 'cabor';
     initialFilters?: FilterData;
 }
 
@@ -63,8 +63,8 @@ onMounted(async () => {
         console.error('Gagal load cabor:', error);
     }
 
-    // Load kategori peserta for all peserta modules (atlet, pelatih, tenaga-pendukung)
-    if (['atlet', 'pelatih', 'tenaga-pendukung'].includes(props.moduleType)) {
+    // Load kategori peserta for all peserta modules (atlet, pelatih, tenaga-pendukung) and cabor
+    if (['atlet', 'pelatih', 'tenaga-pendukung', 'cabor'].includes(props.moduleType)) {
         try {
             const kategoriPesertaResponse = await axios.get('/api/kategori-peserta-list');
             kategoriAtlets.value = kategoriPesertaResponse.data;
@@ -232,7 +232,8 @@ const getLamaBergabungOptions = () => {
 
 // Computed properties untuk conditional rendering
 const isPesertaModule = computed(() => ['atlet', 'pelatih', 'tenaga-pendukung'].includes(props.moduleType));
-const isCaborModule = computed(() => ['cabor-kategori', 'program-latihan', 'pemeriksaan'].includes(props.moduleType));
+const isCaborModule = computed(() => ['cabor-kategori', 'program-latihan', 'pemeriksaan', 'pemeriksaan-khusus'].includes(props.moduleType));
+const isCaborIndexModule = computed(() => props.moduleType === 'cabor');
 </script>
 
 <template>
@@ -243,8 +244,8 @@ const isCaborModule = computed(() => ['cabor-kategori', 'program-latihan', 'peme
             </DialogHeader>
 
             <div class="grid gap-4 py-4">
-                <!-- Filter Tanggal -->
-                <div class="grid grid-cols-2 gap-4">
+                <!-- Filter Tanggal (tidak untuk cabor) -->
+                <div v-if="!isCaborIndexModule" class="grid grid-cols-2 gap-4">
                     <div class="space-y-2">
                         <Label for="filter_start_date">Tanggal Mulai</Label>
                         <div class="relative">
@@ -432,6 +433,41 @@ const isCaborModule = computed(() => ['cabor-kategori', 'program-latihan', 'peme
                     </div>
                 </template>
 
+                <!-- Filter khusus untuk cabor (index) -->
+                <template v-if="isCaborIndexModule">
+                    <!-- Filter Kategori Peserta (Jenis) -->
+                    <div class="space-y-2">
+                        <Label for="kategori_peserta_id">Jenis</Label>
+                        <Select v-model="filters.kategori_peserta_id">
+                            <SelectTrigger class="w-full">
+                                <SelectValue placeholder="Pilih Jenis" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <!-- Search input -->
+                                <div class="p-2">
+                                    <input
+                                        v-model="selectSearchQuery.kategori_peserta_id"
+                                        type="text"
+                                        placeholder="Cari jenis..."
+                                        class="w-full rounded border px-2 py-1 text-sm"
+                                        @click.stop
+                                        @keydown.stop
+                                    />
+                                </div>
+                                <!-- Filtered options -->
+                                <SelectItem value="all">Semua Jenis</SelectItem>
+                                <SelectItem
+                                    v-for="kategori in getFilteredOptions(kategoriAtlets, 'kategori_peserta_id')"
+                                    :key="kategori.id"
+                                    :value="kategori.id.toString()"
+                                >
+                                    {{ kategori.nama }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </template>
+
                 <!-- Filter Cabor (hanya untuk cabor-kategori, program-latihan, pemeriksaan) -->
                 <template v-if="isCaborModule">
                     <!-- Filter Cabor -->
@@ -462,7 +498,7 @@ const isCaborModule = computed(() => ['cabor-kategori', 'program-latihan', 'peme
                         </Select>
                     </div>
 
-                    <!-- Filter Cabor Kategori (hanya untuk program-latihan dan pemeriksaan) -->
+                    <!-- Filter Cabor Kategori (hanya untuk program-latihan, pemeriksaan, dan pemeriksaan-khusus) -->
                     <div v-if="props.moduleType !== 'cabor-kategori'" class="space-y-2">
                         <Label for="cabor_kategori_id">Kategori</Label>
                         <Select

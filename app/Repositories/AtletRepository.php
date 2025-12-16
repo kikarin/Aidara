@@ -47,6 +47,7 @@ class AtletRepository
             'kesehatan.created_by_user',
             'kesehatan.updated_by_user',
             'caborKategoriAtlet.cabor',
+            'caborKategoriAtlet.cabor.kategoriPeserta',
             'caborKategoriAtlet.caborKategori',
             'kategoriAtlet',
             'kategoriPesertas',
@@ -59,7 +60,56 @@ class AtletRepository
 
         $auth = Auth::user();
         if ($auth && (int) $auth->current_role_id === 35) {
+            // Atlet hanya melihat data mereka sendiri
             $query->where('users_id', $auth->id);
+        } elseif ($auth && (int) $auth->current_role_id === 36) {
+            // Pelatih hanya melihat atlet yang memiliki kategori peserta yang sama
+            if ($auth->pelatih && $auth->pelatih->id) {
+                // Ambil kategori peserta dari pelatih
+                $pelatihKategoriPesertaIds = DB::table('pelatih_kategori_peserta')
+                    ->where('pelatih_id', $auth->pelatih->id)
+                    ->whereNull('deleted_at')
+                    ->pluck('mst_kategori_peserta_id')
+                    ->toArray();
+                
+                if (!empty($pelatihKategoriPesertaIds)) {
+                    // Filter atlet yang memiliki kategori peserta yang sama dengan pelatih
+                    $query->whereExists(function ($subQuery) use ($pelatihKategoriPesertaIds) {
+                        $subQuery->select(DB::raw(1))
+                            ->from('atlet_kategori_peserta')
+                            ->whereColumn('atlet_kategori_peserta.atlet_id', 'atlets.id')
+                            ->whereIn('atlet_kategori_peserta.mst_kategori_peserta_id', $pelatihKategoriPesertaIds)
+                            ->whereNull('atlet_kategori_peserta.deleted_at'); // Filter soft deleted
+                    });
+                } else {
+                    // Jika pelatih tidak punya kategori peserta, tidak tampilkan atlet apapun
+                    $query->whereRaw('1 = 0');
+                }
+            }
+        } elseif ($auth && (int) $auth->current_role_id === 37) {
+            // Tenaga Pendukung hanya melihat atlet yang memiliki kategori peserta yang sama
+            if ($auth->tenagaPendukung && $auth->tenagaPendukung->id) {
+                // Ambil kategori peserta dari tenaga pendukung
+                $tenagaPendukungKategoriPesertaIds = DB::table('tenaga_pendukung_kategori_peserta')
+                    ->where('tenaga_pendukung_id', $auth->tenagaPendukung->id)
+                    ->whereNull('deleted_at')
+                    ->pluck('mst_kategori_peserta_id')
+                    ->toArray();
+                
+                if (!empty($tenagaPendukungKategoriPesertaIds)) {
+                    // Filter atlet yang memiliki kategori peserta yang sama dengan tenaga pendukung
+                    $query->whereExists(function ($subQuery) use ($tenagaPendukungKategoriPesertaIds) {
+                        $subQuery->select(DB::raw(1))
+                            ->from('atlet_kategori_peserta')
+                            ->whereColumn('atlet_kategori_peserta.atlet_id', 'atlets.id')
+                            ->whereIn('atlet_kategori_peserta.mst_kategori_peserta_id', $tenagaPendukungKategoriPesertaIds)
+                            ->whereNull('atlet_kategori_peserta.deleted_at'); // Filter soft deleted
+                    });
+                } else {
+                    // Jika tenaga pendukung tidak punya kategori peserta, tidak tampilkan atlet apapun
+                    $query->whereRaw('1 = 0');
+                }
+            }
         }
 
         // Filter untuk exclude atlet yang sudah ada di kategori tertentu
@@ -84,6 +134,7 @@ class AtletRepository
                         ->where('atlet_kategori_peserta.mst_kategori_peserta_id', $caborKategori->kategori_peserta_id);
                 });
             }
+            
         }
 
         // Apply filters
@@ -118,14 +169,31 @@ class AtletRepository
         if ($perPage === -1) {
             $all         = $query->get();
             $transformed = collect($all)->map(function ($item) {
-                // relasi caborKategoriAtlet dimuat
-                $item->load(['caborKategoriAtlet.cabor']);
+                // relasi caborKategoriAtlet dan kategoriPesertas dimuat
+                $item->load(['caborKategoriAtlet.cabor.kategoriPeserta', 'kategoriPesertas']);
                 $itemArray = $item->toArray();
                 if (!isset($itemArray['cabor_kategori_atlet'])) {
                     $itemArray['cabor_kategori_atlet'] = $item->caborKategoriAtlet->map(function ($cabor) {
+                        $caborData = $cabor->cabor ? $cabor->cabor->toArray() : null;
+                        // Include kategori_peserta dari cabor
+                        if ($caborData && $cabor->cabor && $cabor->cabor->kategoriPeserta) {
+                            $caborData['kategori_peserta'] = [
+                                'id' => $cabor->cabor->kategoriPeserta->id,
+                                'nama' => $cabor->cabor->kategoriPeserta->nama,
+                            ];
+                        }
                         return [
                             'id'    => $cabor->id,
-                            'cabor' => $cabor->cabor ? $cabor->cabor->toArray() : null,
+                            'cabor' => $caborData,
+                        ];
+                    })->toArray();
+                }
+                // Ensure kategori_pesertas ter-include
+                if (!isset($itemArray['kategori_pesertas'])) {
+                    $itemArray['kategori_pesertas'] = $item->kategoriPesertas->map(function ($kategori) {
+                        return [
+                            'id'   => $kategori->id,
+                            'nama' => $kategori->nama,
                         ];
                     })->toArray();
                 }
@@ -146,14 +214,31 @@ class AtletRepository
         $pageForPaginate = $page < 1 ? 1 : $page;
         $items           = $query->paginate($perPage, ['*'], 'page', $pageForPaginate)->withQueryString();
         $transformed     = collect($items->items())->map(function ($item) {
-            // relasi caborKategoriAtlet dimuat
-            $item->load(['caborKategoriAtlet.cabor']);
+            // relasi caborKategoriAtlet dan kategoriPesertas dimuat
+            $item->load(['caborKategoriAtlet.cabor.kategoriPeserta', 'kategoriPesertas']);
             $itemArray = $item->toArray();
             if (!isset($itemArray['cabor_kategori_atlet'])) {
                 $itemArray['cabor_kategori_atlet'] = $item->caborKategoriAtlet->map(function ($cabor) {
+                    $caborData = $cabor->cabor ? $cabor->cabor->toArray() : null;
+                    // Include kategori_peserta dari cabor
+                    if ($caborData && $cabor->cabor && $cabor->cabor->kategoriPeserta) {
+                        $caborData['kategori_peserta'] = [
+                            'id' => $cabor->cabor->kategoriPeserta->id,
+                            'nama' => $cabor->cabor->kategoriPeserta->nama,
+                        ];
+                    }
                     return [
                         'id'    => $cabor->id,
-                        'cabor' => $cabor->cabor ? $cabor->cabor->toArray() : null,
+                        'cabor' => $caborData,
+                    ];
+                })->toArray();
+            }
+            // Ensure kategori_pesertas ter-include
+            if (!isset($itemArray['kategori_pesertas'])) {
+                $itemArray['kategori_pesertas'] = $item->kategoriPesertas->map(function ($kategori) {
+                    return [
+                        'id'   => $kategori->id,
+                        'nama' => $kategori->nama,
                     ];
                 })->toArray();
             }

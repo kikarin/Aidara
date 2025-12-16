@@ -16,12 +16,14 @@ const kategoriPesertaOptions = ref<{ value: number; label: string }[]>([]);
 onMounted(async () => {
     try {
         const res = await axios.get('/api/kategori-peserta-list');
-        kategoriPesertaOptions.value = (res.data || []).map((item: { id: number; nama: string }) => ({
+        const kategoriData = Array.isArray(res.data) ? res.data : [];
+        kategoriPesertaOptions.value = kategoriData.map((item: { id: number; nama: string }) => ({
             value: item.id,
             label: item.nama,
         }));
     } catch (error) {
         console.error('Gagal mengambil data kategori peserta:', error);
+        kategoriPesertaOptions.value = [];
     }
 });
 

@@ -28,6 +28,15 @@ const breadcrumbs = [
     { title: 'Detail Prestasi', href: `/tenaga-pendukung/${props.tenagaPendukungId}/prestasi/${props.item.id}` },
 ];
 
+const formatRupiah = (value: number | null | undefined): string => {
+    if (!value || value === 0) return 'Rp 0';
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0,
+    }).format(value);
+};
+
 const fields = computed(() => [
     { label: 'Nama Event', value: props.item?.nama_event || '-' },
     { label: 'Tingkat', value: props.item?.tingkat?.nama || '-' },
@@ -38,6 +47,7 @@ const fields = computed(() => [
             : '-',
     },
     { label: 'Peringkat', value: props.item?.peringkat || '-' },
+    { label: 'Bonus', value: formatRupiah(props.item?.bonus || 0) },
     { label: 'Keterangan', value: props.item?.keterangan || '-', className: 'sm:col-span-2' },
 ]);
 

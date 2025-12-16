@@ -99,24 +99,6 @@ class AllParameterController extends Controller implements HasMiddleware
         return inertia('modules/all-parameter/Statistik', $data);
     }
 
-    public function chart($parameterId)
-    {
-        $parameter = MstParameter::findOrFail($parameterId);
-
-        $data = $this->commonData + [];
-        if ($this->check_permission == true) {
-            $data = array_merge($data, $this->getPermission());
-        }
-
-        $data['parameter'] = [
-            'id'     => $parameter->id,
-            'nama'   => $parameter->nama,
-            'satuan' => $parameter->satuan,
-        ];
-
-        return inertia('modules/all-parameter/Chart', $data);
-    }
-
     public function apiIndex()
     {
         // Get all unique parameters that are used in pemeriksaan
@@ -141,6 +123,7 @@ class AllParameterController extends Controller implements HasMiddleware
     public function apiStatistik($parameterId)
     {
         $parameter = MstParameter::findOrFail($parameterId);
+        $caborId = request('cabor_id');
 
         // Get all pemeriksaan that use this parameter
         $pemeriksaanIds = PemeriksaanParameter::where('mst_parameter_id', $parameterId)
@@ -167,13 +150,48 @@ class AllParameterController extends Controller implements HasMiddleware
             )
             ->get();
 
-        // Get peserta list
+        // Get peserta list dengan filter cabor
         $pesertaList = collect();
         foreach ($statistikData as $data) {
             $pesertaType = $data->peserta_type;
             $pesertaId   = $data->peserta_id;
 
-            // Logic untuk kategori khusus sudah dihapus (module terpisah)
+            // Filter berdasarkan cabor jika dipilih
+            $isInCabor = false;
+            if ($caborId) {
+                switch ($pesertaType) {
+                    case 'App\\Models\\Atlet':
+                        $isInCabor = DB::table('cabor_kategori_atlet')
+                            ->where('atlet_id', $pesertaId)
+                            ->where('cabor_id', $caborId)
+                            ->whereNull('deleted_at')
+                            ->exists();
+                        break;
+
+                    case 'App\\Models\\Pelatih':
+                        $isInCabor = DB::table('cabor_kategori_pelatih')
+                            ->where('pelatih_id', $pesertaId)
+                            ->where('cabor_id', $caborId)
+                            ->whereNull('deleted_at')
+                            ->exists();
+                        break;
+
+                    case 'App\\Models\\TenagaPendukung':
+                        $isInCabor = DB::table('cabor_kategori_tenaga_pendukung')
+                            ->where('tenaga_pendukung_id', $pesertaId)
+                            ->where('cabor_id', $caborId)
+                            ->whereNull('deleted_at')
+                            ->exists();
+                        break;
+                }
+            } else {
+                // Jika tidak ada filter cabor, tampilkan semua
+                $isInCabor = true;
+            }
+
+            if (!$isInCabor) {
+                continue;
+            }
 
             switch ($pesertaType) {
                 case 'App\\Models\\Atlet':
@@ -229,8 +247,13 @@ class AllParameterController extends Controller implements HasMiddleware
             }
         }
 
-        // Transform data untuk menambahkan tanggal pemeriksaan
-        $transformedData = $statistikData->map(function ($item) use ($pemeriksaanList) {
+        // Filter statistikData berdasarkan peserta yang ada di pesertaList
+        $pesertaIds = $pesertaList->pluck('id')->toArray();
+        $transformedData = $statistikData
+            ->filter(function ($item) use ($pesertaIds) {
+                return in_array($item->peserta_id, $pesertaIds);
+            })
+            ->map(function ($item) use ($pemeriksaanList) {
             $pemeriksaan = $pemeriksaanList->firstWhere('id', $item->pemeriksaan_id);
 
             return [

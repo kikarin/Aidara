@@ -201,8 +201,9 @@ class CategoryPermissionSeeder extends Seeder
                 'permission' => ['Cabor Kategori Tenaga Pendukung Show', 'Cabor Kategori Tenaga Pendukung Add', 'Cabor Kategori Tenaga Pendukung Edit', 'Cabor Kategori Tenaga Pendukung Delete'],
             ],
             [
-                'name'       => 'Program Latihan',
-                'permission' => 'CRUD',
+                'name'              => 'Program Latihan',
+                'permission'        => 'CRUD',
+                'permission_common' => ['Program Latihan Rekap Absen'],
             ],
             [
                 'name'       => 'Pemeriksaan',

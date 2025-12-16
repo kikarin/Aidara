@@ -23,6 +23,7 @@ const formData = ref({
     tanggal: props.initialData?.tanggal || '',
     peringkat: props.initialData?.peringkat || '',
     keterangan: props.initialData?.keterangan || '',
+    bonus: props.initialData?.bonus || 0,
     id: props.initialData?.id || undefined,
 });
 
@@ -63,6 +64,14 @@ const formInputs = computed(() => [
     { name: 'tanggal', label: 'Tanggal', type: 'date' as const, placeholder: 'Pilih tanggal', required: false },
     { name: 'peringkat', label: 'Peringkat', type: 'text' as const, placeholder: 'Masukkan peringkat' },
     { name: 'keterangan', label: 'Keterangan', type: 'textarea' as const, placeholder: 'Masukkan keterangan' },
+    { 
+        name: 'bonus', 
+        label: 'Bonus (Rupiah)', 
+        type: 'number' as const, 
+        placeholder: 'Masukkan jumlah bonus', 
+        required: false,
+        help: 'Masukkan jumlah bonus dalam rupiah (contoh: 1000000 untuk 1 juta)',
+    },
 ]);
 
 const handleSave = (dataFromFormInput: any, setFormErrors: (errors: Record<string, string>) => void) => {

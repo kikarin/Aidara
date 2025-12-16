@@ -37,6 +37,7 @@ const props = defineProps<{
         help?: string;
         options?: { value: string | number; label: string }[];
         showPassword?: { value: boolean };
+        disabled?: boolean;
     }[];
     initialData?: Record<string, any>;
     modelValue?: Record<string, any>;
@@ -655,17 +656,20 @@ defineExpose({
                             v-else-if="input.type === 'select'"
                             :required="input.required"
                             :model-value="form[input.name]"
+                            :disabled="input.disabled"
                             @update:modelValue="
                                 (val: any) => {
+                                    if (!input.disabled) {
                                     console.log(`FormInput: Select ${input.name} updated to:`, val);
                                     form[input.name] = val;
                                     emit('field-updated', { field: input.name, value: val });
                                     console.log(`FormInput: Form data after select update:`, form.data());
+                                    }
                                 }
                             "
                             :key="`select-${input.name}-${JSON.stringify(input.options || [])}`"
                         >
-                            <SelectTrigger class="w-full">
+                            <SelectTrigger class="w-full" :disabled="input.disabled">
                                 <SelectValue :placeholder="input.placeholder" />
                             </SelectTrigger>
                             <SelectContent>

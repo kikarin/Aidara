@@ -14,6 +14,7 @@ const props = defineProps<{
         id: number;
         nama: string;
         deskripsi: string;
+        kategori_peserta?: { id: number; nama: string } | null;
         created_at: string;
         created_by_user: { id: number; name: string } | null;
         updated_at: string;
@@ -72,6 +73,7 @@ const tabsConfig = [
 
 const fields = computed(() => [
     { label: 'Nama Cabor', value: dataItem.value?.nama || '-' },
+    { label: 'Jenis', value: dataItem.value?.kategori_peserta?.nama || '-' },
     { label: 'Deskripsi', value: dataItem.value?.deskripsi || '-' },
 ]);
 

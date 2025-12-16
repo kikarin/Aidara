@@ -9,6 +9,7 @@ use App\Notifications\EmailOtpNotification;
 use App\Repositories\RegistrationRepository;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rules;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Support\Facades\Log;
@@ -65,8 +66,29 @@ class RegistrationController extends Controller
      */
     public function store(Request $request)
     {
+        // Cek apakah email sudah ada (termasuk soft delete)
+        $existingUser = User::withTrashed()->where('email', $request->email)->first();
+        
+        // Validasi email: unique hanya untuk user yang tidak di-soft delete
+        $emailRule = [
+            'required',
+            'string',
+            'lowercase',
+            'email',
+            'max:255',
+            new \App\Rules\NotDisposableEmail(),
+        ];
+        
+        // Jika user aktif ada, validasi unique
+        if ($existingUser && !$existingUser->trashed()) {
+            $emailRule[] = Rule::unique('users', 'email');
+        } else {
+            // Jika user di-soft delete atau tidak ada, validasi unique dengan whereNull untuk mengabaikan soft delete
+            $emailRule[] = Rule::unique('users', 'email')->whereNull('deleted_at');
+        }
+        
         $rules = [
-            'email'    => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class, new \App\Rules\NotDisposableEmail()],
+            'email'    => $emailRule,
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ];
 
@@ -88,11 +110,31 @@ class RegistrationController extends Controller
         }
 
         try {
-            $user = $this->repository->createRegistrationUser([
-                'email'    => $request->email,
-                'password' => $request->password,
-                'name'     => $request->email, // Temporary, akan diupdate di step 2
-            ]);
+            // Cek apakah user sudah ada dan di-soft delete
+            $existingUser = User::withTrashed()->where('email', $request->email)->first();
+            
+            if ($existingUser && $existingUser->trashed()) {
+                // Restore user yang sudah di-soft delete
+                $existingUser->restore();
+                $user = $existingUser;
+                
+                // Update password
+                $user->update([
+                    'password' => bcrypt($request->password),
+                ]);
+                
+                Log::info('RegistrationController: Restored soft-deleted user', [
+                    'user_id' => $user->id,
+                    'email' => $request->email,
+                ]);
+            } else {
+                // Buat user baru
+                $user = $this->repository->createRegistrationUser([
+                    'email'    => $request->email,
+                    'password' => $request->password,
+                    'name'     => $request->email, // Temporary, akan diupdate di step 2
+                ]);
+            }
 
             // Login user untuk session
             auth()->login($user);
@@ -129,11 +171,10 @@ class RegistrationController extends Controller
                 'user_id' => $user->id,
             ]);
 
-            // Return JSON response untuk Inertia agar bisa handle di frontend
-            return back()->with([
-                'otp_sent' => true,
-                'message' => 'Kode OTP telah dikirim ke email Anda. Silakan cek inbox email Anda.',
-            ]);
+            // IMPORTANT: Pastikan user tetap login dan redirect ke OTP verification
+            // User akan tetap login meskipun belum verified, sehingga bisa akses registration steps setelah verify
+            return redirect()->route('email.otp.verify')
+                ->with('success', 'Kode OTP telah dikirim ke email Anda. Silakan cek inbox email Anda.');
         } catch (\Exception $e) {
             Log::error('RegistrationController: Error creating registration user', [
                 'error' => $e->getMessage(),

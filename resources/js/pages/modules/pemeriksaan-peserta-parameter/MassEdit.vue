@@ -63,8 +63,10 @@ onMounted(async () => {
         });
         parameterList.value = paramRes.data?.data || [];
 
-        // Fetch peserta berdasarkan jenis
-        const pesertaRes = await axios.get(`/api/pemeriksaan/${props.pemeriksaan.id}/peserta/${props.jenis_peserta}`);
+        // Fetch peserta berdasarkan jenis - gunakan per_page=-1 untuk mendapatkan semua peserta tanpa limit
+        const pesertaRes = await axios.get(`/api/pemeriksaan/${props.pemeriksaan.id}/peserta/${props.jenis_peserta}`, {
+            params: { per_page: -1 } // -1 berarti ambil semua data tanpa limit
+        });
         pesertaList.value = pesertaRes.data?.data || pesertaRes.data?.items?.data || [];
 
         // Init table state

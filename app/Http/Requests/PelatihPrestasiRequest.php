@@ -22,6 +22,7 @@ class PelatihPrestasiRequest extends FormRequest
             'tanggal'                        => 'nullable|date',
             'peringkat'                      => 'nullable|string|max:255',
             'keterangan'                     => 'nullable|string',
+            'bonus'                          => 'nullable|numeric|min:0',
         ];
 
         if ($this->isMethod('patch') || $this->isMethod('put')) {

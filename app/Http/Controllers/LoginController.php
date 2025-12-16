@@ -36,7 +36,11 @@ class LoginController extends Controller
         if (Auth::attempt($credentials, $remember)) {
             $user = Auth::user();
             
-            if ($user->is_active == 0) {
+            // Izinkan login jika user masih dalam proses registrasi (belum punya peserta_id atau registration_status = 'pending')
+            $isInRegistrationProcess = !$user->peserta_id || !$user->peserta_type || $user->registration_status === 'pending';
+            
+            // Jika user tidak aktif, cek apakah masih dalam proses registrasi
+            if ($user->is_active == 0 && !$isInRegistrationProcess) {
                 Auth::logout();
 
                 return redirect('login')->withError('Your account is not active!');
@@ -64,8 +68,16 @@ class LoginController extends Controller
                     $request->session()->put('otp_last_sent', now());
                 }
                 
+                // Redirect ke OTP verification, user tetap login
                 return redirect()->route('email.otp.verify')
                     ->with('warning', 'Email Anda belum diverifikasi. Silakan masukkan kode OTP yang telah dikirim ke email Anda.');
+            }
+            
+            // Jika user sudah verified tapi masih dalam proses registrasi, redirect ke registration steps
+            $isInRegistrationProcess = !$user->peserta_id || !$user->peserta_type || $user->registration_status === 'pending';
+            if ($isInRegistrationProcess) {
+                return redirect()->route('registration.steps', ['step' => 1])
+                    ->with('info', 'Silakan lengkapi data registrasi Anda.');
             }
             
             if ($user->verification_token != null) {

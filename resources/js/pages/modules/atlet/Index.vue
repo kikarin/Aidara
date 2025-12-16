@@ -42,8 +42,8 @@ const columns = [
             return row.jenis_kelamin === 'L' ? 'Laki-laki' : row.jenis_kelamin === 'P' ? 'Perempuan' : '-';
         },
     },
-    { key: 'tempat_lahir', label: 'Tempat Lahir' },
-    { key: 'agama', label: 'Agama' },
+    // { key: 'tempat_lahir', label: 'Tempat Lahir' },
+    // { key: 'agama', label: 'Agama' },
     // {
     //     key: 'tanggal_lahir',
     //     label: 'Tanggal Lahir',
@@ -81,6 +81,20 @@ const columns = [
         key: 'lama_bergabung',
         label: 'Lama Bergabung',
         format: (row: any) => getLamaBergabung(row.tanggal_bergabung),
+    },
+    {
+        key: 'kategori_peserta',
+        label: 'Kategori Peserta',
+        format: (row: any) => {
+            if (row.kategori_pesertas && row.kategori_pesertas.length > 0) {
+                const kategoriList = row.kategori_pesertas.map((item: any) => {
+                    const kategoriName = typeof item === 'object' ? item.nama : item;
+                    return kategoriName;
+                });
+                return kategoriList.join(', ');
+            }
+            return '-';
+        },
     },
     {
         key: 'cabor',

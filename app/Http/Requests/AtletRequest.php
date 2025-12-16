@@ -40,6 +40,9 @@ class AtletRequest extends FormRequest
             'kelurahan_id'      => 'nullable|integer',
             'no_hp'             => 'nullable|string|max:40',
             'email'             => 'nullable|email|max:200',
+            'disabilitas'       => 'nullable|string|max:255',
+            'klasifikasi'       => 'nullable|string|max:255',
+            'iq'                => 'nullable|string|max:50',
             'is_active'         => 'nullable|boolean',
             'is_delete_foto'    => 'nullable|boolean',
 
@@ -125,6 +128,9 @@ class AtletRequest extends FormRequest
             'ukuran_sepatu'     => $nullIfEmpty($this->ukuran_sepatu),
             'no_hp'             => $nullIfEmpty($this->no_hp),
             'email'             => $nullIfEmpty($this->email),
+            'disabilitas'       => $nullIfEmpty($this->disabilitas),
+            'klasifikasi'       => $nullIfEmpty($this->klasifikasi),
+            'iq'                => $nullIfEmpty($this->iq),
 
             // Prepare AtletOrangTua fields - convert empty strings to null
             'nama_ibu_kandung'  => $nullIfEmpty($this->nama_ibu_kandung),

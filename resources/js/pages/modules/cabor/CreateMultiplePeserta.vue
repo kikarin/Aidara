@@ -15,6 +15,7 @@ const props = defineProps<{
     cabor: {
         id: number;
         nama: string;
+        kategori_peserta_id?: number | null;
     };
     tipe: 'atlet' | 'pelatih' | 'tenaga_pendukung';
 }>();
@@ -136,14 +137,19 @@ const apiEndpoint = computed(() => {
 const fetchAvailableData = async () => {
     loading.value = true;
     try {
-        const response = await axios.get(apiEndpoint.value, {
-            params: {
+        const params: Record<string, any> = {
                 page: currentPage.value > 1 ? currentPage.value - 1 : 0,
                 per_page: perPage.value,
                 search: searchQuery.value,
                 exclude_cabor_id: props.cabor.id, // Exclude yang sudah ada di cabor ini
-            },
-        });
+        };
+        
+        // Filter berdasarkan kategori_peserta_id dari cabor jika ada
+        if (props.cabor.kategori_peserta_id) {
+            params.kategori_peserta_id = props.cabor.kategori_peserta_id;
+        }
+        
+        const response = await axios.get(apiEndpoint.value, { params });
         dataList.value = response.data.data || [];
         total.value = response.data.meta?.total || 0;
     } catch (error) {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FilterModal from '@/components/FilterModal.vue';
 import { useToast } from '@/components/ui/toast/useToast';
 import PageIndex from '@/pages/modules/base-page/PageIndex.vue';
 import { router } from '@inertiajs/vue3';
@@ -11,6 +12,13 @@ const breadcrumbs = [{ title: 'Cabor', href: '/cabor' }];
 
 const columns = [
     { key: 'nama', label: 'Nama Cabor' },
+    {
+        key: 'jenis',
+        label: 'Jenis',
+        format: (row: any) => {
+            return row.kategori_peserta?.nama || '-';
+        },
+    },
     { key: 'peserta', label: 'Peserta', sortable: false, orderable: false },
     { key: 'deskripsi', label: 'Deskripsi' },
 ];
@@ -18,6 +26,10 @@ const columns = [
 const selected = ref<number[]>([]);
 const pageIndex = ref();
 const { toast } = useToast();
+
+// Filter state
+const showFilterModal = ref(false);
+const currentFilters = ref<any>({});
 
 const showPesertaModal = ref(false);
 const selectedPesertaData = ref<any[]>([]);
@@ -76,6 +88,17 @@ const closePesertaModal = () => {
     selectedPesertaTipe.value = '';
     selectedCaborId.value = null;
 };
+
+const bukaFilterModal = () => {
+    showFilterModal.value = true;
+};
+
+const handleFilter = (filters: any) => {
+    currentFilters.value = filters;
+    // Apply filters to the data table
+    pageIndex.value.handleFilterFromParent(filters);
+    toast({ title: 'Filter berhasil diterapkan', variant: 'success' });
+};
 </script>
 
 <template>
@@ -88,13 +111,15 @@ const closePesertaModal = () => {
             :create-url="'/cabor/create'"
             :actions="actions"
             :selected="selected"
-            @update:selected="(val) => (selected = val)"
+            @update:selected="(val: number[]) => (selected = val)"
             :on-delete-selected="deleteSelected"
             api-endpoint="/api/cabor"
             ref="pageIndex"
             :on-toast="toast"
             :on-delete-row-confirm="deleteRow"
             :show-import="false"
+            :showFilter="true"
+            @filter="bukaFilterModal"
         >
             <template #cell-peserta="{ row }">
                 <BadgeGroup
@@ -121,6 +146,15 @@ const closePesertaModal = () => {
                 />
             </template>
         </PageIndex>
+
+        <!-- Filter Modal -->
+        <FilterModal
+            :open="showFilterModal"
+            @update:open="showFilterModal = $event"
+            module-type="cabor"
+            :initial-filters="currentFilters"
+            @filter="handleFilter"
+        />
 
         <!-- Modal Peserta -->
         <PesertaModal

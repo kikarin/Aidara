@@ -128,6 +128,27 @@ const fetchAvailableAtlet = async () => {
         });
         atletList.value = response.data.data || [];
         total.value = response.data.meta?.total || 0;
+        
+        // Auto-select semua atlet yang sesuai filter jenis kelamin
+        if (atletList.value.length > 0) {
+            const filteredAtletIds = atletList.value
+                .filter((atlet: any) => {
+                    // Jika jenis kelamin kategori adalah L atau P, hanya pilih yang sesuai
+                    if (props.caborKategori.jenis_kelamin === 'L' || props.caborKategori.jenis_kelamin === 'P') {
+                        return atlet.jenis_kelamin === props.caborKategori.jenis_kelamin;
+                    }
+                    // Jika Campuran, pilih semua
+                    return true;
+                })
+                .map((atlet: any) => atlet.id);
+            
+            // Merge dengan yang sudah ter-select (jangan overwrite)
+            filteredAtletIds.forEach((id: number) => {
+                if (!selectedAtletIds.value.includes(id)) {
+                    selectedAtletIds.value.push(id);
+                }
+            });
+        }
     } catch (error) {
         console.error('Gagal mengambil data atlet:', error);
         toast({ title: 'Gagal mengambil data atlet', variant: 'destructive' });

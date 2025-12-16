@@ -111,6 +111,22 @@ const props = defineProps<{
         kategori_atlet?: { id: number; nama: string } | null;
         kategori_atlets?: Array<{ id: number; nama: string }>;
         kategori_pesertas?: Array<{ id: number; nama: string }>;
+        cabor_kategori_atlet?: Array<{
+            id: number;
+            cabor_id: number;
+            cabor_kategori_id: number | null;
+            posisi_atlet: string | null;
+            posisi_atlet_id: number | null;
+            cabor?: {
+                id: number;
+                nama: string;
+                kategori_peserta_id: number | null;
+            };
+            caborKategori?: {
+                id: number;
+                nama: string;
+            } | null;
+        }>;
     };
 }>();
 
@@ -218,8 +234,24 @@ const fields = computed(() => {
                       ? props.item.kategori_atlets.map((k: { nama: string }) => k.nama).join(', ')
                       : props.item?.kategori_atlet?.nama || '-',
         },
+        {
+            label: 'Cabang Olahraga',
+            value: props.item?.cabor_kategori_atlet && props.item.cabor_kategori_atlet.length > 0
+                ? props.item.cabor_kategori_atlet.map((c: any) => {
+                    const caborName = c.cabor?.nama || 'Cabor tidak diketahui';
+                    const kategoriName = c.caborKategori?.nama ? ` - ${c.caborKategori.nama}` : '';
+                    const posisi = c.posisi_atlet ? ` (${c.posisi_atlet})` : '';
+                    return `${caborName}${kategoriName}${posisi}`;
+                }).join(', ')
+                : '-',
+            className: 'sm:col-span-2',
+        },
         { label: 'No HP', value: props.item?.no_hp || '-' },
         { label: 'Email', value: props.item?.email || '-' },
+        // Field NPCI/SOIna - hanya tampilkan jika ada nilai
+        ...(props.item?.disabilitas ? [{ label: 'Disabilitas', value: props.item.disabilitas }] : []),
+        ...(props.item?.klasifikasi ? [{ label: 'Klasifikasi', value: props.item.klasifikasi }] : []),
+        ...(props.item?.iq ? [{ label: 'IQ', value: props.item.iq }] : []),
         {
             label: 'Status',
             value: props.item?.is_active ? 'Aktif' : 'Nonaktif',

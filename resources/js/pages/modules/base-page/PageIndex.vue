@@ -10,6 +10,7 @@ import debounce from 'lodash.debounce';
 import { computed, onMounted, ref, watch } from 'vue';
 import DataTable from '../components/DataTable.vue';
 import HeaderActions from './HeaderActions.vue';
+import permissionService from '@/services/permissionService';
 
 // Configure axios to send credentials (cookies) with requests
 axios.defaults.withCredentials = true;
@@ -103,6 +104,8 @@ const props = defineProps<{
         delete?: boolean;
         import?: boolean;
         kelola?: boolean;
+        detail?: boolean;
+        edit?: boolean;
     };
     showStatistik?: boolean;
     statistikUrl?: string;
@@ -117,6 +120,32 @@ const localSelected = ref<number[]>([]);
 
 // Filter state
 const currentFilters = ref<any>({});
+
+// Generate permissions otomatis dari moduleName jika tidak diberikan
+const computedPermissions = computed(() => {
+    if (props.permissions) {
+        return {
+            ...props.permissions,
+            // Tambahkan detail dan edit jika belum ada
+            detail: props.permissions.detail !== undefined ? props.permissions.detail : undefined,
+            edit: props.permissions.edit !== undefined ? props.permissions.edit : undefined,
+        };
+    }
+    
+    // Generate permissions otomatis berdasarkan moduleName
+    if (props.moduleName) {
+        return {
+            create: permissionService.canCreate(props.moduleName),
+            delete: permissionService.canDelete(props.moduleName),
+            import: permissionService.hasPermission(`${props.moduleName} Import`),
+            kelola: permissionService.hasPermission(`${props.moduleName} Kelola`),
+            detail: permissionService.canRead(props.moduleName),
+            edit: permissionService.canUpdate(props.moduleName),
+        };
+    }
+    
+    return undefined;
+});
 
 watch(
     () => props.selected,
@@ -184,7 +213,28 @@ const confirmDeleteRow = async () => {
 
 const localActions = (row: any) => {
     const base = props.actions ? props.actions(row) : [];
-    return base.map((action) => {
+    
+    // Filter actions berdasarkan permission
+    return base.filter((action) => {
+        // Jika action punya permission field, check permission tersebut
+        if (action.permission) {
+            return permissionService.hasPermission(action.permission);
+        }
+        
+        // Untuk default actions (Detail, Edit, Delete), check berdasarkan computedPermissions
+        if (action.label === 'Detail') {
+            return computedPermissions.value?.detail !== false;
+        }
+        if (action.label === 'Edit') {
+            return computedPermissions.value?.edit !== false;
+        }
+        if (action.label === 'Delete') {
+            return computedPermissions.value?.delete !== false;
+        }
+        
+        // Default: tampilkan jika tidak ada permission check
+        return true;
+    }).map((action) => {
         if (action.label === 'Delete') {
             return {
                 ...action,
@@ -256,7 +306,7 @@ defineExpose({ fetchData, handleFilterFromParent });
                         :kelolaUrl="props.kelolaUrl"
                         :kelolaLabel="props.kelolaLabel"
                         :showDelete="props.showDelete"
-                        :permissions="permissions"
+                        :permissions="computedPermissions"
                         :showStatistik="props.showStatistik"
                         :statistikUrl="props.statistikUrl"
                         :showFilter="props.showFilter"
@@ -283,7 +333,7 @@ defineExpose({ fetchData, handleFilterFromParent });
                         :per-page="props.limit !== undefined ? props.limit : localLimit"
                         :base-url="''"
                         :module-name="moduleName"
-                        :permissions="permissions"
+                        :permissions="computedPermissions"
                         @update:search="handleSearchDebounced"
                         @update:sort="handleSort"
                         @update:page="handlePageChange"

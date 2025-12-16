@@ -71,11 +71,18 @@ interface Kesehatan {
 
 interface CaborData {
     id: number;
-    cabor_nama: string;
-    cabor_kategori_nama: string;
-    jenis_tenaga_pendukung_nama: string;
-    is_active: boolean;
-    created_at: string;
+    cabor_id: number;
+    cabor_kategori_id: number | null;
+    jenis_tenaga_pendukung: string | null;
+    cabor?: {
+        id: number;
+        nama: string;
+        kategori_peserta_id: number | null;
+    };
+    caborKategori?: {
+        id: number;
+        nama: string;
+    } | null;
 }
 
 const props = defineProps<{
@@ -101,7 +108,21 @@ const props = defineProps<{
         prestasi?: Prestasi[];
         dokumen?: Dokumen[];
         kesehatan?: Kesehatan | null;
-        cabor_kategori_tenaga_pendukung?: CaborData[];
+        cabor_kategori_tenaga_pendukung?: Array<{
+            id: number;
+            cabor_id: number;
+            cabor_kategori_id: number | null;
+            jenis_tenaga_pendukung: string | null;
+            cabor?: {
+                id: number;
+                nama: string;
+                kategori_peserta_id: number | null;
+            };
+            caborKategori?: {
+                id: number;
+                nama: string;
+            } | null;
+        }>;
         kecamatan?: { nama: string } | null;
         kelurahan?: { nama: string } | null;
         tanggal_bergabung?: string;
@@ -197,6 +218,18 @@ const fields = computed(() => {
                 props.item?.kategori_pesertas && props.item.kategori_pesertas.length > 0
                     ? props.item.kategori_pesertas.map((k: { nama: string }) => k.nama).join(', ')
                     : '-',
+        },
+        {
+            label: 'Cabang Olahraga',
+            value: props.item?.cabor_kategori_tenaga_pendukung && props.item.cabor_kategori_tenaga_pendukung.length > 0
+                ? props.item.cabor_kategori_tenaga_pendukung.map((c: any) => {
+                    const caborName = c.cabor?.nama || 'Cabor tidak diketahui';
+                    const kategoriName = c.caborKategori?.nama ? ` - ${c.caborKategori.nama}` : '';
+                    const jenisTenagaPendukung = c.jenis_tenaga_pendukung ? ` (${c.jenis_tenaga_pendukung})` : '';
+                    return `${caborName}${kategoriName}${jenisTenagaPendukung}`;
+                }).join(', ')
+                : '-',
+            className: 'sm:col-span-2',
         },
         { label: 'No HP', value: props.item?.no_hp || '-' },
         { label: 'Email', value: props.item?.email || '-' },

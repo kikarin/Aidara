@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use App\Models\Role;
+use App\Models\CaborKategori;
 
 class TenagaPendukungRepository
 {
@@ -64,7 +65,7 @@ class TenagaPendukungRepository
             });
 
             // Filter berdasarkan kategori_peserta dari cabor_kategori jika ada
-            $caborKategori = \App\Models\CaborKategori::find($excludeKategoriId);
+            $caborKategori = CaborKategori::find($excludeKategoriId);
             if ($caborKategori && $caborKategori->kategori_peserta_id) {
                 $query->whereExists(function ($subQuery) use ($caborKategori) {
                     $subQuery->select(DB::raw(1))
@@ -73,6 +74,7 @@ class TenagaPendukungRepository
                         ->where('tenaga_pendukung_kategori_peserta.mst_kategori_peserta_id', $caborKategori->kategori_peserta_id);
                 });
             }
+            
         }
 
         // Apply filters
@@ -288,22 +290,30 @@ class TenagaPendukungRepository
     {
         // Load kategori peserta yang sudah ada (multiple)
         if ($item && isset($item->id)) {
-            $item->load(['kategoriPesertas', 'caborKategoriTenagaPendukung.cabor']);
+            $item->load(['kategoriPesertas', 'caborKategoriTenagaPendukung.cabor', 'caborKategoriTenagaPendukung.caborKategori']);
             $kategoriPesertasIds = $item->kategoriPesertas->pluck('id')->toArray();
             $data['kategori_pesertas'] = $kategoriPesertasIds;
             
-            // Load cabor data dari pivot (ambil yang pertama jika ada)
-            $caborKategoriTenagaPendukung = $item->caborKategoriTenagaPendukung->first();
+            // Load semua cabor data dari pivot (yang langsung ke cabor, tanpa kategori)
+            $caborKategoriTenagaPendukungList = $item->caborKategoriTenagaPendukung->where('cabor_kategori_id', null);
             
             // Convert item ke array dan tambahkan kategori_pesertas
             $itemArray = $item->toArray();
             $itemArray['kategori_pesertas'] = $kategoriPesertasIds;
             
-            // Tambahkan cabor data
-            if ($caborKategoriTenagaPendukung) {
-                $itemArray['cabor_id'] = $caborKategoriTenagaPendukung->cabor_id;
-                $itemArray['jenis_tenaga_pendukung'] = $caborKategoriTenagaPendukung->jenis_tenaga_pendukung;
-                $itemArray['posisi_atlet'] = $caborKategoriTenagaPendukung->posisi_atlet;
+            // Tambahkan cabor_kategori_tenaga_pendukung untuk form bisa akses
+            $itemArray['cabor_kategori_tenaga_pendukung'] = $item->caborKategoriTenagaPendukung->toArray();
+            
+            // Ambil semua cabor_id yang unik (yang langsung ke cabor, tanpa kategori)
+            $caborIds = $caborKategoriTenagaPendukungList->pluck('cabor_id')->unique()->values()->toArray();
+            $itemArray['cabor_ids'] = $caborIds;
+            
+            // Tambahkan cabor data (untuk backward compatibility)
+            $firstCaborKategoriTenagaPendukung = $caborKategoriTenagaPendukungList->first();
+            if ($firstCaborKategoriTenagaPendukung) {
+                $itemArray['cabor_id'] = $firstCaborKategoriTenagaPendukung->cabor_id;
+                $itemArray['jenis_tenaga_pendukung'] = $firstCaborKategoriTenagaPendukung->jenis_tenaga_pendukung;
+                $itemArray['posisi_atlet'] = $firstCaborKategoriTenagaPendukung->posisi_atlet;
             } else {
                 $itemArray['cabor_id'] = null;
                 $itemArray['jenis_tenaga_pendukung'] = null;
@@ -356,13 +366,37 @@ class TenagaPendukungRepository
             $this->kategoriPesertasForCallback = null;
         }
 
-        // Simpan cabor_id, jenis_tenaga_pendukung, dan posisi_atlet untuk digunakan di callbackAfterStoreOrUpdate
+        // Simpan cabor_ids (array), jenis_tenaga_pendukung, dan posisi_atlet untuk digunakan di callbackAfterStoreOrUpdate
+        // Support backward compatibility dengan cabor_id (single)
+        // Cek dari $data terlebih dahulu, lalu dari request sebagai fallback
+        $caborIds = [];
+        if (isset($data['cabor_ids']) && is_array($data['cabor_ids'])) {
+            $caborIds = array_filter($data['cabor_ids']); // Remove null/empty values
+        } elseif (request()->has('cabor_ids') && is_array(request()->input('cabor_ids'))) {
+            // Fallback: ambil dari request langsung
+            $caborIds = array_filter(request()->input('cabor_ids', []));
+        } elseif (isset($data['cabor_id']) && $data['cabor_id']) {
+            // Backward compatibility: jika masih pakai cabor_id (single)
+            $caborIds = [$data['cabor_id']];
+        } elseif (request()->has('cabor_id') && request()->input('cabor_id')) {
+            // Fallback: ambil dari request langsung
+            $caborIds = [request()->input('cabor_id')];
+        }
+        
+        Log::info('TenagaPendukungRepository: customDataCreateUpdate - cabor_ids', [
+            'cabor_ids_from_data' => $data['cabor_ids'] ?? 'not set',
+            'cabor_ids_from_request' => request()->input('cabor_ids', 'not set'),
+            'cabor_ids_final' => $caborIds,
+            'method' => is_null($record) ? 'create' : 'update',
+        ]);
+        
         $this->caborDataForCallback = [
-            'cabor_id' => $data['cabor_id'] ?? null,
-            'jenis_tenaga_pendukung' => $data['jenis_tenaga_pendukung'] ?? null,
-            'posisi_atlet' => $data['posisi_atlet'] ?? null,
+            'cabor_ids' => $caborIds,
+            'jenis_tenaga_pendukung' => $data['jenis_tenaga_pendukung'] ?? request()->input('jenis_tenaga_pendukung'),
+            'posisi_atlet' => $data['posisi_atlet'] ?? request()->input('posisi_atlet'),
         ];
         unset($data['cabor_id']);
+        unset($data['cabor_ids']);
         unset($data['jenis_tenaga_pendukung']);
         unset($data['posisi_atlet']);
 
@@ -451,20 +485,55 @@ class TenagaPendukungRepository
             }
 
             // Handle Cabor Assignment (langsung ke cabor tanpa kategori)
+            // Support multiple cabor_ids (array) dengan backward compatibility untuk cabor_id (single)
             $caborData = $this->caborDataForCallback ?? [
-                'cabor_id' => request()->input('cabor_id'),
+                'cabor_ids' => request()->input('cabor_ids', []),
+                'cabor_id' => request()->input('cabor_id'), // Backward compatibility
                 'jenis_tenaga_pendukung' => request()->input('jenis_tenaga_pendukung'),
                 'posisi_atlet' => request()->input('posisi_atlet'),
             ];
             
-            if (!empty($caborData['cabor_id'])) {
-                $caborId = $caborData['cabor_id'];
+            // Get cabor_ids array (support backward compatibility)
+            $caborIds = [];
+            if (!empty($caborData['cabor_ids']) && is_array($caborData['cabor_ids'])) {
+                $caborIds = array_filter($caborData['cabor_ids']); // Remove null/empty values
+            } elseif (!empty($caborData['cabor_id'])) {
+                // Backward compatibility: jika masih pakai cabor_id (single)
+                $caborIds = [$caborData['cabor_id']];
+            }
+            
+            // Selalu hapus relasi cabor yang tidak ada di array baru (soft delete)
+            // Ini penting untuk handle kasus ketika cabor_ids kosong atau berubah
+            $existingCaborIds = CaborKategoriTenagaPendukung::where('tenaga_pendukung_id', $model->id)
+                ->whereNull('cabor_kategori_id') // Hanya yang langsung ke cabor (tanpa kategori)
+                ->pluck('cabor_id')
+                ->toArray();
+            
+            $caborIdsToDelete = array_diff($existingCaborIds, $caborIds);
+            if (!empty($caborIdsToDelete)) {
+                CaborKategoriTenagaPendukung::where('tenaga_pendukung_id', $model->id)
+                    ->whereNull('cabor_kategori_id')
+                    ->whereIn('cabor_id', $caborIdsToDelete)
+                    ->delete();
+                Log::info('TenagaPendukungRepository: Deleted cabor assignments', [
+                    'tenaga_pendukung_id' => $model->id,
+                    'deleted_cabor_ids' => $caborIdsToDelete,
+                ]);
+            }
+            
+            // Jika ada cabor_ids, create atau update relasi
+            if (!empty($caborIds)) {
                 $jenisTenagaPendukung = $caborData['jenis_tenaga_pendukung'] ?? null;
                 $posisiAtlet = $caborData['posisi_atlet'] ?? null;
                 
+                // Create atau update relasi untuk setiap cabor_id
+                foreach ($caborIds as $caborId) {
+                    if (empty($caborId)) continue;
+                
                 // Cek apakah sudah ada relasi ke cabor ini
-                $existingRelation = \App\Models\CaborKategoriTenagaPendukung::where('cabor_id', $caborId)
+                $existingRelation = CaborKategoriTenagaPendukung::where('cabor_id', $caborId)
                     ->where('tenaga_pendukung_id', $model->id)
+                        ->whereNull('cabor_kategori_id') // Hanya yang langsung ke cabor
                     ->first();
                 
                 if ($existingRelation) {
@@ -472,6 +541,7 @@ class TenagaPendukungRepository
                     $existingRelation->update([
                         'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
                         'posisi_atlet' => $posisiAtlet,
+                            'is_active' => 1,
                         'updated_by' => Auth::id(),
                     ]);
                     Log::info('TenagaPendukungRepository: Updated cabor assignment', [
@@ -482,7 +552,7 @@ class TenagaPendukungRepository
                     ]);
                 } else {
                     // Buat relasi baru tanpa kategori (cabor_kategori_id = null)
-                    \App\Models\CaborKategoriTenagaPendukung::create([
+                    CaborKategoriTenagaPendukung::create([
                         'cabor_id' => $caborId,
                         'cabor_kategori_id' => null, // Langsung ke cabor tanpa kategori
                         'tenaga_pendukung_id' => $model->id,
@@ -498,6 +568,7 @@ class TenagaPendukungRepository
                         'jenis_tenaga_pendukung' => $jenisTenagaPendukung,
                         'posisi_atlet' => $posisiAtlet,
                     ]);
+                    }
                 }
             }
 

@@ -6,8 +6,10 @@ import { useToast } from '@/components/ui/toast/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { ArrowDown, ArrowUp, BarChart3, Minus, RefreshCw } from 'lucide-vue-next';
-import { computed, onMounted, ref } from 'vue';
+import { ArrowDown, ArrowUp, Minus, RefreshCw } from 'lucide-vue-next';
+import { computed, onMounted, ref, watch } from 'vue';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 const { toast } = useToast();
 const page = usePage();
@@ -60,15 +62,38 @@ const rencanaPemeriksaanList = ref<RencanaPemeriksaan[]>([]);
 const parameterInfo = ref<Parameter | null>(null);
 const loading = ref(false);
 
+// State untuk filter cabor
+const selectedCaborId = ref<string>('');
+const caborList = ref<Array<{ id: number; nama: string }>>([]);
+
 // Modal state
 const isModalOpen = ref(false);
 const selectedParticipant = ref<Peserta | null>(null);
 
-// Load data statistik
+// Load list cabor
+const loadCaborList = async () => {
+    try {
+        const response = await axios.get('/api/cabor-list');
+        caborList.value = response.data;
+    } catch (error) {
+        console.error('Error loading cabor list:', error);
+        toast({ title: 'Gagal memuat data cabor', variant: 'destructive' });
+    }
+};
+
+// Load data statistik dengan filter cabor
 const loadStatistikData = async () => {
+    if (!selectedCaborId.value) {
+        statistikData.value = [];
+        pesertaList.value = [];
+        rencanaPemeriksaanList.value = [];
+        return;
+    }
+
     loading.value = true;
     try {
-        const response = await axios.get(`/api/pemeriksaan-parameter/AllParameter/${parameterId.value}/statistik`);
+        const url = `/api/pemeriksaan-parameter/AllParameter/${parameterId.value}/statistik?cabor_id=${selectedCaborId.value}`;
+        const response = await axios.get(url);
 
         statistikData.value = response.data.data || [];
         pesertaList.value = response.data.peserta || [];
@@ -81,6 +106,11 @@ const loadStatistikData = async () => {
         loading.value = false;
     }
 };
+
+// Watch selectedCaborId untuk reload data
+watch(selectedCaborId, () => {
+    loadStatistikData();
+});
 
 // Generate data untuk tabel
 const sortedRencanaPemeriksaan = computed(() => {
@@ -156,7 +186,8 @@ const closeModal = () => {
 
 // Fetch data saat component mount
 onMounted(async () => {
-    await loadStatistikData();
+    await loadCaborList();
+    // Jangan load statistik data dulu, tunggu user pilih cabor
 });
 </script>
 
@@ -183,18 +214,27 @@ onMounted(async () => {
                 </CardContent>
             </Card>
 
-            <Button
-                v-if="statistikData.length > 0"
-                @click="router.visit(`/pemeriksaan-parameter/AllParameter/${parameterId}/chart`)"
-                variant="outline"
-                class="flex items-center gap-2"
-            >
-                <BarChart3 class="h-4 w-4" />
-                Lihat Grafik
-            </Button>
+            <!-- Filter Cabor -->
+            <Card class="bg-white dark:bg-neutral-900">
+                <CardContent class="pt-6">
+                    <div class="flex items-center gap-4">
+                        <Label for="cabor_id" class="min-w-[100px]">Pilih Cabor:</Label>
+                        <Select v-model="selectedCaborId">
+                            <SelectTrigger class="w-[300px]">
+                                <SelectValue placeholder="Pilih Cabor untuk melihat peserta" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="cabor in caborList" :key="cabor.id" :value="cabor.id.toString()">
+                                    {{ cabor.nama }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
+            </Card>
 
             <!-- Statistik Table -->
-            <div class="rounded-lg border bg-white dark:bg-neutral-900">
+            <div v-if="selectedCaborId" class="rounded-lg border bg-white dark:bg-neutral-900">
                 <div v-if="loading" class="flex items-center justify-center p-8">
                     <div class="flex items-center gap-2">
                         <RefreshCw class="h-4 w-4 animate-spin" />
@@ -287,6 +327,13 @@ onMounted(async () => {
                     </table>
                 </div>
             </div>
+
+            <!-- Pesan jika belum pilih cabor -->
+            <Card v-else class="bg-white dark:bg-neutral-900">
+                <CardContent class="py-12 text-center">
+                    <p class="text-muted-foreground">Silakan pilih Cabor terlebih dahulu untuk melihat data statistik peserta</p>
+                </CardContent>
+            </Card>
         </div>
 
         <!-- Modal Chart Peserta -->

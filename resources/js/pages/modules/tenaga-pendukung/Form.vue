@@ -35,8 +35,12 @@ const formData = ref({
     id: props.initialData?.id || undefined,
     file: null,
     is_delete_foto: 0,
-    // Cabang Olahraga fields
-    cabor_id: props.initialData?.cabor_id || '',
+    // Cabang Olahraga fields (multi-select)
+    cabor_ids: Array.isArray(props.initialData?.cabor_ids) 
+        ? props.initialData.cabor_ids 
+        : props.initialData?.cabor_id 
+            ? [props.initialData.cabor_id] 
+            : [],
     jenis_tenaga_pendukung: props.initialData?.jenis_tenaga_pendukung || '',
 });
 
@@ -44,29 +48,66 @@ const kecamatanOptions = ref<{ value: number; label: string }[]>([]);
 const kelurahanOptions = ref<{ value: number; label: string }[]>([]);
 const kategoriPesertaOptions = ref<{ value: number; label: string }[]>([]);
 const caborOptions = ref<{ value: number; label: string }[]>([]);
+const allCaborOptions = ref<{ value: number; label: string; kategori_peserta_id: number | null }[]>([]);
 
 onMounted(async () => {
     try {
+        // Load kecamatan
+    try {
         const res = await axios.get('/api/kecamatan-list');
-        kecamatanOptions.value = (res.data || []).map((item: { id: number; nama: string }) => ({ value: item.id, label: item.nama }));
-
-        if (props.mode === 'edit' && formData.value.kecamatan_id) {
-            const kelurahanRes = await axios.get(`/api/kelurahan-by-kecamatan/${formData.value.kecamatan_id}`);
-            kelurahanOptions.value = kelurahanRes.data.map((item: { id: number; nama: string }) => ({ value: item.id, label: item.nama }));
+            const kecamatanData = Array.isArray(res.data) ? res.data : [];
+            kecamatanOptions.value = kecamatanData.map((item: { id: number; nama: string }) => ({ value: item.id, label: item.nama }));
+        } catch (error) {
+            console.error('Gagal mengambil data kecamatan:', error);
+            kecamatanOptions.value = [];
         }
 
-        const kategoriPesertaRes = await axios.get('/api/kategori-peserta-list');
-        kategoriPesertaOptions.value = (kategoriPesertaRes.data || []).map((item: { id: number; nama: string }) => ({
-            value: item.id,
-            label: item.nama,
-        }));
+        if (props.mode === 'edit' && formData.value.kecamatan_id) {
+            try {
+            const kelurahanRes = await axios.get(`/api/kelurahan-by-kecamatan/${formData.value.kecamatan_id}`);
+                const kelurahanData = Array.isArray(kelurahanRes.data) ? kelurahanRes.data : [];
+                kelurahanOptions.value = kelurahanData.map((item: { id: number; nama: string }) => ({ value: item.id, label: item.nama }));
+            } catch (error) {
+                console.error('Gagal mengambil data kelurahan:', error);
+                kelurahanOptions.value = [];
+            }
+        }
 
-        // Load cabor list
-        const caborRes = await axios.get('/api/cabor-list');
-        caborOptions.value = (caborRes.data || []).map((item: { id: number; nama: string }) => ({
+        // Load kategori peserta
+        try {
+        const kategoriPesertaRes = await axios.get('/api/kategori-peserta-list');
+            const kategoriData = Array.isArray(kategoriPesertaRes.data) ? kategoriPesertaRes.data : [];
+            kategoriPesertaOptions.value = kategoriData.map((item: { id: number; nama: string }) => ({
             value: item.id,
             label: item.nama,
         }));
+        } catch (error) {
+            console.error('Gagal mengambil data kategori peserta:', error);
+            kategoriPesertaOptions.value = [];
+        }
+
+        // Load cabor list (semua cabor untuk filtering nanti)
+        try {
+            // Gunakan /api/cabor-list dengan parameter for_peserta_form untuk mengecualikan filter
+        const caborRes = await axios.get('/api/cabor-list', { params: { for_peserta_form: true } });
+            const caborData = Array.isArray(caborRes.data) ? caborRes.data : [];
+            
+            allCaborOptions.value = caborData.map((item: any) => ({
+            value: item.id,
+            label: item.nama,
+                kategori_peserta_id: item.kategori_peserta_id || null,
+            }));
+            
+            // Filter cabor berdasarkan kategori peserta yang sudah dipilih (jika ada)
+            // Pastikan allCaborOptions sudah terisi sebelum filter
+            if (allCaborOptions.value.length > 0) {
+                filterCaborByKategoriPeserta();
+            }
+        } catch (error) {
+            console.error('Gagal mengambil data cabor:', error);
+            allCaborOptions.value = [];
+            caborOptions.value = [];
+        }
 
         // Load kategori peserta yang sudah ada (untuk edit mode)
         // Cek dari initialData terlebih dahulu, lalu dari page.props
@@ -91,14 +132,31 @@ onMounted(async () => {
             }
 
             // Load cabor data dari pivot jika ada
-            const existingCabor = props.initialData?.cabor_id 
-                || (page.props as any).item?.cabor_id;
+            // Gunakan cabor_ids dari item jika ada (sudah di-filter di backend)
+            if (props.initialData?.cabor_ids && Array.isArray(props.initialData.cabor_ids) && props.initialData.cabor_ids.length > 0) {
+                formData.value.cabor_ids = props.initialData.cabor_ids;
+            } else if ((page.props as any).item?.cabor_ids && Array.isArray((page.props as any).item.cabor_ids) && (page.props as any).item.cabor_ids.length > 0) {
+                formData.value.cabor_ids = (page.props as any).item.cabor_ids;
+            } else {
+                // Fallback: ambil dari cabor_kategori_tenaga_pendukung (hanya yang cabor_kategori_id null)
+                const existingCaborKategoriTenagaPendukung = props.initialData?.cabor_kategori_tenaga_pendukung 
+                    || (page.props as any).item?.cabor_kategori_tenaga_pendukung;
+                
+                if (existingCaborKategoriTenagaPendukung && Array.isArray(existingCaborKategoriTenagaPendukung) && existingCaborKategoriTenagaPendukung.length > 0) {
+                    // Filter hanya yang cabor_kategori_id null (langsung ke cabor, tanpa kategori)
+                    const directCabor = existingCaborKategoriTenagaPendukung.filter((item: any) => !item.cabor_kategori_id);
+                    // Ambil semua cabor_id yang unik
+                    const caborIds = [...new Set(directCabor.map((item: any) => item.cabor_id || item.cabor?.id).filter(Boolean))];
+                    formData.value.cabor_ids = caborIds;
+                } else if (props.initialData?.cabor_id || (page.props as any).item?.cabor_id) {
+                    // Fallback untuk backward compatibility
+                    const existingCabor = props.initialData?.cabor_id || (page.props as any).item?.cabor_id;
+                    formData.value.cabor_ids = [existingCabor];
+                }
+            }
+            
             const existingJenisTenagaPendukung = props.initialData?.jenis_tenaga_pendukung 
                 || (page.props as any).item?.jenis_tenaga_pendukung;
-            
-            if (existingCabor) {
-                formData.value.cabor_id = existingCabor;
-            }
             if (existingJenisTenagaPendukung) {
                 formData.value.jenis_tenaga_pendukung = existingJenisTenagaPendukung;
             }
@@ -117,10 +175,60 @@ watch(
     (newKategori) => {
         if (props.mode === 'edit' && Array.isArray(newKategori)) {
             formData.value.kategori_pesertas = newKategori;
-            console.log('TenagaPendukung/Form.vue: Updated kategori_pesertas from watch', newKategori);
         }
     },
     { immediate: true }
+);
+
+// Function untuk filter cabor berdasarkan kategori peserta
+const filterCaborByKategoriPeserta = () => {
+    // Pastikan allCaborOptions sudah terisi
+    if (!allCaborOptions.value || allCaborOptions.value.length === 0) {
+        caborOptions.value = [];
+        return;
+    }
+    
+    const kategoriPesertas = formData.value.kategori_pesertas;
+    
+    // Jika belum ada kategori peserta yang dipilih, tampilkan semua cabor
+    if (!kategoriPesertas || !Array.isArray(kategoriPesertas) || kategoriPesertas.length === 0) {
+        caborOptions.value = allCaborOptions.value.map((c: any) => ({
+            value: c.value,
+            label: c.label,
+        }));
+        return;
+    }
+    
+    // Ambil kategori_peserta_id dari array kategori_pesertas
+    const kategoriPesertaIds = kategoriPesertas.map((k: any) => typeof k === 'object' ? k.id : k);
+    
+    // Filter cabor yang memiliki kategori_peserta_id yang sama dengan yang dipilih
+    // Jika cabor tidak punya kategori_peserta_id, tetap tampilkan (untuk backward compatibility)
+    caborOptions.value = allCaborOptions.value.filter((cabor) => {
+        // Jika cabor tidak punya kategori_peserta_id, tetap tampilkan
+        if (!cabor.kategori_peserta_id) return true;
+        // Jika punya kategori_peserta_id, filter berdasarkan yang dipilih
+        return kategoriPesertaIds.includes(cabor.kategori_peserta_id);
+    }).map((c: any) => ({
+        value: c.value,
+        label: c.label,
+    }));
+    
+    // Reset cabor_ids jika cabor yang dipilih tidak ada di filtered list
+    if (formData.value.cabor_ids && formData.value.cabor_ids.length > 0) {
+        formData.value.cabor_ids = formData.value.cabor_ids.filter((caborId: number) => 
+            caborOptions.value.find((c: any) => c.value === caborId)
+        );
+    }
+};
+
+// Watch untuk filter cabor saat kategori peserta berubah
+watch(
+    () => formData.value.kategori_pesertas,
+    () => {
+        filterCaborByKategoriPeserta();
+    },
+    { deep: true }
 );
 
 watch(
@@ -180,13 +288,13 @@ const formInputs = computed(() => [
     },
     // Cabang Olahraga Section
     {
-        name: 'cabor_id',
+        name: 'cabor_ids',
         label: 'Cabang Olahraga',
-        type: 'select' as const,
+        type: 'multi-select' as const,
         placeholder: 'Pilih Cabang Olahraga (Opsional)',
         required: false,
         options: caborOptions.value,
-        help: 'Pilih cabang olahraga jika tenaga pendukung sudah ditentukan cabornya',
+        help: 'Pilih satu atau lebih cabang olahraga untuk tenaga pendukung ini',
     },
     {
         name: 'jenis_tenaga_pendukung',
@@ -229,14 +337,28 @@ const handleSave = (dataFromFormInput: any, setFormErrors: (errors: Record<strin
         ? dataFromFormInput.kategori_pesertas.filter((id: any) => id !== null && id !== undefined)
         : [];
 
+    // Pastikan cabor_ids selalu array, ambil dari dataFromFormInput atau formData
+    const caborIds = Array.isArray(dataFromFormInput.cabor_ids) 
+        ? dataFromFormInput.cabor_ids.filter((id: any) => id !== null && id !== undefined)
+        : (Array.isArray(formData.value.cabor_ids) 
+            ? formData.value.cabor_ids.filter((id: any) => id !== null && id !== undefined)
+            : []);
+
     const formFields = {
         ...formData.value,
         ...dataFromFormInput,
         kategori_pesertas: kategoriPesertaIds,
-        // Cabang Olahraga fields
-        cabor_id: dataFromFormInput.cabor_id || formData.value.cabor_id || null,
+        // Cabang Olahraga fields (multi-select) - selalu kirim sebagai array
+        cabor_ids: caborIds,
         jenis_tenaga_pendukung: dataFromFormInput.jenis_tenaga_pendukung || formData.value.jenis_tenaga_pendukung || null,
     };
+
+    // Debug log
+    console.log('TenagaPendukung Form - handleSave:', {
+        cabor_ids: formFields.cabor_ids,
+        jenis_tenaga_pendukung: formFields.jenis_tenaga_pendukung,
+        mode: props.mode,
+    });
 
     // Jika user masih pending, jangan kirim is_active (biarkan tetap 0 sampai di-approve)
     if (isPendingRegistration.value) {

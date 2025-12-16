@@ -6,11 +6,13 @@ use App\Models\ProgramLatihan;
 use App\Models\RekapAbsenProgramLatihan;
 use App\Traits\BaseTrait;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
-class RekapAbsenProgramLatihanController extends Controller
+class RekapAbsenProgramLatihanController extends Controller implements HasMiddleware
 {
     use BaseTrait;
 
@@ -20,6 +22,13 @@ class RekapAbsenProgramLatihanController extends Controller
         $this->route                          = 'program-latihan';
         $this->commonData['kode_first_menu']  = 'PROGRAM-LATIHAN';
         $this->commonData['kode_second_menu'] = 'REKAP-ABSEN';
+    }
+
+    public static function middleware(): array
+    {
+        return [
+            new Middleware("can:Program Latihan Rekap Absen", only: ['index', 'store', 'update', 'deleteMedia']),
+        ];
     }
 
     public function index($program_id)

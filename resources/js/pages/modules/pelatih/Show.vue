@@ -217,6 +217,28 @@ const fields = computed(() => {
                     ? props.item.kategori_pesertas.map((k: { nama: string }) => k.nama).join(', ')
                     : '-',
         },
+        {
+            label: 'Cabang Olahraga',
+            value: props.item?.cabor_kategori_pelatih && props.item.cabor_kategori_pelatih.length > 0
+                ? (() => {
+                    // Filter unique berdasarkan cabor_id untuk menghindari duplikasi
+                    const uniqueCaborMap = new Map();
+                    props.item.cabor_kategori_pelatih.forEach((c: any) => {
+                        const caborId = c.cabor_id;
+                        if (!uniqueCaborMap.has(caborId)) {
+                            uniqueCaborMap.set(caborId, c);
+                        }
+                    });
+                    return Array.from(uniqueCaborMap.values()).map((c: any) => {
+                        const caborName = c.cabor?.nama || 'Cabor tidak diketahui';
+                        const kategoriName = c.caborKategori?.nama ? ` - ${c.caborKategori.nama}` : '';
+                        const jenisPelatih = c.jenis_pelatih ? ` (${c.jenis_pelatih})` : '';
+                        return `${caborName}${kategoriName}${jenisPelatih}`;
+                    }).join(', ');
+                })()
+                : '-',
+            className: 'sm:col-span-2',
+        },
         { label: 'No HP', value: props.item?.no_hp || '-' },
         { label: 'Email', value: props.item?.email || '-' },
         {

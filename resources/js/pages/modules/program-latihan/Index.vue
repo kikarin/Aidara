@@ -99,7 +99,7 @@ const actions = (row: any) => [
     {
         label: 'Rekap Absen',
         onClick: () => router.visit(`/program-latihan/${row.id}/rekap-absen`),
-        permission: 'Program Latihan Detail',
+        permission: 'Program Latihan Rekap Absen',
     },
     {
         label: 'Edit',

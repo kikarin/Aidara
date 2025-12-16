@@ -43,20 +43,20 @@ onMounted(() => {
     }, 2000);
 });
 
-// Permission checking
-computed(() => {
+// Permission checking - FIX: Simpan ke variable agar bisa digunakan
+const canDetail = computed(() => {
     if (props.permissions?.detail !== undefined) return props.permissions.detail;
     if (!props.moduleName) return true;
     return permissionService.canRead(props.moduleName);
 });
 
-computed(() => {
+const canEdit = computed(() => {
     if (props.permissions?.edit !== undefined) return props.permissions.edit;
     if (!props.moduleName) return true;
     return permissionService.canUpdate(props.moduleName);
 });
 
-computed(() => {
+const canDelete = computed(() => {
     if (props.permissions?.delete !== undefined) return props.permissions.delete;
     if (!props.moduleName) return true;
     return permissionService.canDelete(props.moduleName);
@@ -75,7 +75,7 @@ const canCustomAction = (permission?: string) => {
     }
 };
 
-// Get available actions
+// Get available actions - TAMBAHKAN DEFAULT ACTIONS
 const getAvailableActions = computed(() => {
     const actions: Array<{
         label: string;
@@ -83,14 +83,44 @@ const getAvailableActions = computed(() => {
         icon: any;
     }> = [];
 
+    // Default actions berdasarkan permission (Detail, Edit, Delete)
+    // Hanya tambahkan jika belum ada di custom actions
+    const hasCustomDetail = props.actions?.some(a => a.label === 'Detail');
+    const hasCustomEdit = props.actions?.some(a => a.label === 'Edit');
+    const hasCustomDelete = props.actions?.some(a => a.label === 'Delete');
+
+    if (canDetail.value && !hasCustomDetail) {
+        actions.push({
+            label: 'Detail',
+            action: () => emit('detail', props.id),
+            icon: Eye,
+        });
+    }
+
+    if (canEdit.value && !hasCustomEdit) {
+        actions.push({
+            label: 'Edit',
+            action: () => emit('edit', props.id),
+            icon: Edit,
+        });
+    }
+
+    if (canDelete.value && !hasCustomDelete) {
+        actions.push({
+            label: 'Delete',
+            action: () => emit('delete', props.id),
+            icon: Trash2,
+        });
+    }
+
+    // Custom actions dari props
     if (props.actions && props.actions.length > 0) {
         props.actions.forEach((action) => {
             if (canCustomAction(action.permission)) {
                 actions.push({
                     label: action.label,
                     action: action.onClick,
-                    icon
-                    :action.label === 'Detail'
+                    icon: action.label === 'Detail'
                         ? Eye
                     : action.label === 'Edit'
                         ? Edit
@@ -108,7 +138,7 @@ const getAvailableActions = computed(() => {
                         ? Activity
                     : action.label === 'Setujui'
                         ? CircleCheckBig
-                    : action.label === 'Tolak'                                            
+                    : action.label === 'Tolak'
                         ? X
                     : action.label === 'Setup'
                         ? PictureInPicture
@@ -130,17 +160,23 @@ const items = computed(() => {
 const hasActions = computed(() => {
     if (!permissionsLoaded.value) return false;
 
-    if (!props.actions || props.actions.length === 0) return false;
+    // Check jika ada default actions yang bisa ditampilkan
+    const hasDefaultActions = canDetail.value || canEdit.value || canDelete.value;
+    
+    // Check jika ada custom actions
+    const hasCustomActions = props.actions && props.actions.length > 0;
+
+    if (!hasDefaultActions && !hasCustomActions) return false;
 
     const availableActions = getAvailableActions.value;
     const result = availableActions.length > 0;
 
-    if (props.actions.length > 0 && availableActions.length === 0) {
+    if (hasCustomActions && availableActions.length === 0) {
         console.log('RowActions Debug - Actions filtered out:', {
             moduleName: props.moduleName,
-            totalActions: props.actions.length,
+            totalActions: props.actions?.length || 0,
             availableActions: availableActions.length,
-            actions: props.actions.map((a) => ({ label: a.label, permission: a.permission })),
+            actions: props.actions?.map((a) => ({ label: a.label, permission: a.permission })) || [],
             hasActions: result,
         });
     }

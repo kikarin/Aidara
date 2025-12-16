@@ -38,6 +38,7 @@ use App\Http\Controllers\PemeriksaanParameterController;
 use App\Http\Controllers\PemeriksaanPesertaController;
 use App\Http\Controllers\PemeriksaanPesertaParameterController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\PrestasiController;
 use App\Http\Controllers\ProgramLatihanController;
 use App\Http\Controllers\RekapAbsenProgramLatihanController;
 use App\Http\Controllers\RefStatusPemeriksaanController;
@@ -72,6 +73,16 @@ use App\Models\MstParameter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Mail;
 
 // =====================
 // ROUTE UTAMA
@@ -81,6 +92,12 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'ensure.email.verified', 'check.registration.status'])->name('dashboard');
+
+// Prestasi
+Route::middleware(['auth', 'verified', 'check.registration.status'])->group(function () {
+    Route::get('/prestasi', [PrestasiController::class, 'index'])->name('prestasi.index');
+    Route::get('/api/prestasi', [PrestasiController::class, 'apiIndex'])->name('prestasi.apiIndex');
+});
 
 // =====================
 // REGISTRATION (Multi-step)
@@ -119,25 +136,67 @@ Route::get('/api/parameter', [MstParameterController::class, 'apiIndex']);
 
 // select
 Route::get('/api/tingkat-list', function () {
-    return MstTingkat::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstTingkat::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/tingkat-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kategori-atlet-list', function () {
-    return MstKategoriPeserta::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstKategoriPeserta::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kategori-atlet-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kategori-peserta-list', function () {
-    return MstKategoriPeserta::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstKategoriPeserta::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kategori-peserta-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kategori-prestasi-pelatih-list', function () {
-    return MstKategoriPrestasiPelatih::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstKategoriPrestasiPelatih::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kategori-prestasi-pelatih-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/jenis-dokumen-list', function () {
-    return MstJenisDokumen::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstJenisDokumen::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/jenis-dokumen-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kecamatan-list', function () {
-    return MstKecamatan::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstKecamatan::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kecamatan-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kelurahan-by-kecamatan/{id_kecamatan}', function ($id_kecamatan) {
-    return MstDesa::where('id_kecamatan', $id_kecamatan)->select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstDesa::where('id_kecamatan', $id_kecamatan)->select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kelurahan-by-kecamatan: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/posisi-atlet-list', function () {
     return MstPosisiAtlet::select('id', 'nama')->orderBy('nama')->get();
@@ -387,7 +446,75 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::post('/cabor-kategori/destroy-selected', [CaborKategoriController::class, 'destroy_selected'])->name('cabor-kategori.destroy_selected');
     // API select option
     Route::get('/api/cabor-list', function () {
-        return Cabor::select('id', 'nama')->orderBy('nama')->get();
+        try {
+            $query = Cabor::select('id', 'nama', 'kategori_peserta_id')
+                ->orderBy('nama');
+            
+            // Filter berdasarkan kategori_peserta_id jika ada (untuk filtering saat tambah peserta ke cabor)
+            $kategoriPesertaId = request('kategori_peserta_id');
+            if ($kategoriPesertaId && $kategoriPesertaId !== 'all') {
+                $query->where('kategori_peserta_id', $kategoriPesertaId);
+            }
+            
+            // Filter berdasarkan cabor yang dimiliki pelatih/tenaga pendukung
+            // Kecuali jika dipanggil dari form pelatih/tenaga pendukung (parameter for_peserta_form)
+            $forPesertaForm = request('for_peserta_form', false);
+            if (!$forPesertaForm) {
+                $auth = Auth::user();
+                if ($auth && (int) $auth->current_role_id === 36) {
+                    // Pelatih hanya melihat cabor yang mereka miliki
+                    if ($auth->pelatih && $auth->pelatih->id) {
+                        $caborIds = DB::table('cabor_kategori_pelatih')
+                            ->where('pelatih_id', $auth->pelatih->id)
+                            ->whereNull('deleted_at')
+                            ->pluck('cabor_id')
+                            ->unique()
+                            ->toArray();
+                        
+                        if (!empty($caborIds)) {
+                            $query->whereIn('id', $caborIds);
+                        } else {
+                            // Jika pelatih tidak punya cabor, return empty
+                            return response()->json([]);
+                        }
+                    }
+                } elseif ($auth && (int) $auth->current_role_id === 37) {
+                    // Tenaga Pendukung hanya melihat cabor yang mereka miliki
+                    if ($auth->tenagaPendukung && $auth->tenagaPendukung->id) {
+                        $caborIds = DB::table('cabor_kategori_tenaga_pendukung')
+                            ->where('tenaga_pendukung_id', $auth->tenagaPendukung->id)
+                            ->whereNull('deleted_at')
+                            ->pluck('cabor_id')
+                            ->unique()
+                            ->toArray();
+                        
+                        if (!empty($caborIds)) {
+                            $query->whereIn('id', $caborIds);
+                        } else {
+                            // Jika tenaga pendukung tidak punya cabor, return empty
+                            return response()->json([]);
+                        }
+                    }
+                }
+            }
+            
+            $data = $query->get();
+            // Pastikan selalu return array dengan kategori_peserta_id
+            return response()->json($data->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama' => $item->nama,
+                    'kategori_peserta_id' => $item->kategori_peserta_id,
+                ];
+            })->toArray());
+        } catch (\Exception $e) {
+            \Log::error('Error in /api/cabor-list: ' . $e->getMessage());
+            return response()->json([]);
+        }
+    });
+    Route::get('/api/cabor/{id}', function ($id) {
+        $cabor = Cabor::select('id', 'nama', 'kategori_peserta_id')->find($id);
+        return response()->json($cabor);
     });
     Route::get('/api/cabor-kategori-list', [CaborKategoriController::class, 'list']);
     Route::get('/api/cabor-kategori-by-cabor/{cabor_id}', [CaborKategoriController::class, 'listByCabor']);
@@ -536,7 +663,6 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::prefix('pemeriksaan-parameter')->group(function () {
         Route::get('AllParameter', [AllParameterController::class, 'index'])->name('all.parameter.index');
         Route::get('AllParameter/{parameter_id}/statistik', [AllParameterController::class, 'show'])->name('all.parameter.statistik');
-        Route::get('AllParameter/{parameter_id}/chart', [AllParameterController::class, 'chart'])->name('all.parameter.chart');
     });
 
     // Nested Pemeriksaan Peserta - Web Routes
