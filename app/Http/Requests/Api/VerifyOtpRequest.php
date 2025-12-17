@@ -4,7 +4,7 @@ namespace App\Http\Requests\Api;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class ResetPasswordRequest extends FormRequest
+class VerifyOtpRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -22,33 +22,26 @@ class ResetPasswordRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => 'required|email|exists:users,email',
+            'email' => ['required', 'email', 'exists:users,email'],
+            'otp'   => ['required', 'string', 'size:6', 'regex:/^[0-9]{6}$/'],
         ];
     }
 
     /**
      * Get custom messages for validator errors.
      *
-     * @return array
+     * @return array<string, string>
      */
     public function messages(): array
     {
         return [
             'email.required' => 'Email wajib diisi.',
             'email.email'    => 'Format email tidak valid.',
-            'email.exists'   => 'Email tidak terdaftar dalam sistem.',
-        ];
-    }
-
-    /**
-     * Get custom attributes for validator errors.
-     *
-     * @return array
-     */
-    public function attributes(): array
-    {
-        return [
-            'email' => 'email',
+            'email.exists'   => 'Email tidak ditemukan.',
+            'otp.required'   => 'Kode OTP wajib diisi.',
+            'otp.size'       => 'Kode OTP harus 6 digit.',
+            'otp.regex'      => 'Kode OTP harus berupa angka.',
         ];
     }
 }
+

@@ -3,438 +3,1335 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\ApiResponseResource;
+use App\Http\Requests\Api\StoreDokumenRequest;
+use App\Http\Requests\Api\StorePrestasiRequest;
+use App\Http\Requests\Api\StoreSertifikatRequest;
+use App\Http\Requests\Api\UpdateBiodataRequest;
 use App\Models\Atlet;
+use App\Models\AtletDokumen;
+use App\Models\AtletPrestasi;
+use App\Models\AtletSertifikat;
 use App\Models\Pelatih;
+use App\Models\PelatihDokumen;
+use App\Models\PelatihPrestasi;
+use App\Models\PelatihSertifikat;
 use App\Models\TenagaPendukung;
+use App\Models\TenagaPendukungDokumen;
+use App\Models\TenagaPendukungPrestasi;
+use App\Models\TenagaPendukungSertifikat;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class ProfileController extends Controller
 {
     /**
-     * GET /api/profil/me
-     * Kembalikan profil peserta berdasarkan user yang login (atlet/pelatih/tenaga pendukung)
+     * Get biodata sesuai role user yang login
      */
-    public function me(Request $request): JsonResponse
+    public function getBiodata(Request $request): JsonResponse
     {
-        $user = $request->user();
-
-        // Urutan deteksi berdasarkan role aktif, lalu fallback cari relasi manapun
-        $profile = null;
-        $jenis   = null;
-
-        if ($user) {
-            if ($user->current_role_id === 35) {
-                $profile = $this->findAtletByUserId($user->id);
-                $jenis   = 'atlet';
-            } elseif ($user->current_role_id === 36) {
-                $profile = $this->findPelatihByUserId($user->id);
-                $jenis   = 'pelatih';
-            } elseif ($user->current_role_id === 37) {
-                $profile = $this->findTenagaPendukungByUserId($user->id);
-                $jenis   = 'tenaga-pendukung';
-            }
-
-            if (! $profile) {
-                // Fallback: cek setiap entitas
-                if (! $profile) {
-                    $profile = $this->findAtletByUserId($user->id);
-                    $jenis   = $profile ? 'atlet' : $jenis;
-                }
-                if (! $profile) {
-                    $profile = $this->findPelatihByUserId($user->id);
-                    $jenis   = $profile ? 'pelatih' : $jenis;
-                }
-                if (! $profile) {
-                    $profile = $this->findTenagaPendukungByUserId($user->id);
-                    $jenis   = $profile ? 'tenaga-pendukung' : $jenis;
-                }
-            }
-        }
-
-        if (! $profile || ! $jenis) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Profil peserta tidak ditemukan untuk akun ini',
-            ], 404);
-        }
-
-        $data = match ($jenis) {
-            'atlet'            => $this->formatAtletProfile($profile),
-            'pelatih'          => $this->formatPelatihProfile($profile),
-            'tenaga-pendukung' => $this->formatTenagaPendukungProfile($profile),
-        };
-
-        $data['jenis'] = $jenis;
-
-        return ApiResponseResource::success($data, 'Data profil berhasil diambil')->response();
-    }
-
-    /**
-     * GET /api/profil/atlet
-     */
-    public function myAtlet(Request $request): JsonResponse
-    {
-        $user  = $request->user();
-        $atlet = $user ? $this->findAtletByUserId($user->id) : null;
-
-        if (! $atlet) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Profil atlet tidak ditemukan untuk akun ini',
-            ], 404);
-        }
-
-        return ApiResponseResource::success(
-            $this->formatAtletProfile($atlet),
-            'Data profil atlet berhasil diambil'
-        )->response();
-    }
-
-    /**
-     * GET /api/profil/pelatih
-     */
-    public function myPelatih(Request $request): JsonResponse
-    {
-        $user    = $request->user();
-        $pelatih = $user ? $this->findPelatihByUserId($user->id) : null;
-
-        if (! $pelatih) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Profil pelatih tidak ditemukan untuk akun ini',
-            ], 404);
-        }
-
-        return ApiResponseResource::success(
-            $this->formatPelatihProfile($pelatih),
-            'Data profil pelatih berhasil diambil'
-        )->response();
-    }
-
-    /**
-     * GET /api/profil/tenaga-pendukung
-     */
-    public function myTenagaPendukung(Request $request): JsonResponse
-    {
-        $user            = $request->user();
-        $tenagaPendukung = $user ? $this->findTenagaPendukungByUserId($user->id) : null;
-
-        if (! $tenagaPendukung) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Profil tenaga pendukung tidak ditemukan untuk akun ini',
-            ], 404);
-        }
-
-        return ApiResponseResource::success(
-            $this->formatTenagaPendukungProfile($tenagaPendukung),
-            'Data profil tenaga pendukung berhasil diambil'
-        )->response();
-    }
-
-    private function findAtletByUserId(int $userId): ?Atlet
-    {
-        return Atlet::with([
-            'media',
-            'kecamatan',
-            'kelurahan',
-            'atletOrangTua',
-            'sertifikat',
-            'sertifikat.media',
-            'prestasi',
-            'prestasi.tingkat',
-            'dokumen',
-            'dokumen.jenis_dokumen',
-            'kesehatan',
-        ])->where('users_id', $userId)->first();
-    }
-
-    private function findPelatihByUserId(int $userId): ?Pelatih
-    {
-        return Pelatih::with([
-            'media',
-            'kecamatan',
-            'kelurahan',
-            'sertifikat',
-            'sertifikat.media',
-            'prestasi',
-            'prestasi.tingkat',
-            'dokumen',
-            'dokumen.jenis_dokumen',
-            'kesehatan',
-        ])->where('users_id', $userId)->first();
-    }
-
-    private function findTenagaPendukungByUserId(int $userId): ?TenagaPendukung
-    {
-        return TenagaPendukung::with([
-            'media',
-            'kecamatan',
-            'kelurahan',
-            'sertifikat',
-            'sertifikat.media',
-            'prestasi',
-            'prestasi.tingkat',
-            'dokumen',
-            'dokumen.jenis_dokumen',
-            'kesehatan',
-        ])->where('users_id', $userId)->first();
-    }
-
-    private function formatAtletProfile(Atlet $atlet): array
-    {
-        $orangTua = $atlet->atletOrangTua;
-
-        return [
-            'nik'              => $atlet->nik,
-            'nama'             => $atlet->nama,
-            'jenisKelamin'     => $this->mapJenisKelamin($atlet->jenis_kelamin),
-            'tempatLahir'      => $atlet->tempat_lahir,
-            'tanggalLahir'     => $this->formatDate($atlet->tanggal_lahir),
-            'tanggalBergabung' => $this->formatDate($atlet->tanggal_bergabung),
-            'lamaBergabung'    => $this->getLamaBergabung($atlet->tanggal_bergabung),
-            'alamat'           => $atlet->alamat,
-            'kecamatan'        => $atlet->kecamatan->nama ?? null,
-            'kelurahan'        => $atlet->kelurahan->nama ?? null,
-            'noHP'             => $atlet->no_hp,
-            'email'            => $atlet->email,
-            'status'           => $atlet->is_active ? 'Aktif' : 'Nonaktif',
-            'foto'             => $atlet->foto,
-
-            'ibu' => [
-                'nama'         => $orangTua->nama_ibu_kandung ?? null,
-                'tempatLahir'  => $orangTua->tempat_lahir_ibu ?? null,
-                'tanggalLahir' => $this->formatDate($orangTua->tanggal_lahir_ibu ?? null),
-                'noHP'         => $orangTua->no_hp_ibu     ?? null,
-                'pekerjaan'    => $orangTua->pekerjaan_ibu ?? null,
-                'alamat'       => $orangTua->alamat_ibu    ?? null,
-            ],
-
-            'ayah' => [
-                'nama'         => $orangTua->nama_ayah_kandung ?? null,
-                'tempatLahir'  => $orangTua->tempat_lahir_ayah ?? null,
-                'tanggalLahir' => $this->formatDate($orangTua->tanggal_lahir_ayah ?? null),
-                'noHP'         => $orangTua->no_hp_ayah     ?? null,
-                'pekerjaan'    => $orangTua->pekerjaan_ayah ?? null,
-                'alamat'       => $orangTua->alamat_ayah    ?? null,
-            ],
-
-            'wali' => [
-                'nama'         => $orangTua->nama_wali         ?? null,
-                'tempatLahir'  => $orangTua->tempat_lahir_wali ?? null,
-                'tanggalLahir' => $this->formatDate($orangTua->tanggal_lahir_wali ?? null),
-                'noHP'         => $orangTua->no_hp_wali     ?? null,
-                'pekerjaan'    => $orangTua->pekerjaan_wali ?? null,
-                'alamat'       => $orangTua->alamat_wali    ?? null,
-            ],
-
-            'sertifikat' => $atlet->sertifikat->map(function ($item) {
-                return [
-                    'id'            => $item->id,
-                    'nama'          => $item->nama_sertifikat,
-                    'penyelenggara' => $item->penyelenggara,
-                    'tanggalTerbit' => $this->formatDate($item->tanggal_terbit),
-                    'file'          => $item->file_url,
-                ];
-            })->values()->toArray(),
-
-            'prestasi' => $atlet->prestasi->map(function ($item) {
-                return [
-                    'id'         => $item->id,
-                    'namaEvent'  => $item->nama_event,
-                    'tingkat'    => $item->tingkat->nama ?? null,
-                    'tanggal'    => $this->formatDate($item->tanggal),
-                    'peringkat'  => $item->peringkat,
-                    'keterangan' => $item->keterangan,
-                ];
-            })->values()->toArray(),
-
-            'dokumen' => $atlet->dokumen->map(function ($item) {
-                return [
-                    'id'    => $item->id,
-                    'jenis' => $item->jenis_dokumen->nama ?? null,
-                    'nomor' => $item->nomor,
-                    'file'  => $item->file_url,
-                ];
-            })->values()->toArray(),
-
-            'kesehatan' => [
-                'tinggiBadan'     => optional($atlet->kesehatan)->tinggi_badan,
-                'beratBadan'      => optional($atlet->kesehatan)->berat_badan,
-                'penglihatan'     => optional($atlet->kesehatan)->penglihatan,
-                'pendengaran'     => optional($atlet->kesehatan)->pendengaran,
-                'riwayatPenyakit' => optional($atlet->kesehatan)->riwayat_penyakit,
-                'alergi'          => optional($atlet->kesehatan)->alergi,
-            ],
-        ];
-    }
-
-    private function formatPelatihProfile(Pelatih $pelatih): array
-    {
-        return [
-            'nik'              => $pelatih->nik,
-            'nama'             => $pelatih->nama,
-            'jenisKelamin'     => $this->mapJenisKelamin($pelatih->jenis_kelamin),
-            'tempatLahir'      => $pelatih->tempat_lahir,
-            'tanggalLahir'     => $this->formatDate($pelatih->tanggal_lahir),
-            'tanggalBergabung' => $this->formatDate($pelatih->tanggal_bergabung),
-            'lamaBergabung'    => $this->getLamaBergabung($pelatih->tanggal_bergabung),
-            'alamat'           => $pelatih->alamat,
-            'kecamatan'        => $pelatih->kecamatan->nama ?? null,
-            'kelurahan'        => $pelatih->kelurahan->nama ?? null,
-            'noHP'             => $pelatih->no_hp,
-            'email'            => $pelatih->email,
-            'status'           => $pelatih->is_active ? 'Aktif' : 'Nonaktif',
-            'foto'             => $pelatih->foto,
-
-            'sertifikat' => $pelatih->sertifikat->map(function ($item) {
-                return [
-                    'id'            => $item->id,
-                    'nama'          => $item->nama_sertifikat,
-                    'penyelenggara' => $item->penyelenggara,
-                    'tanggalTerbit' => $this->formatDate($item->tanggal_terbit),
-                    'file'          => $item->file_url,
-                ];
-            })->values()->toArray(),
-
-            'prestasi' => $pelatih->prestasi->map(function ($item) {
-                return [
-                    'id'         => $item->id,
-                    'namaEvent'  => $item->nama_event,
-                    'tingkat'    => $item->tingkat->nama ?? null,
-                    'tanggal'    => $this->formatDate($item->tanggal),
-                    'peringkat'  => $item->peringkat,
-                    'keterangan' => $item->keterangan,
-                ];
-            })->values()->toArray(),
-
-            'dokumen' => $pelatih->dokumen->map(function ($item) {
-                return [
-                    'id'    => $item->id,
-                    'jenis' => $item->jenis_dokumen->nama ?? null,
-                    'nomor' => $item->nomor,
-                    'file'  => $item->file_url,
-                ];
-            })->values()->toArray(),
-
-            'kesehatan' => [
-                'tinggiBadan'     => optional($pelatih->kesehatan)->tinggi_badan,
-                'beratBadan'      => optional($pelatih->kesehatan)->berat_badan,
-                'penglihatan'     => optional($pelatih->kesehatan)->penglihatan,
-                'pendengaran'     => optional($pelatih->kesehatan)->pendengaran,
-                'riwayatPenyakit' => optional($pelatih->kesehatan)->riwayat_penyakit,
-                'alergi'          => optional($pelatih->kesehatan)->alergi,
-            ],
-        ];
-    }
-
-    private function formatTenagaPendukungProfile(TenagaPendukung $model): array
-    {
-        return [
-            'nik'              => $model->nik,
-            'nama'             => $model->nama,
-            'jenisKelamin'     => $this->mapJenisKelamin($model->jenis_kelamin),
-            'tempatLahir'      => $model->tempat_lahir,
-            'tanggalLahir'     => $this->formatDate($model->tanggal_lahir),
-            'tanggalBergabung' => $this->formatDate($model->tanggal_bergabung),
-            'lamaBergabung'    => $this->getLamaBergabung($model->tanggal_bergabung),
-            'alamat'           => $model->alamat,
-            'kecamatan'        => $model->kecamatan->nama ?? null,
-            'kelurahan'        => $model->kelurahan->nama ?? null,
-            'noHP'             => $model->no_hp,
-            'email'            => $model->email,
-            'status'           => $model->is_active ? 'Aktif' : 'Nonaktif',
-            'foto'             => $model->foto,
-
-            'sertifikat' => $model->sertifikat->map(function ($item) {
-                return [
-                    'id'            => $item->id,
-                    'nama'          => $item->nama_sertifikat,
-                    'penyelenggara' => $item->penyelenggara,
-                    'tanggalTerbit' => $this->formatDate($item->tanggal_terbit),
-                    'file'          => $item->file_url,
-                ];
-            })->values()->toArray(),
-
-            'prestasi' => $model->prestasi->map(function ($item) {
-                return [
-                    'id'         => $item->id,
-                    'namaEvent'  => $item->nama_event,
-                    'tingkat'    => $item->tingkat->nama ?? null,
-                    'tanggal'    => $this->formatDate($item->tanggal),
-                    'peringkat'  => $item->peringkat,
-                    'keterangan' => $item->keterangan,
-                ];
-            })->values()->toArray(),
-
-            'dokumen' => $model->dokumen->map(function ($item) {
-                return [
-                    'id'    => $item->id,
-                    'jenis' => $item->jenis_dokumen->nama ?? null,
-                    'nomor' => $item->nomor,
-                    'file'  => $item->file_url,
-                ];
-            })->values()->toArray(),
-
-            'kesehatan' => [
-                'tinggiBadan'     => optional($model->kesehatan)->tinggi_badan,
-                'beratBadan'      => optional($model->kesehatan)->berat_badan,
-                'penglihatan'     => optional($model->kesehatan)->penglihatan,
-                'pendengaran'     => optional($model->kesehatan)->pendengaran,
-                'riwayatPenyakit' => optional($model->kesehatan)->riwayat_penyakit,
-                'alergi'          => optional($model->kesehatan)->alergi,
-            ],
-        ];
-    }
-
-    private function mapJenisKelamin($jenis): ?string
-    {
-        return match ($jenis) {
-            'L'     => 'Laki-laki',
-            'P'     => 'Perempuan',
-            default => null,
-        };
-    }
-
-    private function formatDate($date): ?string
-    {
-        if (! $date) {
-            return null;
-        }
         try {
-            return date('j/n/Y', strtotime($date));
-        } catch (\Throwable $e) {
-            return null;
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            $roleName = $this->getRoleName($user);
+            if (!Gate::allows("{$roleName} Show")) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk melihat biodata.',
+                ], 403);
+            }
+
+            // Get peserta data berdasarkan role
+            $peserta = $this->getPesertaData($user);
+            
+            if (!$peserta) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            // Format response berdasarkan role
+            $biodata = $this->formatBiodataResponse($peserta, $user->peserta_type);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'role' => $user->peserta_type,
+                    'biodata' => $biodata,
+                    'permissions' => $permissions,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get Biodata error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil biodata.',
+            ], 500);
         }
     }
 
-    private function getLamaBergabung($tanggalBergabung): ?string
+    /**
+     * Update biodata sesuai role user yang login
+     */
+    public function updateBiodata(UpdateBiodataRequest $request): JsonResponse
     {
-        if (! $tanggalBergabung) {
-            return null;
+        try {
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            $roleName = $this->getRoleName($user);
+            if (!Gate::allows("{$roleName} Edit")) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk mengedit biodata.',
+                ], 403);
+            }
+
+            // Get peserta data
+            $peserta = $this->getPesertaData($user);
+            
+            if (!$peserta) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            // Check ownership
+            if ($peserta->users_id !== $user->id) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk mengedit data ini.',
+                ], 403);
+            }
+
+            $data = $request->validated();
+            
+            // Handle file upload
+            if ($request->hasFile('file')) {
+                $data['file'] = $request->file('file');
+            }
+
+            // Handle delete foto
+            if ($request->has('is_delete_foto') && $request->is_delete_foto) {
+                $data['is_delete_foto'] = true;
+            }
+
+            // Update berdasarkan role dengan field spesifik
+            $this->updatePesertaBiodata($peserta, $data, $user->peserta_type);
+
+            // Reload peserta dengan relasi yang diperlukan
+            $peserta->refresh();
+            
+            // Reload dengan relasi sesuai role
+            switch ($user->peserta_type) {
+                case 'atlet':
+                    $peserta->load([
+                        'kecamatan', 
+                        'kelurahan', 
+                        'kategoriAtlet', 
+                        'posisiAtlet',
+                        'caborKategoriAtlet' => function($query) {
+                            $query->whereNull('deleted_at')
+                                ->with(['cabor', 'caborKategori']);
+                        },
+                        'kategoriPesertas',
+                    ]);
+                    break;
+                case 'pelatih':
+                    $peserta->load([
+                        'kecamatan', 
+                        'kelurahan', 
+                        'jenisPelatih',
+                        'caborKategoriPelatih' => function($query) {
+                            $query->whereNull('deleted_at')
+                                ->with(['cabor', 'caborKategori']);
+                        },
+                        'kategoriPesertas',
+                    ]);
+                    break;
+                case 'tenaga_pendukung':
+                    $peserta->load([
+                        'kecamatan', 
+                        'kelurahan',
+                        'caborKategoriTenagaPendukung' => function($query) {
+                            $query->whereNull('deleted_at')
+                                ->with(['cabor', 'caborKategori']);
+                        },
+                        'kategoriPesertas',
+                    ]);
+                    break;
+            }
+            
+            $biodata = $this->formatBiodataResponse($peserta, $user->peserta_type);
+
+            Log::info('Biodata updated', [
+                'user_id' => $user->id,
+                'peserta_type' => $user->peserta_type,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Biodata berhasil diperbarui.',
+                'data' => [
+                    'role' => $user->peserta_type,
+                    'biodata' => $biodata,
+                    'permissions' => $permissions,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Update Biodata error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $request->user()->id ?? null,
+                'request_data' => $request->except(['file', 'password']),
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat memperbarui biodata.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /**
+     * Get list sertifikat
+     */
+    public function getSertifikat(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            $roleName = $this->getRoleName($user);
+            if (!Gate::allows("{$roleName} Sertifikat Show")) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk melihat sertifikat.',
+                ], 403);
+            }
+
+            $peserta = $this->getPesertaData($user);
+            
+            if (!$peserta) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            $sertifikat = $peserta->sertifikat()->with('created_by_user', 'updated_by_user')->get();
+            
+            $formattedSertifikat = $sertifikat->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama_sertifikat' => $item->nama_sertifikat,
+                    'penyelenggara' => $item->penyelenggara,
+                    'tanggal_terbit' => $item->tanggal_terbit,
+                    'file_url' => $item->file_url ?? null,
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'sertifikat' => $formattedSertifikat,
+                    'permissions' => $permissions,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get Sertifikat error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil sertifikat.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Store sertifikat
+     */
+    public function storeSertifikat(StoreSertifikatRequest $request): JsonResponse
+    {
+        try {
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            $roleName = $this->getRoleName($user);
+            if (!Gate::allows("{$roleName} Sertifikat Add")) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk menambah sertifikat.',
+                ], 403);
+            }
+
+            $peserta = $this->getPesertaData($user);
+            
+            if (!$peserta) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            $data = $request->validated();
+            $file = $request->file('file');
+            
+            // Create sertifikat berdasarkan role
+            $sertifikat = $this->createSertifikat($peserta, $data, $file, $user->peserta_type);
+
+            Log::info('Sertifikat created', [
+                'user_id' => $user->id,
+                'peserta_type' => $user->peserta_type,
+                'sertifikat_id' => $sertifikat->id,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Sertifikat berhasil ditambahkan.',
+                'data' => [
+                    'sertifikat' => [
+                        'id' => $sertifikat->id,
+                        'nama_sertifikat' => $sertifikat->nama_sertifikat,
+                        'penyelenggara' => $sertifikat->penyelenggara,
+                        'tanggal_terbit' => $sertifikat->tanggal_terbit,
+                        'file_url' => $sertifikat->file_url ?? null,
+                    ],
+                    'permissions' => $permissions,
+                ],
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('Store Sertifikat error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat menambah sertifikat.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete sertifikat
+     */
+    public function deleteSertifikat(Request $request, $id): JsonResponse
+    {
+        try {
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            $roleName = $this->getRoleName($user);
+            if (!Gate::allows("{$roleName} Sertifikat Delete")) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk menghapus sertifikat.',
+                ], 403);
+            }
+
+            $peserta = $this->getPesertaData($user);
+            
+            if (!$peserta) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            // Get sertifikat dan check ownership
+            $sertifikat = $this->getSertifikatById($id, $user->peserta_type);
+            
+            if (!$sertifikat) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Sertifikat tidak ditemukan.',
+                ], 404);
+            }
+
+            // Check ownership
+            if (!$this->checkSertifikatOwnership($sertifikat, $peserta, $user->peserta_type)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk menghapus sertifikat ini.',
+                ], 403);
+            }
+
+            $sertifikat->forceDelete();
+
+            Log::info('Sertifikat deleted', [
+                'user_id' => $user->id,
+                'sertifikat_id' => $id,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Sertifikat berhasil dihapus.',
+                'data' => [
+                    'permissions' => $permissions,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Delete Sertifikat error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat menghapus sertifikat.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Get list prestasi
+     */
+    public function getPrestasi(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            $roleName = $this->getRoleName($user);
+            if (!Gate::allows("{$roleName} Prestasi Show")) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk melihat prestasi.',
+                ], 403);
+            }
+
+            $peserta = $this->getPesertaData($user);
+            
+            if (!$peserta) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            $prestasi = $peserta->prestasi()->with('tingkat', 'created_by_user', 'updated_by_user')->get();
+            
+            $formattedPrestasi = $prestasi->map(function ($item) use ($user) {
+                $data = [
+                    'id' => $item->id,
+                    'nama_event' => $item->nama_event,
+                    'tingkat' => $item->tingkat ? [
+                        'id' => $item->tingkat->id,
+                        'nama' => $item->tingkat->nama,
+                    ] : null,
+                    'tanggal' => $item->tanggal,
+                    'peringkat' => $item->peringkat,
+                    'keterangan' => $item->keterangan,
+                    'bonus' => $item->bonus,
+                ];
+
+                // Tambahkan field khusus untuk Pelatih
+                if ($user->peserta_type === 'pelatih' && method_exists($item, 'kategoriPrestasiPelatih')) {
+                    $data['kategori_prestasi_pelatih'] = $item->kategoriPrestasiPelatih ? [
+                        'id' => $item->kategoriPrestasiPelatih->id,
+                        'nama' => $item->kategoriPrestasiPelatih->nama,
+                    ] : null;
+                    $data['kategori_atlet'] = $item->kategoriAtlet ? [
+                        'id' => $item->kategoriAtlet->id,
+                        'nama' => $item->kategoriAtlet->nama,
+                    ] : null;
+                }
+
+                return $data;
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'prestasi' => $formattedPrestasi,
+                    'permissions' => $permissions,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get Prestasi error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil prestasi.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Store prestasi
+     */
+    public function storePrestasi(StorePrestasiRequest $request): JsonResponse
+    {
+        try {
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            $roleName = $this->getRoleName($user);
+            if (!Gate::allows("{$roleName} Prestasi Add")) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk menambah prestasi.',
+                ], 403);
+            }
+
+            $peserta = $this->getPesertaData($user);
+            
+            if (!$peserta) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            $data = $request->validated();
+            
+            // Create prestasi berdasarkan role
+            $prestasi = $this->createPrestasi($peserta, $data, $user->peserta_type);
+
+            Log::info('Prestasi created', [
+                'user_id' => $user->id,
+                'peserta_type' => $user->peserta_type,
+                'prestasi_id' => $prestasi->id,
+            ]);
+
+            $formattedPrestasi = [
+                'id' => $prestasi->id,
+                'nama_event' => $prestasi->nama_event,
+                'tingkat' => $prestasi->tingkat ? [
+                    'id' => $prestasi->tingkat->id,
+                    'nama' => $prestasi->tingkat->nama,
+                ] : null,
+                'tanggal' => $prestasi->tanggal,
+                'peringkat' => $prestasi->peringkat,
+                'keterangan' => $prestasi->keterangan,
+                'bonus' => $prestasi->bonus,
+            ];
+
+            // Tambahkan field khusus untuk Pelatih
+            if ($user->peserta_type === 'pelatih' && method_exists($prestasi, 'kategoriPrestasiPelatih')) {
+                $prestasi->load('kategoriPrestasiPelatih', 'kategoriAtlet');
+                $formattedPrestasi['kategori_prestasi_pelatih'] = $prestasi->kategoriPrestasiPelatih ? [
+                    'id' => $prestasi->kategoriPrestasiPelatih->id,
+                    'nama' => $prestasi->kategoriPrestasiPelatih->nama,
+                ] : null;
+                $formattedPrestasi['kategori_atlet'] = $prestasi->kategoriAtlet ? [
+                    'id' => $prestasi->kategoriAtlet->id,
+                    'nama' => $prestasi->kategoriAtlet->nama,
+                ] : null;
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Prestasi berhasil ditambahkan.',
+                'data' => [
+                    'prestasi' => $formattedPrestasi,
+                    'permissions' => $permissions,
+                ],
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('Store Prestasi error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat menambah prestasi.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete prestasi
+     */
+    public function deletePrestasi(Request $request, $id): JsonResponse
+    {
+        try {
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            $roleName = $this->getRoleName($user);
+            if (!Gate::allows("{$roleName} Prestasi Delete")) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk menghapus prestasi.',
+                ], 403);
+            }
+
+            $peserta = $this->getPesertaData($user);
+            
+            if (!$peserta) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            // Get prestasi dan check ownership
+            $prestasi = $this->getPrestasiById($id, $user->peserta_type);
+            
+            if (!$prestasi) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Prestasi tidak ditemukan.',
+                ], 404);
+            }
+
+            // Check ownership
+            if (!$this->checkPrestasiOwnership($prestasi, $peserta, $user->peserta_type)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk menghapus prestasi ini.',
+                ], 403);
+            }
+
+            $prestasi->forceDelete();
+
+            Log::info('Prestasi deleted', [
+                'user_id' => $user->id,
+                'prestasi_id' => $id,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Prestasi berhasil dihapus.',
+                'data' => [
+                    'permissions' => $permissions,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Delete Prestasi error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat menghapus prestasi.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Get list dokumen
+     */
+    public function getDokumen(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            $roleName = $this->getRoleName($user);
+            if (!Gate::allows("{$roleName} Dokumen Show")) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk melihat dokumen.',
+                ], 403);
+            }
+
+            $peserta = $this->getPesertaData($user);
+            
+            if (!$peserta) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            $dokumen = $peserta->dokumen()->with('jenis_dokumen', 'created_by_user', 'updated_by_user')->get();
+            
+            $formattedDokumen = $dokumen->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'jenis_dokumen' => $item->jenis_dokumen ? [
+                        'id' => $item->jenis_dokumen->id,
+                        'nama' => $item->jenis_dokumen->nama,
+                    ] : null,
+                    'nomor' => $item->nomor,
+                    'file_url' => $item->file_url ?? null,
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'dokumen' => $formattedDokumen,
+                    'permissions' => $permissions,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get Dokumen error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil dokumen.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Store dokumen
+     */
+    public function storeDokumen(StoreDokumenRequest $request): JsonResponse
+    {
+        try {
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            $roleName = $this->getRoleName($user);
+            if (!Gate::allows("{$roleName} Dokumen Add")) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk menambah dokumen.',
+                ], 403);
+            }
+
+            $peserta = $this->getPesertaData($user);
+            
+            if (!$peserta) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            $data = $request->validated();
+            $file = $request->file('file');
+            
+            // Create dokumen berdasarkan role
+            $dokumen = $this->createDokumen($peserta, $data, $file, $user->peserta_type);
+
+            Log::info('Dokumen created', [
+                'user_id' => $user->id,
+                'peserta_type' => $user->peserta_type,
+                'dokumen_id' => $dokumen->id,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Dokumen berhasil ditambahkan.',
+                'data' => [
+                    'dokumen' => [
+                        'id' => $dokumen->id,
+                        'jenis_dokumen' => $dokumen->jenis_dokumen ? [
+                            'id' => $dokumen->jenis_dokumen->id,
+                            'nama' => $dokumen->jenis_dokumen->nama,
+                        ] : null,
+                        'nomor' => $dokumen->nomor,
+                        'file_url' => $dokumen->file_url ?? null,
+                    ],
+                    'permissions' => $permissions,
+                ],
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('Store Dokumen error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat menambah dokumen.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete dokumen
+     */
+    public function deleteDokumen(Request $request, $id): JsonResponse
+    {
+        try {
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            $roleName = $this->getRoleName($user);
+            if (!Gate::allows("{$roleName} Dokumen Delete")) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk menghapus dokumen.',
+                ], 403);
+            }
+
+            $peserta = $this->getPesertaData($user);
+            
+            if (!$peserta) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            // Get dokumen dan check ownership
+            $dokumen = $this->getDokumenById($id, $user->peserta_type);
+            
+            if (!$dokumen) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Dokumen tidak ditemukan.',
+                ], 404);
+            }
+
+            // Check ownership
+            if (!$this->checkDokumenOwnership($dokumen, $peserta, $user->peserta_type)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk menghapus dokumen ini.',
+                ], 403);
+            }
+
+            $dokumen->forceDelete();
+
+            Log::info('Dokumen deleted', [
+                'user_id' => $user->id,
+                'dokumen_id' => $id,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Dokumen berhasil dihapus.',
+                'data' => [
+                    'permissions' => $permissions,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Delete Dokumen error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat menghapus dokumen.',
+            ], 500);
+        }
+    }
+
+    // ==================== Helper Methods ====================
+
+    /**
+     * Get role name untuk permission check
+     */
+    private function getRoleName($user): string
+    {
+        $roleMap = [
+            'atlet' => 'Atlet',
+            'pelatih' => 'Pelatih',
+            'tenaga_pendukung' => 'Tenaga Pendukung',
+        ];
+
+        return $roleMap[$user->peserta_type] ?? 'Atlet';
+    }
+
+    /**
+     * Get peserta data berdasarkan user
+     */
+    private function getPesertaData($user)
+    {
+        switch ($user->peserta_type) {
+            case 'atlet':
+                return Atlet::where('users_id', $user->id)
+                    ->with([
+                        'kecamatan', 
+                        'kelurahan', 
+                        'kategoriAtlet', 
+                        'posisiAtlet',
+                        'caborKategoriAtlet' => function($query) {
+                            $query->whereNull('deleted_at')
+                                ->with(['cabor', 'caborKategori']);
+                        },
+                        'kategoriPesertas',
+                    ])
+                    ->first();
+            case 'pelatih':
+                return Pelatih::where('users_id', $user->id)
+                    ->with([
+                        'kecamatan', 
+                        'kelurahan', 
+                        'jenisPelatih',
+                        'caborKategoriPelatih' => function($query) {
+                            $query->whereNull('deleted_at')
+                                ->with(['cabor', 'caborKategori']);
+                        },
+                        'kategoriPesertas',
+                    ])
+                    ->first();
+            case 'tenaga_pendukung':
+                return TenagaPendukung::where('users_id', $user->id)
+                    ->with([
+                        'kecamatan', 
+                        'kelurahan',
+                        'caborKategoriTenagaPendukung' => function($query) {
+                            $query->whereNull('deleted_at')
+                                ->with(['cabor', 'caborKategori']);
+                        },
+                        'kategoriPesertas',
+                    ])
+                    ->first();
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Format biodata response berdasarkan role
+     */
+    private function formatBiodataResponse($peserta, $pesertaType): array
+    {
+        $baseData = [
+            'id' => $peserta->id,
+            'nik' => $peserta->nik,
+            'nama' => $peserta->nama,
+            'jenis_kelamin' => $peserta->jenis_kelamin,
+            'tempat_lahir' => $peserta->tempat_lahir,
+            'tanggal_lahir' => $peserta->tanggal_lahir,
+            'tanggal_bergabung' => $peserta->tanggal_bergabung,
+            'alamat' => $peserta->alamat,
+            'kecamatan' => $peserta->kecamatan ? [
+                'id' => $peserta->kecamatan->id,
+                'nama' => $peserta->kecamatan->nama,
+            ] : null,
+            'kelurahan' => $peserta->kelurahan ? [
+                'id' => $peserta->kelurahan->id,
+                'nama' => $peserta->kelurahan->nama,
+            ] : null,
+            'no_hp' => $peserta->no_hp,
+            'email' => $peserta->email,
+            'foto' => $peserta->foto,
+            'foto_thumbnail' => $peserta->foto_thumbnail ?? null,
+        ];
+
+        // Field khusus untuk Atlet
+        if ($pesertaType === 'atlet') {
+            $baseData['nisn'] = $peserta->nisn ?? null;
+            $baseData['agama'] = $peserta->agama ?? null;
+            $baseData['sekolah'] = $peserta->sekolah ?? null;
+            $baseData['kelas_sekolah'] = $peserta->kelas_sekolah ?? null;
+            $baseData['ukuran_baju'] = $peserta->ukuran_baju ?? null;
+            $baseData['ukuran_celana'] = $peserta->ukuran_celana ?? null;
+            $baseData['ukuran_sepatu'] = $peserta->ukuran_sepatu ?? null;
+            $baseData['disabilitas'] = $peserta->disabilitas ?? null;
+            $baseData['klasifikasi'] = $peserta->klasifikasi ?? null;
+            $baseData['iq'] = $peserta->iq ?? null;
+            $baseData['kategori_atlet'] = $peserta->kategoriAtlet ? [
+                'id' => $peserta->kategoriAtlet->id,
+                'nama' => $peserta->kategoriAtlet->nama,
+            ] : null;
+            $baseData['posisi_atlet'] = $peserta->posisiAtlet ? [
+                'id' => $peserta->posisiAtlet->id,
+                'nama' => $peserta->posisiAtlet->nama,
+            ] : null;
+            
+            // Cabor data (many-to-many) - format simple: hanya nama cabor unique
+            $caborNames = $peserta->caborKategoriAtlet
+                ->map(function ($item) {
+                    return $item->cabor->nama ?? null;
+                })
+                ->filter(function ($nama) {
+                    return $nama !== null;
+                })
+                ->unique()
+                ->values()
+                ->toArray();
+            
+            $baseData['cabor'] = $caborNames; // Array of strings: ["Renang", "TENIS MEJA TUNET"]
+            
+            // Kategori Peserta (many-to-many)
+            $baseData['kategori_peserta'] = $peserta->kategoriPesertas->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama' => $item->nama,
+                ];
+            });
         }
 
-        try {
-            $start = new \DateTime($tanggalBergabung);
-            $end   = new \DateTime();
-            $diff  = $start->diff($end);
+        // Field khusus untuk Pelatih
+        if ($pesertaType === 'pelatih') {
+            $baseData['pekerjaan_selain_melatih'] = $peserta->pekerjaan_selain_melatih ?? null;
+            $baseData['jenis_pelatih'] = $peserta->jenisPelatih ? [
+                'id' => $peserta->jenisPelatih->id,
+                'nama' => $peserta->jenisPelatih->nama,
+            ] : null;
+            
+            // Cabor data (many-to-many) - format simple: hanya nama cabor unique
+            $caborNames = $peserta->caborKategoriPelatih
+                ->map(function ($item) {
+                    return $item->cabor->nama ?? null;
+                })
+                ->filter(function ($nama) {
+                    return $nama !== null;
+                })
+                ->unique()
+                ->values()
+                ->toArray();
+            
+            $baseData['cabor'] = $caborNames; // Array of strings: ["Renang", "TENIS MEJA TUNET"]
+            
+            // Kategori Peserta (many-to-many)
+            $baseData['kategori_peserta'] = $peserta->kategoriPesertas->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama' => $item->nama,
+                ];
+            });
+        }
+        
+        // Field khusus untuk Tenaga Pendukung
+        if ($pesertaType === 'tenaga_pendukung') {
+            // Cabor data (many-to-many) - format simple: hanya nama cabor unique
+            $caborNames = $peserta->caborKategoriTenagaPendukung
+                ->map(function ($item) {
+                    return $item->cabor->nama ?? null;
+                })
+                ->filter(function ($nama) {
+                    return $nama !== null;
+                })
+                ->unique()
+                ->values()
+                ->toArray();
+            
+            $baseData['cabor'] = $caborNames; // Array of strings: ["Renang", "TENIS MEJA TUNET"]
+            
+            // Kategori Peserta (many-to-many)
+            $baseData['kategori_peserta'] = $peserta->kategoriPesertas->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama' => $item->nama,
+                ];
+            });
+        }
 
-            $years  = (int) $diff->y;
-            $months = (int) $diff->m;
+        return $baseData;
+    }
 
-            $parts = [];
-            if ($years > 0) {
-                $parts[] = $years.' tahun';
+    /**
+     * Update biodata peserta
+     * Support partial update: hanya update field yang dikirim
+     */
+    private function updatePesertaBiodata($peserta, $data, $pesertaType): void
+    {
+        $updateData = [
+            'updated_by' => auth()->id(),
+        ];
+
+        // Hanya update field yang dikirim (partial update)
+        $commonFields = [
+            'nik', 'nama', 'jenis_kelamin', 'tempat_lahir', 'tanggal_lahir',
+            'tanggal_bergabung', 'alamat', 'kecamatan_id', 'kelurahan_id',
+            'no_hp', 'email',
+        ];
+
+        foreach ($commonFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $updateData[$field] = $data[$field];
             }
-            if ($months > 0) {
-                $parts[] = $months.' bulan';
-            }
+        }
 
-            return empty($parts) ? '0 bulan' : implode(' ', $parts);
-        } catch (\Throwable $e) {
-            return null;
+        // Field khusus untuk Atlet
+        if ($pesertaType === 'atlet') {
+            $atletSpecificFields = [
+                'nisn', 'agama', 'sekolah', 'kelas_sekolah',
+                'ukuran_baju', 'ukuran_celana', 'ukuran_sepatu',
+                'disabilitas', 'klasifikasi', 'iq',
+            ];
+            
+            foreach ($atletSpecificFields as $field) {
+                if (isset($data[$field])) {
+                    $updateData[$field] = $data[$field];
+                }
+            }
+        }
+
+        // Field khusus untuk Pelatih
+        if ($pesertaType === 'pelatih') {
+            if (isset($data['pekerjaan_selain_melatih'])) {
+                $updateData['pekerjaan_selain_melatih'] = $data['pekerjaan_selain_melatih'];
+            }
+        }
+
+        // Handle file upload
+        if (isset($data['file'])) {
+            $peserta->clearMediaCollection('images');
+            $nama = $updateData['nama'] ?? $peserta->nama ?? 'Foto';
+            $peserta->addMedia($data['file'])
+                ->usingName($nama)
+                ->toMediaCollection('images');
+        }
+
+        // Handle delete foto
+        if (isset($data['is_delete_foto']) && $data['is_delete_foto']) {
+            $peserta->clearMediaCollection('images');
+        }
+
+        // Update data (hanya jika ada field yang di-update)
+        if (count($updateData) > 1) { // Lebih dari 1 karena ada 'updated_by'
+            $peserta->update($updateData);
+        }
+    }
+
+    /**
+     * Create sertifikat berdasarkan role
+     */
+    private function createSertifikat($peserta, $data, $file, $pesertaType)
+    {
+        $sertifikatData = [
+            'nama_sertifikat' => $data['nama_sertifikat'],
+            'penyelenggara' => $data['penyelenggara'] ?? null,
+            'tanggal_terbit' => $data['tanggal_terbit'] ?? null,
+            'created_by' => auth()->id(),
+            'updated_by' => auth()->id(),
+        ];
+
+        switch ($pesertaType) {
+            case 'atlet':
+                $sertifikatData['atlet_id'] = $peserta->id;
+                $sertifikat = AtletSertifikat::create($sertifikatData);
+                break;
+            case 'pelatih':
+                $sertifikatData['pelatih_id'] = $peserta->id;
+                $sertifikat = PelatihSertifikat::create($sertifikatData);
+                break;
+            case 'tenaga_pendukung':
+                $sertifikatData['tenaga_pendukung_id'] = $peserta->id;
+                $sertifikat = TenagaPendukungSertifikat::create($sertifikatData);
+                break;
+            default:
+                throw new \Exception('Invalid peserta type');
+        }
+
+        if ($file) {
+            $sertifikat->addMedia($file)
+                ->usingName($data['nama_sertifikat'])
+                ->toMediaCollection('sertifikat_file');
+        }
+
+        return $sertifikat;
+    }
+
+    /**
+     * Get sertifikat by ID
+     */
+    private function getSertifikatById($id, $pesertaType)
+    {
+        switch ($pesertaType) {
+            case 'atlet':
+                return AtletSertifikat::withTrashed()->find($id);
+            case 'pelatih':
+                return PelatihSertifikat::withTrashed()->find($id);
+            case 'tenaga_pendukung':
+                return TenagaPendukungSertifikat::withTrashed()->find($id);
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Check sertifikat ownership
+     */
+    private function checkSertifikatOwnership($sertifikat, $peserta, $pesertaType): bool
+    {
+        switch ($pesertaType) {
+            case 'atlet':
+                return $sertifikat->atlet_id === $peserta->id;
+            case 'pelatih':
+                return $sertifikat->pelatih_id === $peserta->id;
+            case 'tenaga_pendukung':
+                return $sertifikat->tenaga_pendukung_id === $peserta->id;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Create prestasi berdasarkan role
+     */
+    private function createPrestasi($peserta, $data, $pesertaType)
+    {
+        $prestasiData = [
+            'nama_event' => $data['nama_event'],
+            'tingkat_id' => $data['tingkat_id'] ?? null,
+            'tanggal' => $data['tanggal'] ?? null,
+            'peringkat' => $data['peringkat'] ?? null,
+            'keterangan' => $data['keterangan'] ?? null,
+            'bonus' => $data['bonus'] ?? null,
+            'created_by' => auth()->id(),
+            'updated_by' => auth()->id(),
+        ];
+
+        switch ($pesertaType) {
+            case 'atlet':
+                $prestasiData['atlet_id'] = $peserta->id;
+                return AtletPrestasi::create($prestasiData);
+            case 'pelatih':
+                $prestasiData['pelatih_id'] = $peserta->id;
+                $prestasiData['kategori_prestasi_pelatih_id'] = $data['kategori_prestasi_pelatih_id'] ?? null;
+                $prestasiData['kategori_atlet_id'] = $data['kategori_atlet_id'] ?? null;
+                return PelatihPrestasi::create($prestasiData);
+            case 'tenaga_pendukung':
+                $prestasiData['tenaga_pendukung_id'] = $peserta->id;
+                return TenagaPendukungPrestasi::create($prestasiData);
+            default:
+                throw new \Exception('Invalid peserta type');
+        }
+    }
+
+    /**
+     * Get prestasi by ID
+     */
+    private function getPrestasiById($id, $pesertaType)
+    {
+        switch ($pesertaType) {
+            case 'atlet':
+                return AtletPrestasi::withTrashed()->find($id);
+            case 'pelatih':
+                return PelatihPrestasi::withTrashed()->find($id);
+            case 'tenaga_pendukung':
+                return TenagaPendukungPrestasi::withTrashed()->find($id);
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Check prestasi ownership
+     */
+    private function checkPrestasiOwnership($prestasi, $peserta, $pesertaType): bool
+    {
+        switch ($pesertaType) {
+            case 'atlet':
+                return $prestasi->atlet_id === $peserta->id;
+            case 'pelatih':
+                return $prestasi->pelatih_id === $peserta->id;
+            case 'tenaga_pendukung':
+                return $prestasi->tenaga_pendukung_id === $peserta->id;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Create dokumen berdasarkan role
+     */
+    private function createDokumen($peserta, $data, $file, $pesertaType)
+    {
+        $dokumenData = [
+            'jenis_dokumen_id' => $data['jenis_dokumen_id'] ?? null,
+            'nomor' => $data['nomor'] ?? null,
+            'created_by' => auth()->id(),
+            'updated_by' => auth()->id(),
+        ];
+
+        switch ($pesertaType) {
+            case 'atlet':
+                $dokumenData['atlet_id'] = $peserta->id;
+                $dokumen = AtletDokumen::create($dokumenData);
+                break;
+            case 'pelatih':
+                $dokumenData['pelatih_id'] = $peserta->id;
+                $dokumen = PelatihDokumen::create($dokumenData);
+                break;
+            case 'tenaga_pendukung':
+                $dokumenData['tenaga_pendukung_id'] = $peserta->id;
+                $dokumen = TenagaPendukungDokumen::create($dokumenData);
+                break;
+            default:
+                throw new \Exception('Invalid peserta type');
+        }
+
+        if ($file) {
+            $dokumen->addMedia($file)
+                ->usingName($data['nomor'] ?? 'Dokumen')
+                ->toMediaCollection('dokumen_file');
+        }
+
+        return $dokumen;
+    }
+
+    /**
+     * Get dokumen by ID
+     */
+    private function getDokumenById($id, $pesertaType)
+    {
+        switch ($pesertaType) {
+            case 'atlet':
+                return AtletDokumen::withTrashed()->find($id);
+            case 'pelatih':
+                return PelatihDokumen::withTrashed()->find($id);
+            case 'tenaga_pendukung':
+                return TenagaPendukungDokumen::withTrashed()->find($id);
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Check dokumen ownership
+     */
+    private function checkDokumenOwnership($dokumen, $peserta, $pesertaType): bool
+    {
+        switch ($pesertaType) {
+            case 'atlet':
+                return $dokumen->atlet_id === $peserta->id;
+            case 'pelatih':
+                return $dokumen->pelatih_id === $peserta->id;
+            case 'tenaga_pendukung':
+                return $dokumen->tenaga_pendukung_id === $peserta->id;
+            default:
+                return false;
         }
     }
 }
+

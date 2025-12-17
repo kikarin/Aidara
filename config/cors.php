@@ -6,11 +6,11 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:3002',
-        'https://dispora.vercel.app',
-        'https://dispora-mobile.summitbreak.com',
+        // Development - React + Vite
+        'http://localhost:5173',
+        'http://localhost:5174',
+        // Production
+        'https://aidara-mobile.summitct.co.id',
     ],
 
     'allowed_origins_patterns' => [],
@@ -21,5 +21,5 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => true,
+    'supports_credentials' => true, // Penting untuk Sanctum
 ];
