@@ -104,7 +104,7 @@ const actions = (row: any) => [
         permission: 'Pelatih Detail',
     },
     {
-        label: 'Edit Jenis Pelatih',
+        label: 'Edit',
         onClick: () => router.visit(`/cabor-kategori-pelatih/${row.id}/edit`),
         permission: 'Cabor Kategori Pelatih Edit',
     },

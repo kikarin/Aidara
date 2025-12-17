@@ -103,7 +103,7 @@ const actions = (row: any) => [
         permission: 'Atlet Detail',
     },
     {
-        label: 'Edit Posisi',
+        label: 'Edit',
         onClick: () => router.visit(`/cabor-kategori-atlet/${row.id}/edit`),
         permission: 'Cabor Kategori Atlet Edit',
     },

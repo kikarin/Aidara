@@ -325,6 +325,59 @@ class CaborController extends Controller implements HasMiddleware
     }
 
     /**
+     * Hapus peserta dari cabor
+     */
+    public function destroyPeserta($id, $tipe, $pesertaId)
+    {
+        $cabor = $this->repository->getById($id);
+        
+        if (!$cabor) {
+            return response()->json(['message' => 'Cabor tidak ditemukan'], 404);
+        }
+
+        try {
+            switch ($tipe) {
+                case 'atlet':
+                    $caborKategoriAtlet = \App\Models\CaborKategoriAtlet::where('cabor_id', $id)
+                        ->where('atlet_id', $pesertaId)
+                        ->first();
+                    
+                    if ($caborKategoriAtlet) {
+                        $caborKategoriAtlet->delete(); // Soft delete
+                        return response()->json(['message' => 'Atlet berhasil dihapus dari cabor']);
+                    }
+                    break;
+                    
+                case 'pelatih':
+                    $caborKategoriPelatih = \App\Models\CaborKategoriPelatih::where('cabor_id', $id)
+                        ->where('pelatih_id', $pesertaId)
+                        ->first();
+                    
+                    if ($caborKategoriPelatih) {
+                        $caborKategoriPelatih->delete(); // Soft delete
+                        return response()->json(['message' => 'Pelatih berhasil dihapus dari cabor']);
+                    }
+                    break;
+                    
+                case 'tenaga_pendukung':
+                    $caborKategoriTenagaPendukung = \App\Models\CaborKategoriTenagaPendukung::where('cabor_id', $id)
+                        ->where('tenaga_pendukung_id', $pesertaId)
+                        ->first();
+                    
+                    if ($caborKategoriTenagaPendukung) {
+                        $caborKategoriTenagaPendukung->delete(); // Soft delete
+                        return response()->json(['message' => 'Tenaga Pendukung berhasil dihapus dari cabor']);
+                    }
+                    break;
+            }
+            
+            return response()->json(['message' => 'Peserta tidak ditemukan'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Gagal menghapus peserta: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * API untuk perbandingan multi-tes
      */
     public function apiPerbandinganMultiTes(Request $request, $cabor_id)

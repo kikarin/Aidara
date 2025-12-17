@@ -163,10 +163,11 @@ class CaborKategoriAtletRepository
         $insertData = [];
 
         foreach ($data['atlet_ids'] as $atletId) {
-            // Cek apakah atlet sudah ada di cabor ini (unique: cabor_id + atlet_id)
-            // Tidak peduli cabor_kategori_id nya apa
+            // Cek apakah atlet sudah ada dengan kombinasi cabor_id + cabor_kategori_id + atlet_id
+            // Unique constraint adalah kombinasi ketiganya, jadi harus cek ketiganya
             $existing = $this->model->withTrashed()
                 ->where('cabor_id', $data['cabor_id'])
+                ->where('cabor_kategori_id', $data['cabor_kategori_id'])
                 ->where('atlet_id', $atletId)
                 ->first();
 
@@ -176,8 +177,7 @@ class CaborKategoriAtletRepository
                     $existing->restore();
                 }
                 
-                // Update cabor_kategori_id dan field lainnya
-                $existing->cabor_kategori_id = $data['cabor_kategori_id'];
+                // Update field lainnya (cabor_kategori_id sudah sama, jadi tidak perlu diupdate)
                 $existing->is_active = (int) $data['is_active'];
                 if (isset($data['posisi_atlet'])) {
                     $existing->posisi_atlet = $data['posisi_atlet'];
@@ -186,13 +186,13 @@ class CaborKategoriAtletRepository
                 $existing->updated_at = now();
                 $existing->save();
                 
-                Log::info('Updated existing cabor-atlet relation', [
+                Log::info('Updated existing cabor-kategori-atlet relation', [
                     'atlet_id' => $atletId,
                     'cabor_id' => $data['cabor_id'],
                     'cabor_kategori_id' => $data['cabor_kategori_id'],
                 ]);
             } else {
-                // Insert baru hanya jika belum ada di cabor ini
+                // Insert baru hanya jika belum ada dengan kombinasi yang sama
                 $insertData[] = [
                     'cabor_id'          => $data['cabor_id'],
                     'cabor_kategori_id' => $data['cabor_kategori_id'],
@@ -212,7 +212,7 @@ class CaborKategoriAtletRepository
             
             if (! empty($insertData)) {
                 DB::table('cabor_kategori_atlet')->insert($insertData);
-                Log::info('Inserted new cabor-atlet relations', ['count' => count($insertData)]);
+                Log::info('Inserted new cabor-kategori-atlet relations', ['count' => count($insertData)]);
             }
             
             DB::commit();

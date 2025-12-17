@@ -436,6 +436,7 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::get('/cabor/{id}/peserta/{tipe}', [CaborController::class, 'getPeserta'])->name('cabor.peserta');
     Route::get('/cabor/{id}/peserta/{tipe}/create', [CaborController::class, 'createMultiplePeserta'])->name('cabor.peserta.create');
     Route::post('/cabor/{id}/peserta/{tipe}/store', [CaborController::class, 'storeMultiplePeserta'])->name('cabor.peserta.store');
+    Route::delete('/cabor/{id}/peserta/{tipe}/{pesertaId}', [CaborController::class, 'destroyPeserta'])->name('cabor.peserta.destroy');
     Route::get('/api/cabor', [CaborController::class, 'apiIndex']);
     Route::get('/api/cabor/{cabor_id}/perbandingan-multi-tes', [CaborController::class, 'apiPerbandinganMultiTes'])->name('api.cabor.perbandingan-multi-tes');
     Route::get('/api/cabor/{cabor_id}/ranking', [CaborController::class, 'apiRanking'])->name('api.cabor.ranking');
@@ -750,6 +751,7 @@ Route::post('/api/pemeriksaan-khusus/clone-from-template', [PemeriksaanKhususCon
 Route::post('/api/pemeriksaan-khusus/save-aspek-item-tes', [PemeriksaanKhususController::class, 'apiSaveAspekItemTes'])->name('api.pemeriksaan-khusus.save-aspek-item-tes');
 Route::post('/api/pemeriksaan-khusus/save-as-template', [PemeriksaanKhususController::class, 'apiSaveAsTemplate'])->name('api.pemeriksaan-khusus.save-as-template');
 Route::get('/api/pemeriksaan-khusus/{id}/peserta', [PemeriksaanKhususController::class, 'apiGetPeserta'])->name('api.pemeriksaan-khusus.get-peserta');
+Route::delete('/pemeriksaan-khusus/{id}/peserta/{pesertaId}', [PemeriksaanKhususController::class, 'destroyPeserta'])->name('pemeriksaan-khusus.peserta.destroy');
 Route::get('/api/pemeriksaan-khusus/{id}/hasil-tes', [PemeriksaanKhususController::class, 'apiGetHasilTes'])->name('api.pemeriksaan-khusus.get-hasil-tes');
 Route::post('/api/pemeriksaan-khusus/save-hasil-tes', [PemeriksaanKhususController::class, 'apiSaveHasilTes'])->name('api.pemeriksaan-khusus.save-hasil-tes');
 Route::get('/api/pemeriksaan-khusus/{id}/visualisasi', [PemeriksaanKhususController::class, 'apiGetVisualisasi'])->name('api.pemeriksaan-khusus.get-visualisasi');

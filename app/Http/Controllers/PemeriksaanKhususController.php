@@ -499,32 +499,50 @@ class PemeriksaanKhususController extends Controller implements HasMiddleware
     {
         try {
             $pemeriksaanKhusus = $this->repository->getById($id);
+            
+            // Get jenis peserta dari query parameter (optional)
+            $jenisPeserta = request('jenis_peserta', 'atlet'); // default atlet
 
-            // Get hanya atlet (pelatih dan tenaga pendukung tidak dinilai dalam pemeriksaan khusus)
+            $pesertaTypeMap = [
+                'atlet' => 'App\\Models\\Atlet',
+                'pelatih' => 'App\\Models\\Pelatih',
+                'tenaga_pendukung' => 'App\\Models\\TenagaPendukung',
+            ];
+
+            $pesertaType = $pesertaTypeMap[$jenisPeserta] ?? 'App\\Models\\Atlet';
+
             $pesertaList = PemeriksaanKhususPeserta::with(['peserta'])
                 ->where('pemeriksaan_khusus_id', $id)
-                ->where('peserta_type', 'App\\Models\\Atlet')
+                ->where('peserta_type', $pesertaType)
                 ->whereNull('deleted_at')
                 ->get();
 
-            // Format data untuk frontend - HANYA ATLET
-            $atlet = [];
+            // Format data untuk frontend
+            $formattedPeserta = [];
 
             foreach ($pesertaList as $peserta) {
                 $pesertaData = [
                     'id' => $peserta->id, // pemeriksaan_khusus_peserta id
+                    'peserta_id' => $peserta->peserta_id, // id peserta asli (atlet/pelatih/tenaga pendukung)
                     'nama' => $peserta->peserta->nama ?? '-',
                     'jenis_kelamin' => $peserta->peserta->jenis_kelamin ?? null,
+                    'tanggal_lahir' => $peserta->peserta->tanggal_lahir ?? null,
                 ];
 
-                $atlet[] = $pesertaData;
+                // Hitung usia jika ada tanggal_lahir
+                if ($pesertaData['tanggal_lahir']) {
+                    $pesertaData['usia'] = \Carbon\Carbon::parse($pesertaData['tanggal_lahir'])->age;
+                } else {
+                    $pesertaData['usia'] = null;
+                }
+
+                $formattedPeserta[] = $pesertaData;
             }
 
             return response()->json([
                 'success' => true,
-                'atlet' => $atlet,
-                'pelatih' => [], // Pelatih tidak dinilai dalam pemeriksaan khusus
-                'tenaga_pendukung' => [], // Tenaga pendukung tidak dinilai dalam pemeriksaan khusus
+                'data' => $formattedPeserta,
+                'tipe' => $jenisPeserta,
             ]);
         } catch (\Exception $e) {
             Log::error('Error in apiGetPeserta: ' . $e->getMessage(), [
@@ -535,6 +553,45 @@ class PemeriksaanKhususController extends Controller implements HasMiddleware
                 'success' => false,
                 'error' => 'Terjadi kesalahan saat mengambil peserta',
                 'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Hapus peserta dari pemeriksaan khusus (hanya hapus dari pemeriksaan, tidak dari cabor)
+     */
+    public function destroyPeserta($id, $pesertaId)
+    {
+        try {
+            $pemeriksaanKhusus = $this->repository->getById($id);
+            
+            if (!$pemeriksaanKhusus) {
+                return response()->json(['message' => 'Pemeriksaan khusus tidak ditemukan'], 404);
+            }
+
+            $pemeriksaanKhususPeserta = PemeriksaanKhususPeserta::where('pemeriksaan_khusus_id', $id)
+                ->where('id', $pesertaId)
+                ->first();
+            
+            if (!$pemeriksaanKhususPeserta) {
+                return response()->json(['message' => 'Peserta tidak ditemukan dalam pemeriksaan khusus ini'], 404);
+            }
+
+            // Soft delete (hanya hapus dari pemeriksaan khusus, tidak dari cabor)
+            $pemeriksaanKhususPeserta->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Peserta berhasil dihapus dari pemeriksaan khusus'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in destroyPeserta: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus peserta: ' . $e->getMessage()
             ], 500);
         }
     }

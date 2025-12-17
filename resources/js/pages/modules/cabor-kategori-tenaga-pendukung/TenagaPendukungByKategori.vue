@@ -104,7 +104,7 @@ const actions = (row: any) => [
         permission: 'Tenaga Pendukung Detail',
     },
     {
-        label: 'Edit Jenis Tenaga Pendukung',
+        label: 'Edit',
         onClick: () => router.visit(`/cabor-kategori-tenaga-pendukung/${row.id}/edit`),
         permission: 'Cabor Kategori Tenaga Pendukung Edit',
     },

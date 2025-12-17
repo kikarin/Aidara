@@ -181,11 +181,25 @@ const loadData = async () => {
         aspekList.value = Array.from(uniqueAspekMap.values());
 
         // Load peserta dari pemeriksaan khusus - HANYA ATLET (pelatih dan tenaga pendukung tidak dinilai)
-        const pesertaRes = await axios.get(`/api/pemeriksaan-khusus/${props.item.id}/peserta`);
-        pesertaList.value = [
-            ...(pesertaRes.data.atlet || []).map((a: any) => ({ ...a, jenis_peserta: 'atlet' })),
-            // Pelatih dan tenaga pendukung tidak dinilai dalam pemeriksaan khusus
-        ];
+        const pesertaRes = await axios.get(`/api/pemeriksaan-khusus/${props.item.id}/peserta?jenis_peserta=atlet`);
+        // Response structure: { success: true, data: [...], tipe: 'atlet' }
+        // data[].id = pemeriksaan_khusus_peserta.id (untuk mapping dengan hasil tes)
+        // data[].peserta_id = id peserta asli (atlet id)
+        if (pesertaRes.data.success && pesertaRes.data.data) {
+            pesertaList.value = pesertaRes.data.data.map((a: any) => ({ 
+                id: a.id, // pemeriksaan_khusus_peserta.id (untuk mapping dengan hasil tes)
+                peserta_id: a.peserta_id, // id peserta asli (atlet id)
+                nama: a.nama,
+                jenis_kelamin: a.jenis_kelamin,
+                usia: a.usia,
+                jenis_peserta: 'atlet' 
+            }));
+        } else {
+            // Fallback untuk backward compatibility
+            pesertaList.value = [
+                ...(pesertaRes.data.atlet || []).map((a: any) => ({ ...a, jenis_peserta: 'atlet' })),
+            ];
+        }
 
         // Load hasil tes yang sudah ada
         const hasilTesRes = await axios.get(`/api/pemeriksaan-khusus/${props.item.id}/hasil-tes`);
@@ -213,6 +227,7 @@ const loadData = async () => {
                     }
                     seenItemTesIds.add(itemTes.id);
                     
+                    // Gunakan peserta.id (yang sudah di-map dari peserta_id di loadData)
                     const key = `${peserta.id}-${itemTes.id}`;
                     const existingHasil = hasilTesMap.get(key);
                     const target = getTarget(itemTes, jenisKelamin);
@@ -237,7 +252,7 @@ const loadData = async () => {
             });
 
             return {
-                peserta_id: peserta.id,
+                peserta_id: peserta.id, // peserta.id sudah di-map dari peserta_id
                 peserta: {
                     id: peserta.id,
                     nama: peserta.nama,

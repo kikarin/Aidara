@@ -6,6 +6,7 @@ import { router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { ref } from 'vue';
 import BadgeGroup from '../components/BadgeGroup.vue';
+import PesertaModal from './components/PesertaModal.vue';
 
 const { toast } = useToast();
 const breadcrumbs = [{ title: 'Pemeriksaan Khusus', href: '/pemeriksaan-khusus' }];
@@ -35,6 +36,12 @@ const selected = ref<number[]>([]);
 // Filter state
 const showFilterModal = ref(false);
 const currentFilters = ref<any>({});
+
+// Peserta modal state
+const showPesertaModal = ref(false);
+const selectedPesertaData = ref<any[]>([]);
+const selectedPesertaTipe = ref<string>('');
+const selectedPemeriksaanKhususId = ref<number | null>(null);
 
 const actions = (row: any) => [
     {
@@ -95,6 +102,48 @@ const handleFilter = (filters: any) => {
     toast({ title: 'Filter berhasil diterapkan', variant: 'success' });
 };
 
+const handlePesertaClick = async (pemeriksaanKhususId: number, tipe: string) => {
+    try {
+        const response = await axios.get(`/api/pemeriksaan-khusus/${pemeriksaanKhususId}/peserta?jenis_peserta=${tipe}`);
+        if (response.data.success) {
+            selectedPesertaData.value = response.data.data || [];
+            selectedPesertaTipe.value = tipe;
+            selectedPemeriksaanKhususId.value = pemeriksaanKhususId;
+            showPesertaModal.value = true;
+        } else {
+            toast({ title: 'Gagal mengambil data peserta', variant: 'destructive' });
+        }
+    } catch (error: any) {
+        console.error('Gagal mengambil data peserta:', error);
+        toast({ 
+            title: error.response?.data?.message || 'Gagal mengambil data peserta', 
+            variant: 'destructive' 
+        });
+    }
+};
+
+const handleRefreshPeserta = async () => {
+    if (selectedPemeriksaanKhususId.value && selectedPesertaTipe.value) {
+        try {
+            const response = await axios.get(`/api/pemeriksaan-khusus/${selectedPemeriksaanKhususId.value}/peserta?jenis_peserta=${selectedPesertaTipe.value}`);
+            if (response.data.success) {
+                selectedPesertaData.value = response.data.data || [];
+                // Refresh data table juga
+                pageIndex.value?.fetchData();
+            }
+        } catch (error) {
+            console.error('Gagal refresh data peserta:', error);
+        }
+    }
+};
+
+const closePesertaModal = () => {
+    showPesertaModal.value = false;
+    selectedPesertaData.value = [];
+    selectedPesertaTipe.value = '';
+    selectedPemeriksaanKhususId.value = null;
+};
+
 </script>
 
 <template>
@@ -122,16 +171,19 @@ const handleFilter = (filters: any) => {
                         label: 'Atlet',
                         value: row.jumlah_atlet || 0,
                         colorClass: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
+                        onClick: () => handlePesertaClick(row.id, 'atlet'),
                     },
                     {
                         label: 'Pelatih',
                         value: row.jumlah_pelatih || 0,
                         colorClass: 'bg-green-100 text-green-800 hover:bg-green-200',
+                        onClick: () => handlePesertaClick(row.id, 'pelatih'),
                     },
                     {
                         label: 'Tenaga Pendukung',
                         value: row.jumlah_tenaga_pendukung || 0,
                         colorClass: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
+                        onClick: () => handlePesertaClick(row.id, 'tenaga_pendukung'),
                     },
                 ]"
             />
@@ -145,6 +197,16 @@ const handleFilter = (filters: any) => {
         module-type="pemeriksaan-khusus"
         :initial-filters="currentFilters"
         @filter="handleFilter"
+    />
+
+    <!-- Peserta Modal -->
+    <PesertaModal
+        :show="showPesertaModal"
+        :data="selectedPesertaData"
+        :tipe="selectedPesertaTipe"
+        :pemeriksaan-khusus-id="selectedPemeriksaanKhususId"
+        @close="closePesertaModal"
+        @refresh="handleRefreshPeserta"
     />
 </template>
 

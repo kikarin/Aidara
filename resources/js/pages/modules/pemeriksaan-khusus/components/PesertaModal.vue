@@ -4,14 +4,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { router } from '@inertiajs/vue3';
 import { useToast } from '@/components/ui/toast/useToast';
-import { Plus, Trash2 } from 'lucide-vue-next';
+import { Trash2 } from 'lucide-vue-next';
 import axios from 'axios';
 import { ref } from 'vue';
 
 interface Peserta {
-    id: number;
+    id: number; // pemeriksaan_khusus_peserta id
+    peserta_id: number; // id peserta asli
     nama: string;
-    foto: string | null;
     jenis_kelamin: string;
     usia: number | null;
 }
@@ -20,7 +20,7 @@ interface Props {
     show: boolean;
     data: Peserta[];
     tipe: string;
-    caborId: number | null;
+    pemeriksaanKhususId: number | null;
 }
 
 interface Emits {
@@ -64,25 +64,19 @@ const handleClose = () => {
     emit('close');
 };
 
-const handleAddPeserta = () => {
-    if (props.caborId && props.tipe) {
-        router.visit(`/cabor/${props.caborId}/peserta/${props.tipe}/create`);
-    }
-};
-
 const handleDeleteClick = (peserta: Peserta) => {
     pesertaToDelete.value = peserta;
     showDeleteDialog.value = true;
 };
 
 const handleConfirmDelete = async () => {
-    if (!pesertaToDelete.value || !props.caborId || !props.tipe) return;
+    if (!pesertaToDelete.value || !props.pemeriksaanKhususId) return;
     
     isDeleting.value = true;
     try {
-        await axios.delete(`/cabor/${props.caborId}/peserta/${props.tipe}/${pesertaToDelete.value.id}`);
+        await axios.delete(`/pemeriksaan-khusus/${props.pemeriksaanKhususId}/peserta/${pesertaToDelete.value.id}`);
         toast({ 
-            title: `${getTipeLabel(props.tipe)} berhasil dihapus dari cabor`, 
+            title: `${getTipeLabel(props.tipe)} berhasil dihapus dari pemeriksaan khusus`, 
             variant: 'success' 
         });
         showDeleteDialog.value = false;
@@ -116,13 +110,9 @@ const getPesertaRoute = (tipe: string, pesertaId: number) => {
     <Dialog :open="show" @update:open="handleClose">
         <DialogContent class="max-h-[80vh] max-w-4xl overflow-y-auto">
             <DialogHeader>
-                <div class="flex items-center justify-between">
-                    <DialogTitle class="text-xl font-semibold"> Daftar {{ getTipeLabel(tipe) }} </DialogTitle>
-                    <Button @click="handleAddPeserta" size="sm" class="mr-8">
-                        <Plus class="mr-1 h-4 w-4" />
-                        Tambah {{ getTipeLabel(tipe) }}
-                    </Button>
-                </div>
+                <DialogTitle class="text-xl font-semibold"> 
+                    Daftar {{ getTipeLabel(tipe) }} 
+                </DialogTitle>
             </DialogHeader>
 
             <div class="mt-6">
@@ -139,7 +129,7 @@ const getPesertaRoute = (tipe: string, pesertaId: number) => {
                     <tbody>
                         <tr v-if="data.length === 0">
                             <td colspan="5" class="text-muted-foreground py-4 text-center">
-                                Tidak ada data {{ getTipeLabel(tipe) }} untuk cabor ini
+                                Tidak ada data {{ getTipeLabel(tipe) }} untuk pemeriksaan khusus ini
                             </td>
                         </tr>
                         <tr v-for="(peserta, idx) in data" :key="peserta.id" class="hover:bg-muted/50">
@@ -148,7 +138,7 @@ const getPesertaRoute = (tipe: string, pesertaId: number) => {
                                 <span 
                                     class="truncate cursor-pointer hover:text-primary" 
                                     :title="peserta.nama" 
-                                    @click="() => router.visit(getPesertaRoute(tipe, peserta.id))"
+                                    @click="() => router.visit(getPesertaRoute(tipe, peserta.peserta_id))"
                                 >
                                     {{ peserta.nama }}
                                 </span>
@@ -184,11 +174,13 @@ const getPesertaRoute = (tipe: string, pesertaId: number) => {
     <AlertDialog :open="showDeleteDialog" @update:open="showDeleteDialog = $event">
         <AlertDialogContent>
             <AlertDialogHeader>
-                <AlertDialogTitle>Hapus Peserta?</AlertDialogTitle>
+                <AlertDialogTitle>Hapus Peserta dari Pemeriksaan Khusus?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Apakah Anda yakin ingin menghapus <strong>{{ pesertaToDelete?.nama }}</strong> dari cabor ini?
+                    Apakah Anda yakin ingin menghapus <strong>{{ pesertaToDelete?.nama }}</strong> dari pemeriksaan khusus ini?
                     <br>
-                    <span class="text-sm text-muted-foreground">Cabor juga akan menghilang dari biodata diri peserta.</span>
+                    <span class="text-sm text-muted-foreground">
+                        Peserta akan dihapus dari pemeriksaan khusus, tetapi tetap ada di cabor.
+                    </span>
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -204,3 +196,4 @@ const getPesertaRoute = (tipe: string, pesertaId: number) => {
         </AlertDialogContent>
     </AlertDialog>
 </template>
+

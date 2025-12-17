@@ -82,6 +82,19 @@ const handlePesertaClick = async (caborId: number, tipe: string) => {
     }
 };
 
+const handleRefreshPeserta = async () => {
+    if (selectedCaborId.value && selectedPesertaTipe.value) {
+        try {
+            const response = await axios.get(`/cabor/${selectedCaborId.value}/peserta/${selectedPesertaTipe.value}`);
+            selectedPesertaData.value = response.data.data;
+            // Refresh data table juga
+            pageIndex.value?.fetchData();
+        } catch (error) {
+            console.error('Gagal refresh data peserta:', error);
+        }
+    }
+};
+
 const closePesertaModal = () => {
     showPesertaModal.value = false;
     selectedPesertaData.value = [];
@@ -163,6 +176,7 @@ const handleFilter = (filters: any) => {
             :tipe="selectedPesertaTipe"
             :cabor-id="selectedCaborId"
             @close="closePesertaModal"
+            @refresh="handleRefreshPeserta"
         />
     </div>
 </template>
