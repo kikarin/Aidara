@@ -330,7 +330,7 @@ fetchAvailableData();
                                             type="checkbox"
                                             class="peer sr-only"
                                             :checked="selectedIds.length > 0 && selectedIds.length === dataList.length"
-                                            @change="(e) => toggleSelectAll((e.target as HTMLInputElement).checked)"
+                                            @change="(e: Event) => toggleSelectAll((e.target as HTMLInputElement).checked)"
                                         />
                                         <div class="bg-primary h-3 w-3 scale-0 transform rounded-sm transition-all peer-checked:scale-100"></div>
                                     </label>

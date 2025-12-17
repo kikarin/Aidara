@@ -6,7 +6,8 @@ import { router } from '@inertiajs/vue3';
 import { useToast } from '@/components/ui/toast/useToast';
 import { Plus, Trash2 } from 'lucide-vue-next';
 import axios from 'axios';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import permissionService from '@/services/permissionService';
 
 interface Peserta {
     id: number;
@@ -14,6 +15,9 @@ interface Peserta {
     foto: string | null;
     jenis_kelamin: string;
     usia: number | null;
+    posisi_atlet?: string;
+    jenis_pelatih?: string;
+    jenis_tenaga_pendukung?: string;
 }
 
 interface Props {
@@ -35,6 +39,15 @@ const { toast } = useToast();
 const showDeleteDialog = ref(false);
 const pesertaToDelete = ref<Peserta | null>(null);
 const isDeleting = ref(false);
+
+// Permission checks
+const canTambahPeserta = computed(() => {
+    return permissionService.hasPermission('Cabor Tambah Peserta');
+});
+
+const canHapusPeserta = computed(() => {
+    return permissionService.hasPermission('Cabor Hapus Peserta');
+});
 
 const getTipeLabel = (tipe: string) => {
     switch (tipe) {
@@ -118,7 +131,7 @@ const getPesertaRoute = (tipe: string, pesertaId: number) => {
             <DialogHeader>
                 <div class="flex items-center justify-between">
                     <DialogTitle class="text-xl font-semibold"> Daftar {{ getTipeLabel(tipe) }} </DialogTitle>
-                    <Button @click="handleAddPeserta" size="sm" class="mr-8">
+                    <Button v-if="canTambahPeserta" @click="handleAddPeserta" size="sm" class="mr-8">
                         <Plus class="mr-1 h-4 w-4" />
                         Tambah {{ getTipeLabel(tipe) }}
                     </Button>
@@ -133,25 +146,36 @@ const getPesertaRoute = (tipe: string, pesertaId: number) => {
                             <th class="border px-3 py-2 text-left">Nama</th>
                             <th class="border px-3 py-2 text-center">Jenis Kelamin</th>
                             <th class="border px-3 py-2 text-center">Usia</th>
-                            <th class="w-24 border px-3 py-2 text-center">Aksi</th>
+                            <th v-if="canHapusPeserta" class="w-24 border px-3 py-2 text-center">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-if="data.length === 0">
-                            <td colspan="5" class="text-muted-foreground py-4 text-center">
+                            <td :colspan="canHapusPeserta ? 5 : 4" class="text-muted-foreground py-4 text-center">
                                 Tidak ada data {{ getTipeLabel(tipe) }} untuk cabor ini
                             </td>
                         </tr>
                         <tr v-for="(peserta, idx) in data" :key="peserta.id" class="hover:bg-muted/50">
                             <td class="border px-2 py-2 text-center">{{ idx + 1 }}</td>
-                            <td class="flex items-center space-x-3 border px-3 py-2">
-                                <span 
-                                    class="truncate cursor-pointer hover:text-primary" 
-                                    :title="peserta.nama" 
-                                    @click="() => router.visit(getPesertaRoute(tipe, peserta.id))"
-                                >
-                                    {{ peserta.nama }}
-                                </span>
+                            <td class="border px-3 py-2">
+                                <div class="flex flex-col">
+                                    <span 
+                                        class="truncate cursor-pointer hover:text-primary font-medium" 
+                                        :title="peserta.nama" 
+                                        @click="() => router.visit(getPesertaRoute(tipe, peserta.id))"
+                                    >
+                                        {{ peserta.nama }}
+                                    </span>
+                                    <span v-if="tipe === 'atlet' && peserta.posisi_atlet" class="text-xs text-muted-foreground mt-1">
+                                        {{ peserta.posisi_atlet }}
+                                    </span>
+                                    <span v-else-if="tipe === 'pelatih' && peserta.jenis_pelatih" class="text-xs text-muted-foreground mt-1">
+                                        {{ peserta.jenis_pelatih }}
+                                    </span>
+                                    <span v-else-if="tipe === 'tenaga_pendukung' && peserta.jenis_tenaga_pendukung" class="text-xs text-muted-foreground mt-1">
+                                        {{ peserta.jenis_tenaga_pendukung }}
+                                    </span>
+                                </div>
                             </td>
                             <td class="border px-3 py-2 text-center">
                                 {{ getJenisKelaminLabel(peserta.jenis_kelamin) }}
@@ -159,7 +183,7 @@ const getPesertaRoute = (tipe: string, pesertaId: number) => {
                             <td class="border px-3 py-2 text-center">
                                 {{ peserta.usia ? `${peserta.usia} tahun` : '-' }}
                             </td>
-                            <td class="border px-3 py-2 text-center">
+                            <td v-if="canHapusPeserta" class="border px-3 py-2 text-center">
                                 <Button 
                                     variant="ghost" 
                                     size="sm" 

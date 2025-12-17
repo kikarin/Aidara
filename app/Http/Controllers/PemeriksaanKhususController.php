@@ -520,6 +520,8 @@ class PemeriksaanKhususController extends Controller implements HasMiddleware
             // Format data untuk frontend
             $formattedPeserta = [];
 
+            $caborKategoriId = $pemeriksaanKhusus->cabor_kategori_id;
+
             foreach ($pesertaList as $peserta) {
                 $pesertaData = [
                     'id' => $peserta->id, // pemeriksaan_khusus_peserta id
@@ -534,6 +536,30 @@ class PemeriksaanKhususController extends Controller implements HasMiddleware
                     $pesertaData['usia'] = \Carbon\Carbon::parse($pesertaData['tanggal_lahir'])->age;
                 } else {
                     $pesertaData['usia'] = null;
+                }
+
+                // Tambahkan posisi/jenis berdasarkan tipe peserta
+                if ($jenisPeserta === 'atlet' && $caborKategoriId) {
+                    $caborKategoriAtlet = \App\Models\CaborKategoriAtlet::where('cabor_kategori_id', $caborKategoriId)
+                        ->where('atlet_id', $peserta->peserta_id)
+                        ->whereNull('deleted_at')
+                        ->first();
+                    
+                    $pesertaData['posisi_atlet'] = $caborKategoriAtlet ? ($caborKategoriAtlet->posisi_atlet ?? '-') : '-';
+                } elseif ($jenisPeserta === 'pelatih' && $caborKategoriId) {
+                    $caborKategoriPelatih = \App\Models\CaborKategoriPelatih::where('cabor_kategori_id', $caborKategoriId)
+                        ->where('pelatih_id', $peserta->peserta_id)
+                        ->whereNull('deleted_at')
+                        ->first();
+                    
+                    $pesertaData['jenis_pelatih'] = $caborKategoriPelatih ? ($caborKategoriPelatih->jenis_pelatih ?? '-') : '-';
+                } elseif ($jenisPeserta === 'tenaga_pendukung' && $caborKategoriId) {
+                    $caborKategoriTenagaPendukung = \App\Models\CaborKategoriTenagaPendukung::where('cabor_kategori_id', $caborKategoriId)
+                        ->where('tenaga_pendukung_id', $peserta->peserta_id)
+                        ->whereNull('deleted_at')
+                        ->first();
+                    
+                    $pesertaData['jenis_tenaga_pendukung'] = $caborKategoriTenagaPendukung ? ($caborKategoriTenagaPendukung->jenis_tenaga_pendukung ?? '-') : '-';
                 }
 
                 $formattedPeserta[] = $pesertaData;
@@ -558,10 +584,190 @@ class PemeriksaanKhususController extends Controller implements HasMiddleware
     }
 
     /**
+     * Get peserta yang tersedia untuk ditambahkan (dari cabor kategori, belum ada di pemeriksaan khusus)
+     */
+    public function apiAvailablePeserta($id, Request $request)
+    {
+        try {
+            $pemeriksaanKhusus = $this->repository->getById($id);
+            
+            if (!$pemeriksaanKhusus) {
+                return response()->json(['success' => false, 'message' => 'Pemeriksaan khusus tidak ditemukan'], 404);
+            }
+
+            $jenisPeserta = $request->input('jenis_peserta', 'atlet');
+            $caborKategoriId = $pemeriksaanKhusus->cabor_kategori_id;
+
+            // Get peserta yang sudah ada di pemeriksaan khusus ini
+            $existingPesertaIds = PemeriksaanKhususPeserta::where('pemeriksaan_khusus_id', $id)
+                ->whereNull('deleted_at')
+                ->pluck('peserta_id')
+                ->toArray();
+
+            $pesertaTypeMap = [
+                'atlet' => ['App\\Models\\Atlet', 'CaborKategoriAtlet', 'atlet_id', 'atlet'],
+                'pelatih' => ['App\\Models\\Pelatih', 'CaborKategoriPelatih', 'pelatih_id', 'pelatih'],
+                'tenaga_pendukung' => ['App\\Models\\TenagaPendukung', 'CaborKategoriTenagaPendukung', 'tenaga_pendukung_id', 'tenagaPendukung'],
+            ];
+
+            $config = $pesertaTypeMap[$jenisPeserta] ?? $pesertaTypeMap['atlet'];
+            [$pesertaType, $caborKategoriModel, $idKey, $relationName] = $config;
+
+            // Query peserta dari cabor kategori yang belum ada di pemeriksaan khusus
+            $modelClass = "App\\Models\\{$caborKategoriModel}";
+            $query = $modelClass::with([$relationName])
+                ->where('cabor_kategori_id', $caborKategoriId)
+                ->where('is_active', 1)
+                ->whereNull('deleted_at')
+                ->whereNotIn($idKey, $existingPesertaIds);
+
+            // Search filter
+            if ($request->has('search')) {
+                $search = $request->input('search');
+                $query->whereHas($relationName, function ($q) use ($search) {
+                    $q->where('nama', 'like', "%{$search}%")
+                        ->orWhere('nik', 'like', "%{$search}%");
+                });
+            }
+
+            $perPage = (int) $request->input('per_page', 10);
+            $page = (int) $request->input('page', 1);
+            $result = $query->paginate($perPage, ['*'], 'page', $page);
+
+            // Transform data
+            $transformed = collect($result->items())->map(function ($item) use ($idKey, $relationName) {
+                $peserta = $item->$relationName;
+                if (!$peserta) return null;
+
+                $usia = null;
+                if ($peserta->tanggal_lahir) {
+                    $usia = \Carbon\Carbon::parse($peserta->tanggal_lahir)->age;
+                }
+
+                return [
+                    'id' => $peserta->id,
+                    'nama' => $peserta->nama ?? '-',
+                    'jenis_kelamin' => $peserta->jenis_kelamin ?? null,
+                    'usia' => $usia,
+                    'foto' => $peserta->foto ?? null,
+                ];
+            })->filter();
+
+            return response()->json([
+                'success' => true,
+                'data' => $transformed->values(),
+                'meta' => [
+                    'total' => $result->total(),
+                    'current_page' => $result->currentPage(),
+                    'per_page' => $result->perPage(),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiAvailablePeserta: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data peserta: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Tambah peserta ke pemeriksaan khusus
+     */
+    public function storePeserta($id, Request $request)
+    {
+        // Check permission
+        if (!auth()->user()->can('Pemeriksaan Khusus Tambah Peserta')) {
+            return response()->json(['success' => false, 'message' => 'Anda tidak memiliki izin untuk menambahkan peserta ke pemeriksaan khusus'], 403);
+        }
+
+        try {
+            $pemeriksaanKhusus = $this->repository->getById($id);
+            
+            if (!$pemeriksaanKhusus) {
+                return response()->json(['success' => false, 'message' => 'Pemeriksaan khusus tidak ditemukan'], 404);
+            }
+
+            $request->validate([
+                'peserta_ids' => 'required|array|min:1',
+                'peserta_ids.*' => 'required|integer',
+                'jenis_peserta' => 'required|in:atlet,pelatih,tenaga_pendukung',
+            ]);
+
+            $pesertaIds = $request->input('peserta_ids');
+            $jenisPeserta = $request->input('jenis_peserta');
+            $userId = Auth::id();
+
+            $pesertaTypeMap = [
+                'atlet' => 'App\\Models\\Atlet',
+                'pelatih' => 'App\\Models\\Pelatih',
+                'tenaga_pendukung' => 'App\\Models\\TenagaPendukung',
+            ];
+
+            $pesertaType = $pesertaTypeMap[$jenisPeserta] ?? 'App\\Models\\Atlet';
+
+            // Cek peserta yang sudah ada
+            $existingPeserta = PemeriksaanKhususPeserta::where('pemeriksaan_khusus_id', $id)
+                ->whereIn('peserta_id', $pesertaIds)
+                ->where('peserta_type', $pesertaType)
+                ->whereNull('deleted_at')
+                ->pluck('peserta_id')
+                ->toArray();
+
+            $newPesertaIds = array_diff($pesertaIds, $existingPeserta);
+
+            if (empty($newPesertaIds)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Semua peserta yang dipilih sudah ada di pemeriksaan khusus ini'
+                ], 400);
+            }
+
+            // Insert peserta baru
+            $insertData = [];
+            foreach ($newPesertaIds as $pesertaId) {
+                $insertData[] = [
+                    'pemeriksaan_khusus_id' => $id,
+                    'peserta_id' => $pesertaId,
+                    'peserta_type' => $pesertaType,
+                    'created_by' => $userId,
+                    'updated_by' => $userId,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            PemeriksaanKhususPeserta::insert($insertData);
+
+            return response()->json([
+                'success' => true,
+                'message' => count($newPesertaIds) . ' peserta berhasil ditambahkan ke pemeriksaan khusus'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in storePeserta: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menambahkan peserta: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Hapus peserta dari pemeriksaan khusus (hanya hapus dari pemeriksaan, tidak dari cabor)
      */
     public function destroyPeserta($id, $pesertaId)
     {
+        // Check permission
+        if (!auth()->user()->can('Pemeriksaan Khusus Hapus Peserta')) {
+            return response()->json(['success' => false, 'message' => 'Anda tidak memiliki izin untuk menghapus peserta dari pemeriksaan khusus'], 403);
+        }
+
         try {
             $pemeriksaanKhusus = $this->repository->getById($id);
             

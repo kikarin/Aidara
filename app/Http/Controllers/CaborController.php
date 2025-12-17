@@ -204,6 +204,10 @@ class CaborController extends Controller implements HasMiddleware
      */
     public function storeMultiplePeserta(Request $request, $id, $tipe)
     {
+        if (!auth()->user()->can('Cabor Tambah Peserta')) {
+            return redirect()->back()->with('error', 'Anda tidak memiliki izin untuk menambahkan peserta ke cabor');
+        }
+
         $request->validate([
             'peserta_ids' => 'required|array|min:1',
             'peserta_ids.*' => 'required|integer',
@@ -329,6 +333,11 @@ class CaborController extends Controller implements HasMiddleware
      */
     public function destroyPeserta($id, $tipe, $pesertaId)
     {
+        // Check permission
+        if (!auth()->user()->can('Cabor Hapus Peserta')) {
+            return response()->json(['message' => 'Anda tidak memiliki izin untuk menghapus peserta dari cabor'], 403);
+        }
+
         $cabor = $this->repository->getById($id);
         
         if (!$cabor) {

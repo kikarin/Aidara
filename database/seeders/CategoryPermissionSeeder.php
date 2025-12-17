@@ -181,8 +181,9 @@ class CategoryPermissionSeeder extends Seeder
                 'permission' => 'CRUD',
             ],
             [
-                'name'       => 'Cabor',
-                'permission' => 'CRUD',
+                'name'              => 'Cabor',
+                'permission'        => 'CRUD',
+                'permission_common' => ['Cabor Tambah Peserta', 'Cabor Hapus Peserta'],
             ],
             [
                 'name'       => 'Cabor Kategori',
@@ -225,7 +226,7 @@ class CategoryPermissionSeeder extends Seeder
             [
                 'name'              => 'Pemeriksaan Khusus',
                 'permission'        => 'CRUD',
-                'permission_common' => ['Pemeriksaan Khusus Setup', 'Pemeriksaan Khusus Input Hasil Tes'],
+                'permission_common' => ['Pemeriksaan Khusus Setup', 'Pemeriksaan Khusus Input Hasil Tes', 'Pemeriksaan Khusus Tambah Peserta', 'Pemeriksaan Khusus Hapus Peserta'],
             ],
             [
                 'name'      => 'Turnamen',

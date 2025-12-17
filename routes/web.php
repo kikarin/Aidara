@@ -751,6 +751,8 @@ Route::post('/api/pemeriksaan-khusus/clone-from-template', [PemeriksaanKhususCon
 Route::post('/api/pemeriksaan-khusus/save-aspek-item-tes', [PemeriksaanKhususController::class, 'apiSaveAspekItemTes'])->name('api.pemeriksaan-khusus.save-aspek-item-tes');
 Route::post('/api/pemeriksaan-khusus/save-as-template', [PemeriksaanKhususController::class, 'apiSaveAsTemplate'])->name('api.pemeriksaan-khusus.save-as-template');
 Route::get('/api/pemeriksaan-khusus/{id}/peserta', [PemeriksaanKhususController::class, 'apiGetPeserta'])->name('api.pemeriksaan-khusus.get-peserta');
+Route::get('/api/pemeriksaan-khusus/{id}/peserta/available', [PemeriksaanKhususController::class, 'apiAvailablePeserta'])->name('api.pemeriksaan-khusus.peserta.available');
+Route::post('/pemeriksaan-khusus/{id}/peserta', [PemeriksaanKhususController::class, 'storePeserta'])->name('pemeriksaan-khusus.peserta.store');
 Route::delete('/pemeriksaan-khusus/{id}/peserta/{pesertaId}', [PemeriksaanKhususController::class, 'destroyPeserta'])->name('pemeriksaan-khusus.peserta.destroy');
 Route::get('/api/pemeriksaan-khusus/{id}/hasil-tes', [PemeriksaanKhususController::class, 'apiGetHasilTes'])->name('api.pemeriksaan-khusus.get-hasil-tes');
 Route::post('/api/pemeriksaan-khusus/save-hasil-tes', [PemeriksaanKhususController::class, 'apiSaveHasilTes'])->name('api.pemeriksaan-khusus.save-hasil-tes');

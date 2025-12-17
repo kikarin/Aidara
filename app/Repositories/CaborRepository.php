@@ -243,7 +243,7 @@ class CaborRepository
                     ->join('atlets as a', 'cka.atlet_id', '=', 'a.id')
                     ->where('cka.cabor_id', $caborId)
                     ->whereNull('cka.deleted_at') // Filter soft deleted
-                    ->select('a.id', 'a.nama', 'a.foto', 'a.jenis_kelamin', 'a.tanggal_lahir')
+                    ->select('a.id', 'a.nama', 'a.foto', 'a.jenis_kelamin', 'a.tanggal_lahir', DB::raw('COALESCE(cka.posisi_atlet, "-") as posisi_atlet'))
                     ->distinct()
                     ->get()
                     ->map(function ($item) {
@@ -259,6 +259,7 @@ class CaborRepository
                             'foto'          => $item->foto,
                             'jenis_kelamin' => $item->jenis_kelamin,
                             'usia'          => $usia,
+                            'posisi_atlet'  => $item->posisi_atlet ?? '-',
                         ];
                     });
 
@@ -267,7 +268,7 @@ class CaborRepository
                     ->join('pelatihs as p', 'ckp.pelatih_id', '=', 'p.id')
                     ->where('ckp.cabor_id', $caborId)
                     ->whereNull('ckp.deleted_at') // Filter soft deleted
-                    ->select('p.id', 'p.nama', 'p.foto', 'p.jenis_kelamin', 'p.tanggal_lahir')
+                    ->select('p.id', 'p.nama', 'p.foto', 'p.jenis_kelamin', 'p.tanggal_lahir', DB::raw('COALESCE(ckp.jenis_pelatih, "-") as jenis_pelatih'))
                     ->distinct()
                     ->get()
                     ->map(function ($item) {
@@ -283,6 +284,7 @@ class CaborRepository
                             'foto'          => $item->foto,
                             'jenis_kelamin' => $item->jenis_kelamin,
                             'usia'          => $usia,
+                            'jenis_pelatih' => $item->jenis_pelatih ?? '-',
                         ];
                     });
 
@@ -291,7 +293,7 @@ class CaborRepository
                     ->join('tenaga_pendukungs as tp', 'cktp.tenaga_pendukung_id', '=', 'tp.id')
                     ->where('cktp.cabor_id', $caborId)
                     ->whereNull('cktp.deleted_at') // Filter soft deleted
-                    ->select('tp.id', 'tp.nama', 'tp.foto', 'tp.jenis_kelamin', 'tp.tanggal_lahir')
+                    ->select('tp.id', 'tp.nama', 'tp.foto', 'tp.jenis_kelamin', 'tp.tanggal_lahir', DB::raw('COALESCE(cktp.jenis_tenaga_pendukung, "-") as jenis_tenaga_pendukung'))
                     ->distinct()
                     ->get()
                     ->map(function ($item) {
@@ -307,6 +309,7 @@ class CaborRepository
                             'foto'          => $item->foto,
                             'jenis_kelamin' => $item->jenis_kelamin,
                             'usia'          => $usia,
+                            'jenis_tenaga_pendukung' => $item->jenis_tenaga_pendukung ?? '-',
                         ];
                     });
 
