@@ -940,14 +940,16 @@ class CaborController extends Controller implements HasMiddleware
      */
     private function getPredikatFromPercentage($percentage)
     {
-        if ($percentage >= 80) {
+        if ($percentage >= 100) {
             return 'target';
-        } elseif ($percentage >= 60) {
+        } elseif ($percentage >= 80) {
             return 'mendekati_target';
-        } elseif ($percentage >= 40) {
+        } elseif ($percentage >= 60) {
             return 'sedang';
-        } elseif ($percentage >= 20) {
+        } elseif ($percentage >= 40) {
             return 'kurang';
+        } elseif ($percentage >= 20) {
+            return 'sangat_kurang';
         } else {
             return 'sangat_kurang';
         }
@@ -995,6 +997,102 @@ class CaborController extends Controller implements HasMiddleware
                 'error' => $e->getMessage(),
             ]);
             return '-';
+        }
+    }
+
+    /**
+     * API: Get 3 pemeriksaan khusus terakhir untuk atlet tertentu
+     */
+    public function apiGetLastThreePemeriksaan(Request $request, $cabor_id, $atlet_id)
+    {
+        try {
+            // Get 3 pemeriksaan khusus terakhir untuk atlet ini di cabor ini
+            $pemeriksaanList = PemeriksaanKhusus::where('cabor_id', $cabor_id)
+                ->whereHas('pemeriksaanKhususPeserta', function ($q) use ($atlet_id) {
+                    $q->where('peserta_id', $atlet_id)
+                        ->where('peserta_type', 'App\\Models\\Atlet');
+                })
+                ->with(['caborKategori'])
+                ->orderBy('tanggal_pemeriksaan', 'desc')
+                ->limit(3)
+                ->get();
+
+            if ($pemeriksaanList->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [],
+                    'message' => 'Tidak ada data pemeriksaan khusus untuk atlet ini',
+                ]);
+            }
+
+            // Load aspek dan hasil untuk setiap pemeriksaan
+            $result = [];
+            foreach ($pemeriksaanList as $pemeriksaan) {
+                // Load aspek dengan urutan
+                $aspekList = PemeriksaanKhususAspek::where('pemeriksaan_khusus_id', $pemeriksaan->id)
+                    ->whereNull('deleted_at')
+                    ->orderBy('urutan')
+                    ->get();
+
+                // Get peserta untuk atlet ini di pemeriksaan ini
+                $peserta = PemeriksaanKhususPeserta::with([
+                    'hasilAspek.aspek',
+                    'hasilKeseluruhan',
+                ])
+                    ->where('pemeriksaan_khusus_id', $pemeriksaan->id)
+                    ->where('peserta_id', $atlet_id)
+                    ->where('peserta_type', 'App\\Models\\Atlet')
+                    ->first();
+
+                if (!$peserta) {
+                    continue;
+                }
+
+                // Format data aspek
+                $aspekData = [];
+                foreach ($aspekList as $aspek) {
+                    $hasilAspek = $peserta->hasilAspek->firstWhere('pemeriksaan_khusus_aspek_id', $aspek->id);
+                    $aspekData[] = [
+                        'aspek_id' => $aspek->id,
+                        'nama' => $aspek->nama,
+                        'nilai_performa' => $hasilAspek ? (float) $hasilAspek->nilai_performa : null,
+                        'predikat' => $hasilAspek->predikat ?? null,
+                    ];
+                }
+
+                $result[] = [
+                    'pemeriksaan_id' => $pemeriksaan->id,
+                    'nama_pemeriksaan' => $pemeriksaan->nama_pemeriksaan,
+                    'tanggal_pemeriksaan' => $pemeriksaan->tanggal_pemeriksaan,
+                    'cabor_kategori' => $pemeriksaan->caborKategori->nama ?? '-',
+                    'aspek_list' => $aspekList->map(fn($a) => [
+                        'id' => $a->id,
+                        'nama' => $a->nama,
+                        'urutan' => $a->urutan,
+                    ])->toArray(),
+                    'aspek' => $aspekData,
+                    'nilai_keseluruhan' => $peserta->hasilKeseluruhan ? (float) $peserta->hasilKeseluruhan->nilai_keseluruhan : null,
+                    'predikat_keseluruhan' => $peserta->hasilKeseluruhan->predikat ?? null,
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiGetLastThreePemeriksaan', [
+                'cabor_id' => $cabor_id,
+                'atlet_id' => $atlet_id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data pemeriksaan khusus',
+                'error' => $e->getMessage(),
+            ], 500);
         }
     }
 }

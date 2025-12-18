@@ -9,6 +9,7 @@ use App\Models\Pemeriksaan;
 use App\Models\PemeriksaanPeserta;
 use App\Models\PemeriksaanPesertaParameter;
 use App\Repositories\PelatihRepository;
+use Illuminate\Support\Facades\DB;
 use App\Traits\BaseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -495,6 +496,32 @@ class PelatihController extends Controller implements HasMiddleware
                 'message' => 'Terjadi kesalahan saat mengambil data karakteristik pelatih',
                 'error'   => $e->getMessage(),
             ], 500);
+        }
+    }
+
+    public function apiGetCabor($id)
+    {
+        try {
+            $pelatih = Pelatih::with('caborKategoriPelatih.cabor')->find($id);
+            if (!$pelatih) {
+                return response()->json(['success' => false, 'message' => 'Pelatih tidak ditemukan'], 404);
+            }
+
+            $caborKategoriPelatih = $pelatih->caborKategoriPelatih->first();
+            if (!$caborKategoriPelatih || !$caborKategoriPelatih->cabor) {
+                return response()->json(['success' => true, 'data' => ['cabor_id' => null]]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'cabor_id' => $caborKategoriPelatih->cabor_id,
+                    'cabor_nama' => $caborKategoriPelatih->cabor->nama,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching cabor for pelatih: '.$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan saat mengambil data'], 500);
         }
     }
 }

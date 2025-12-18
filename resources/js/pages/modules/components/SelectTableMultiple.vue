@@ -21,7 +21,7 @@ const items = ref<any[]>([]);
 const loading = ref(false);
 const searchQuery = ref('');
 const currentPage = ref(1);
-const perPage = ref(10);
+const perPage = ref(100); // Default lebih besar untuk menampilkan lebih banyak item
 const total = ref(0);
 const localSelected = ref<number[]>(props.selectedIds ? [...props.selectedIds] : []);
 
@@ -117,7 +117,7 @@ const isSelected = (id: number) => localSelected.value.includes(id);
                                         type="checkbox"
                                         class="peer sr-only"
                                         :checked="localSelected.length > 0 && localSelected.length === items.length"
-                                        @change="(e) => toggleSelectAll((e.target as HTMLInputElement).checked)"
+                                        @change="(e: Event) => toggleSelectAll((e.target as HTMLInputElement).checked)"
                                     />
                                     <div class="bg-primary h-3 w-3 scale-0 transform rounded-sm transition-all peer-checked:scale-100"></div>
                                 </label>

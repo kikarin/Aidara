@@ -178,12 +178,6 @@ const tabsConfig = computed(() => {
             allowedForPending: true, // Data diri bisa diakses
         },
         {
-            value: 'parameter-umum-data',
-            label: 'Parameter Umum',
-            onClick: () => router.visit(`/atlet/${props.atletId}/edit?tab=parameter-umum-data`),
-            allowedForPending: false, // TIDAK bisa diakses untuk pending
-        },
-        {
             value: 'orang-tua-data',
             label: 'Orang Tua/Wali',
             onClick: () => router.visit(`/atlet/${props.atletId}/edit?tab=orang-tua-data`),

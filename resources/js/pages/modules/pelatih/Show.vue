@@ -2,6 +2,7 @@
 import AppTabs from '@/components/AppTabs.vue';
 import { useToast } from '@/components/ui/toast/useToast';
 import PageShow from '@/pages/modules/base-page/PageShow.vue';
+import { formatCaborWithIcon } from '@/utils/caborFormatter';
 import { router, usePage } from '@inertiajs/vue3';
 import { Pencil, Plus } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
@@ -33,7 +34,8 @@ interface Prestasi {
     tingkat_id?: number;
     tingkat?: { nama: string } | null;
     tanggal?: string;
-    peringkat?: string;
+    juara?: string;
+    medali?: string;
     keterangan?: string;
     created_at: string;
     updated_at: string;
@@ -81,6 +83,7 @@ interface CaborData {
         id: number;
         nama: string;
         deskripsi: string;
+        icon?: string | null;
     };
     cabor_kategori: {
         id: number;
@@ -231,9 +234,13 @@ const fields = computed(() => {
                     });
                     return Array.from(uniqueCaborMap.values()).map((c: any) => {
                         const caborName = c.cabor?.nama || 'Cabor tidak diketahui';
+                        const caborIcon = c.cabor?.icon || null;
                         const kategoriName = c.caborKategori?.nama ? ` - ${c.caborKategori.nama}` : '';
                         const jenisPelatih = c.jenis_pelatih ? ` (${c.jenis_pelatih})` : '';
-                        return `${caborName}${kategoriName}${jenisPelatih}`;
+                        
+                        // Format dengan icon
+                        const formattedCabor = formatCaborWithIcon({ nama: caborName, icon: caborIcon });
+                        return `${formattedCabor}${kategoriName}${jenisPelatih}`;
                     }).join(', ');
                 })()
                 : '-',

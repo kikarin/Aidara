@@ -14,13 +14,17 @@ class AtletPrestasiRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'atlet_id'   => 'required|exists:atlets,id',
-            'nama_event' => 'required|string|max:255',
-            'tingkat_id' => 'nullable|integer',
-            'tanggal'    => 'nullable|date',
-            'peringkat'  => 'nullable|string|max:255',
-            'keterangan' => 'nullable|string',
-            'bonus'      => 'nullable|numeric|min:0',
+            'atlet_id'          => 'required|exists:atlets,id',
+            'jenis_prestasi'    => 'required|in:individu,ganda/mixed/beregu/double',
+            'juara'             => 'nullable|string|max:255',
+            'medali'            => 'nullable|in:Emas,Perak,Perunggu',
+            'nama_event'        => 'required|string|max:255',
+            'tingkat_id'        => 'nullable|integer',
+            'tanggal'           => 'nullable|date',
+            'keterangan'        => 'nullable|string',
+            'bonus'             => 'nullable|numeric|min:0',
+            'anggota_beregu'    => 'nullable|array',
+            'anggota_beregu.*'  => 'required|integer|exists:atlets,id',
         ];
 
         if ($this->isMethod('patch') || $this->isMethod('put')) {

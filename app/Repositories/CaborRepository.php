@@ -27,7 +27,7 @@ class CaborRepository
 
     public function customIndex($data)
     {
-        $query = $this->model->select('id', 'nama', 'deskripsi', 'kategori_peserta_id')->with('kategoriPeserta');
+        $query = $this->model->select('id', 'nama', 'deskripsi', 'kategori_peserta_id', 'icon')->with('kategoriPeserta');
 
         // Role-based filtering
         $auth = Auth::user();
@@ -115,6 +115,7 @@ class CaborRepository
                     'id'                      => $item->id,
                     'nama'                    => $item->nama,
                     'deskripsi'               => $item->deskripsi,
+                    'icon'                    => $item->icon,
                     'kategori_peserta'        => $item->kategoriPeserta ? [
                         'id' => $item->kategoriPeserta->id,
                         'nama' => $item->kategoriPeserta->nama,

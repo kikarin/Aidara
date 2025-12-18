@@ -24,7 +24,7 @@ const props = defineProps<{
     deleteUrl?: string;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
     detail: [id: string | number];
     edit: [id: string | number];
     delete: [id: string | number];

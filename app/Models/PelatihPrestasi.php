@@ -21,6 +21,11 @@ class PelatihPrestasi extends Model
 
     protected $fillable = [
         'pelatih_id',
+        'kategori_peserta_id',
+        'jenis_prestasi',
+        'juara',
+        'medali',
+        'prestasi_group_id',
         'kategori_prestasi_pelatih_id',
         'kategori_atlet_id',
         'nama_event',
@@ -60,5 +65,20 @@ class PelatihPrestasi extends Model
     public function kategoriAtlet()
     {
         return $this->belongsTo(MstKategoriAtlet::class, 'kategori_atlet_id');
+    }
+
+    public function kategoriPeserta()
+    {
+        return $this->belongsTo(MstKategoriPeserta::class, 'kategori_peserta_id');
+    }
+
+    public function prestasiGroup()
+    {
+        return $this->belongsTo(PelatihPrestasi::class, 'prestasi_group_id');
+    }
+
+    public function anggotaGroup()
+    {
+        return $this->hasMany(PelatihPrestasi::class, 'prestasi_group_id', 'id');
     }
 }

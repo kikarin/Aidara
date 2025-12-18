@@ -8,6 +8,10 @@ use App\Models\Atlet;
 use App\Models\Pemeriksaan;
 use App\Models\PemeriksaanPeserta;
 use App\Models\PemeriksaanPesertaParameter;
+use App\Models\PemeriksaanKhusus;
+use App\Models\PemeriksaanKhususPeserta;
+use App\Models\PemeriksaanKhususAspek;
+use App\Models\PemeriksaanKhususItemTes;
 use App\Repositories\AtletRepository;
 use App\Traits\BaseTrait;
 use Illuminate\Http\Request;
@@ -606,6 +610,290 @@ class AtletController extends Controller implements HasMiddleware
         } catch (\Exception $e) {
             Log::error('Error updating parameter umum atlet: '.$e->getMessage());
             return response()->json(['success' => false, 'message' => 'Terjadi kesalahan saat memperbarui parameter umum', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function apiPemeriksaanKhusus($id)
+    {
+        try {
+            $atlet = $this->repository->getDetailWithRelations($id);
+            if (!$atlet) {
+                return response()->json(['success' => false, 'message' => 'Atlet tidak ditemukan'], 404);
+            }
+
+            // Get semua pemeriksaan khusus yang pernah diikuti atlet ini
+            $pemeriksaanList = PemeriksaanKhusus::whereHas('pemeriksaanKhususPeserta', function ($q) use ($id) {
+                    $q->where('peserta_id', $id)
+                        ->where('peserta_type', 'App\\Models\\Atlet');
+                })
+                ->with(['cabor', 'caborKategori'])
+                ->orderBy('tanggal_pemeriksaan', 'desc')
+                ->get();
+
+            if ($pemeriksaanList->isEmpty()) {
+                return response()->json(['success' => true, 'data' => []]);
+            }
+
+            $result = [];
+            foreach ($pemeriksaanList as $pemeriksaan) {
+                // Get peserta untuk atlet ini
+                $peserta = PemeriksaanKhususPeserta::with([
+                    'hasilAspek.aspek',
+                    'hasilKeseluruhan',
+                    'pemeriksaanKhususPesertaItemTes.itemTes.aspek',
+                ])
+                    ->where('pemeriksaan_khusus_id', $pemeriksaan->id)
+                    ->where('peserta_id', $id)
+                    ->where('peserta_type', 'App\\Models\\Atlet')
+                    ->first();
+
+                if (!$peserta) {
+                    continue;
+                }
+
+                // Load aspek dengan urutan
+                $aspekList = PemeriksaanKhususAspek::where('pemeriksaan_khusus_id', $pemeriksaan->id)
+                    ->whereNull('deleted_at')
+                    ->orderBy('urutan')
+                    ->get();
+
+                // Load item tes dengan aspek
+                $itemTesList = PemeriksaanKhususItemTes::with('aspek')
+                    ->whereHas('aspek', function ($q) use ($pemeriksaan) {
+                        $q->where('pemeriksaan_khusus_id', $pemeriksaan->id)->whereNull('deleted_at');
+                    })
+                    ->whereNull('deleted_at')
+                    ->orderBy('pemeriksaan_khusus_aspek_id')
+                    ->orderBy('urutan')
+                    ->get();
+
+                // Format data aspek
+                $aspekData = [];
+                foreach ($aspekList as $aspek) {
+                    $hasilAspek = $peserta->hasilAspek->firstWhere('pemeriksaan_khusus_aspek_id', $aspek->id);
+                    
+                    // Get item tes untuk aspek ini
+                    $itemTesInAspek = $itemTesList->where('pemeriksaan_khusus_aspek_id', $aspek->id);
+                    $itemTesData = [];
+                    
+                    foreach ($itemTesInAspek as $itemTes) {
+                        $hasilItemTes = $peserta->pemeriksaanKhususPesertaItemTes->firstWhere('pemeriksaan_khusus_item_tes_id', $itemTes->id);
+                        $itemTesData[] = [
+                            'id' => $itemTes->id,
+                            'nama' => $itemTes->nama,
+                            'satuan' => $itemTes->satuan,
+                            'nilai' => $hasilItemTes ? (float) $hasilItemTes->nilai : null,
+                            'persentase_performa' => $hasilItemTes ? (float) $hasilItemTes->persentase_performa : null,
+                            'persentase_riil' => $hasilItemTes ? (float) $hasilItemTes->persentase_riil : null,
+                            'predikat' => $hasilItemTes->predikat ?? null,
+                        ];
+                    }
+                    
+                    $aspekData[] = [
+                        'id' => $aspek->id,
+                        'nama' => $aspek->nama,
+                        'urutan' => $aspek->urutan,
+                        'nilai_performa' => $hasilAspek ? (float) $hasilAspek->nilai_performa : null,
+                        'predikat' => $hasilAspek->predikat ?? null,
+                        'item_tes' => $itemTesData,
+                    ];
+                }
+
+                $result[] = [
+                    'pemeriksaan_id' => $pemeriksaan->id,
+                    'nama_pemeriksaan' => $pemeriksaan->nama_pemeriksaan,
+                    'tanggal_pemeriksaan' => $pemeriksaan->tanggal_pemeriksaan,
+                    'cabor_nama' => $pemeriksaan->cabor->nama ?? '-',
+                    'cabor_kategori_nama' => $pemeriksaan->caborKategori->nama ?? '-',
+                    'aspek' => $aspekData,
+                    'nilai_keseluruhan' => $peserta->hasilKeseluruhan ? (float) $peserta->hasilKeseluruhan->nilai_keseluruhan : null,
+                    'predikat_keseluruhan' => $peserta->hasilKeseluruhan->predikat ?? null,
+                ];
+            }
+
+            return response()->json(['success' => true, 'data' => $result]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching pemeriksaan khusus atlet: '.$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan saat mengambil data', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function apiLastThreePemeriksaanKhusus($id)
+    {
+        try {
+            $atlet = $this->repository->getDetailWithRelations($id);
+            if (!$atlet) {
+                return response()->json(['success' => false, 'message' => 'Atlet tidak ditemukan'], 404);
+            }
+
+            // Get 3 pemeriksaan khusus terakhir untuk atlet ini
+            $pemeriksaanList = PemeriksaanKhusus::whereHas('pemeriksaanKhususPeserta', function ($q) use ($id) {
+                    $q->where('peserta_id', $id)
+                        ->where('peserta_type', 'App\\Models\\Atlet');
+                })
+                ->with(['caborKategori'])
+                ->orderBy('tanggal_pemeriksaan', 'desc')
+                ->limit(3)
+                ->get();
+
+            if ($pemeriksaanList->isEmpty()) {
+                return response()->json(['success' => true, 'data' => []]);
+            }
+
+            $result = [];
+            foreach ($pemeriksaanList as $pemeriksaan) {
+                // Load aspek dengan urutan
+                $aspekList = PemeriksaanKhususAspek::where('pemeriksaan_khusus_id', $pemeriksaan->id)
+                    ->whereNull('deleted_at')
+                    ->orderBy('urutan')
+                    ->get();
+
+                // Get peserta untuk atlet ini di pemeriksaan ini
+                $peserta = PemeriksaanKhususPeserta::with([
+                    'hasilAspek.aspek',
+                    'hasilKeseluruhan',
+                ])
+                    ->where('pemeriksaan_khusus_id', $pemeriksaan->id)
+                    ->where('peserta_id', $id)
+                    ->where('peserta_type', 'App\\Models\\Atlet')
+                    ->first();
+
+                if (!$peserta) {
+                    continue;
+                }
+
+                // Format data aspek
+                $aspekData = [];
+                foreach ($aspekList as $aspek) {
+                    $hasilAspek = $peserta->hasilAspek->firstWhere('pemeriksaan_khusus_aspek_id', $aspek->id);
+                    $aspekData[] = [
+                        'aspek_id' => $aspek->id,
+                        'nama' => $aspek->nama,
+                        'nilai_performa' => $hasilAspek ? (float) $hasilAspek->nilai_performa : null,
+                        'predikat' => $hasilAspek->predikat ?? null,
+                    ];
+                }
+
+                $result[] = [
+                    'pemeriksaan_id' => $pemeriksaan->id,
+                    'nama_pemeriksaan' => $pemeriksaan->nama_pemeriksaan,
+                    'tanggal_pemeriksaan' => $pemeriksaan->tanggal_pemeriksaan,
+                    'cabor_kategori' => $pemeriksaan->caborKategori->nama ?? '-',
+                    'aspek_list' => $aspekList->map(fn($a) => [
+                        'id' => $a->id,
+                        'nama' => $a->nama,
+                        'urutan' => $a->urutan,
+                    ])->toArray(),
+                    'aspek' => $aspekData,
+                    'nilai_keseluruhan' => $peserta->hasilKeseluruhan ? (float) $peserta->hasilKeseluruhan->nilai_keseluruhan : null,
+                    'predikat_keseluruhan' => $peserta->hasilKeseluruhan->predikat ?? null,
+                ];
+            }
+
+            return response()->json(['success' => true, 'data' => $result]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching last three pemeriksaan khusus atlet: '.$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan saat mengambil data', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function apiGetCabor($id)
+    {
+        try {
+            $atlet = Atlet::with('caborKategoriAtlet.cabor')->find($id);
+            if (!$atlet) {
+                return response()->json(['success' => false, 'message' => 'Atlet tidak ditemukan'], 404);
+            }
+
+            $caborKategoriAtlet = $atlet->caborKategoriAtlet->first();
+            if (!$caborKategoriAtlet || !$caborKategoriAtlet->cabor) {
+                return response()->json(['success' => true, 'data' => ['cabor_id' => null]]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'cabor_id' => $caborKategoriAtlet->cabor_id,
+                    'cabor_nama' => $caborKategoriAtlet->cabor->nama,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching cabor for atlet: '.$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan saat mengambil data'], 500);
+        }
+    }
+
+    /**
+     * Get available athletes for beregu (same cabor, exclude current athlete)
+     */
+    public function apiGetBereguAvailable($id, Request $request)
+    {
+        try {
+            $atlet = Atlet::with('caborKategoriAtlet.cabor')->find($id);
+            if (!$atlet) {
+                return response()->json(['success' => false, 'message' => 'Atlet tidak ditemukan'], 404);
+            }
+
+            $caborKategoriAtlet = $atlet->caborKategoriAtlet->first();
+            if (!$caborKategoriAtlet || !$caborKategoriAtlet->cabor) {
+                return response()->json([
+                    'data' => [],
+                    'meta' => ['total' => 0],
+                ]);
+            }
+
+            $caborId = $caborKategoriAtlet->cabor_id;
+            
+            // Get all athletes from same cabor (exclude current athlete)
+            $query = Atlet::whereHas('caborKategoriAtlet', function ($q) use ($caborId) {
+                $q->where('cabor_id', $caborId)->whereNull('deleted_at');
+            })->where('id', '!=', $id)->whereNull('deleted_at');
+
+            // Search filter
+            if ($request->has('search') && $request->search) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('nama', 'like', "%{$search}%");
+                });
+            }
+
+            // Pagination - default per_page lebih besar untuk modal
+            $perPage = $request->input('per_page', 100); // Default 100 untuk menampilkan lebih banyak atlet
+            $page = $request->input('page', 1);
+            
+            $total = $query->count();
+            $atlets = $query->select('id', 'nama', 'jenis_kelamin', 'tanggal_lahir')
+                ->orderBy('nama')
+                ->skip(($page - 1) * $perPage)
+                ->take($perPage)
+                ->get();
+
+            // Calculate age
+            $data = $atlets->map(function ($item) {
+                $usia = null;
+                if ($item->tanggal_lahir) {
+                    $usia = \Carbon\Carbon::parse($item->tanggal_lahir)->age;
+                }
+                return [
+                    'id' => $item->id,
+                    'nama' => $item->nama,
+                    'jenis_kelamin' => $item->jenis_kelamin,
+                    'usia' => $usia,
+                ];
+            });
+
+            return response()->json([
+                'data' => $data,
+                'meta' => [
+                    'total' => $total,
+                    'per_page' => $perPage,
+                    'current_page' => $page,
+                    'last_page' => ceil($total / $perPage),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching beregu available athletes: '.$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan saat mengambil data'], 500);
         }
     }
 }

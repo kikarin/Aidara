@@ -440,6 +440,7 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::get('/api/cabor', [CaborController::class, 'apiIndex']);
     Route::get('/api/cabor/{cabor_id}/perbandingan-multi-tes', [CaborController::class, 'apiPerbandinganMultiTes'])->name('api.cabor.perbandingan-multi-tes');
     Route::get('/api/cabor/{cabor_id}/ranking', [CaborController::class, 'apiRanking'])->name('api.cabor.ranking');
+    Route::get('/api/cabor/{cabor_id}/atlet/{atlet_id}/last-three-pemeriksaan', [CaborController::class, 'apiGetLastThreePemeriksaan'])->name('api.cabor.atlet.last-three-pemeriksaan');
     Route::post('/cabor/destroy-selected', [CaborController::class, 'destroy_selected'])->name('cabor.destroy_selected');
     // KATEGORI (CaborKategori)
     Route::resource('/cabor-kategori', CaborKategoriController::class)->names('cabor-kategori');
@@ -558,11 +559,16 @@ Route::get('/api/atlet/{atlet_id}/dokumen', [AtletDokumenController::class, 'api
 Route::get('/api/atlet/{atlet_id}/riwayat-pemeriksaan', [AtletController::class, 'apiRiwayatPemeriksaan']);
 Route::get('/api/atlet/{id}/parameter-umum', [AtletController::class, 'apiParameterUmum']);
 Route::get('/api/atlet/{id}/rekap-parameter-khusus', [AtletController::class, 'apiRekapParameterKhusus']);
+Route::get('/api/atlet/{id}/pemeriksaan-khusus', [AtletController::class, 'apiPemeriksaanKhusus'])->name('api.atlet.pemeriksaan-khusus');
+Route::get('/api/atlet/{id}/last-three-pemeriksaan-khusus', [AtletController::class, 'apiLastThreePemeriksaanKhusus'])->name('api.atlet.last-three-pemeriksaan-khusus');
+Route::get('/api/atlet/{id}/cabor', [AtletController::class, 'apiGetCabor'])->name('api.atlet.cabor');
+Route::get('/api/atlet/{id}/beregu/available', [AtletController::class, 'apiGetBereguAvailable'])->name('api.atlet.beregu.available');
 Route::post('/api/atlet/{id}/parameter-umum', [AtletController::class, 'apiUpdateParameterUmum']);
 Route::get('/api/pelatih/{pelatih_id}/sertifikat', [PelatihSertifikatController::class, 'apiIndex']);
 Route::get('/api/pelatih/{pelatih_id}/prestasi', [PelatihPrestasiController::class, 'apiIndex']);
 Route::get('/api/pelatih/{pelatih_id}/dokumen', [PelatihDokumenController::class, 'apiIndex']);
 Route::get('/api/pelatih/{pelatih_id}/riwayat-pemeriksaan', [PelatihController::class, 'apiRiwayatPemeriksaan']);
+Route::get('/api/pelatih/{id}/cabor', [PelatihController::class, 'apiGetCabor'])->name('api.pelatih.cabor');
 
 // API endpoint untuk sertifikat tenaga pendukung
 Route::get('/api/tenaga-pendukung/{tenaga_pendukung_id}/sertifikat', [TenagaPendukungSertifikatController::class, 'apiIndex']);
@@ -581,6 +587,7 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     // Rekap Absen Program Latihan (harus SEBELUM resource route)
     Route::prefix('program-latihan/{program_id}/rekap-absen')->group(function () {
         Route::get('/', [RekapAbsenProgramLatihanController::class, 'index'])->name('program-latihan.rekap-absen.index');
+        Route::get('/detail', [RekapAbsenProgramLatihanController::class, 'show'])->name('program-latihan.rekap-absen.show');
         Route::post('/', [RekapAbsenProgramLatihanController::class, 'store'])->name('program-latihan.rekap-absen.store');
         Route::put('/{rekap_id}', [RekapAbsenProgramLatihanController::class, 'update'])->name('program-latihan.rekap-absen.update');
     });

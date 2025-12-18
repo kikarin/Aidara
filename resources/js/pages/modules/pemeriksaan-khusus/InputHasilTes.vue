@@ -37,16 +37,56 @@ const aspekList = ref<any[]>([]);
 const pesertaList = ref<any[]>([]);
 const tableState = ref<any[]>([]);
 
+// Helper: Konversi format waktu ke detik
+const parseTimeToSeconds = (timeString: string): number | null => {
+    const parts = timeString.split(':');
+    
+    if (parts.length === 2) {
+        // Format mm:ss
+        const minutes = parseInt(parts[0], 10);
+        const seconds = parseInt(parts[1], 10);
+        if (isNaN(minutes) || isNaN(seconds)) return null;
+        return (minutes * 60) + seconds;
+    } else if (parts.length === 3) {
+        // Format hh:mm:ss
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        const seconds = parseInt(parts[2], 10);
+        if (isNaN(hours) || isNaN(minutes) || isNaN(seconds)) return null;
+        return (hours * 3600) + (minutes * 60) + seconds;
+    }
+    
+    return null;
+};
+
+// Helper: Parse number dengan support comma, dot, dan format waktu
+const parseNumber = (value: string | null): number | null => {
+    if (!value) return null;
+    
+    const strValue = value.trim();
+    if (!strValue) return null;
+    
+    // Deteksi format waktu (ada titik dua)
+    if (strValue.includes(':')) {
+        return parseTimeToSeconds(strValue);
+    }
+    
+    const normalizedValue = strValue.replace(',', '.');
+    const parsed = parseFloat(normalizedValue);
+    
+    return isNaN(parsed) ? null : parsed;
+};
+
 // Helper: Calculate persentase performa (client-side preview)
 const calculatePerforma = (nilaiAktual: string | null, target: string | null, performaArah: 'max' | 'min'): { persentase: number | null; predikat: string | null } => {
     if (!nilaiAktual || !target) {
         return { persentase: null, predikat: null };
     }
 
-    const nilai = parseFloat(nilaiAktual.replace(',', '.'));
-    const targetValue = parseFloat(target.replace(',', '.'));
+    const nilai = parseNumber(nilaiAktual);
+    const targetValue = parseNumber(target);
 
-    if (isNaN(nilai) || isNaN(targetValue) || targetValue <= 0) {
+    if (nilai === null || targetValue === null || targetValue <= 0) {
         return { persentase: null, predikat: null };
     }
 
@@ -70,7 +110,8 @@ const getPredikat = (persentase: number | null): string | null => {
     if (persentase >= 20 && persentase < 40) return 'kurang';
     if (persentase >= 40 && persentase < 60) return 'sedang';
     if (persentase >= 60 && persentase < 80) return 'mendekati_target';
-    return 'target';
+    if (persentase >= 80 && persentase < 100) return 'mendekati_target';
+    return 'target'; // >= 100
 };
 
 // Helper: Get predikat label

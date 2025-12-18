@@ -4,11 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast/useToast';
 import PageIndex from '@/pages/modules/base-page/PageIndex.vue';
+import { formatCaborWithIcon } from '@/utils/caborFormatter';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { ref } from 'vue';
 
 const breadcrumbs = [{ title: 'Atlet', href: '/atlet' }];
+
+// Helper function untuk format cabor dengan icon
+const formatCabor = (caborName: string, caborIcon: string | null): string => {
+    if (!caborIcon) {
+        return caborName;
+    }
+    const iconClass = caborIcon.startsWith('fa-') ? caborIcon : `fa-${caborIcon}`;
+    return `<div class="flex items-center gap-2"><i class="fa-solid ${iconClass} text-sm text-muted-foreground"></i><span>${caborName}</span></div>`;
+};
+
 const calculateAge = (birthDate: string | null | undefined): number | string => {
     if (!birthDate) return '-';
     const today = new Date();
@@ -101,11 +112,29 @@ const columns = [
         label: 'Cabor',
         format: (row: any) => {
             if (row.cabor_kategori_atlet && row.cabor_kategori_atlet.length > 0) {
-                const caborList = row.cabor_kategori_atlet.map((item: any) => {
-                    const caborName = item.cabor?.nama || '-';
-                    return `${caborName}`;
+                // Filter untuk menghindari duplikasi berdasarkan cabor_id
+                const uniqueCaborMap = new Map();
+                row.cabor_kategori_atlet.forEach((item: any) => {
+                    const caborId = item.cabor_id;
+                    if (caborId && !uniqueCaborMap.has(caborId)) {
+                        uniqueCaborMap.set(caborId, item);
+                    }
                 });
-                return caborList.join(', ');
+                
+                // Convert map values ke array dan format
+                const caborItems = Array.from(uniqueCaborMap.values()).map((item: any) => {
+                    const caborName = item.cabor?.nama || '-';
+                    const caborIcon = item.cabor?.icon || null;
+                    const posisi = item.posisi_atlet ? ` (${item.posisi_atlet})` : '';
+                    
+                    // Format dengan icon - hanya nama cabor dan posisi (tanpa kategori)
+                    if (caborIcon) {
+                        const iconClass = caborIcon.startsWith('fa-') ? caborIcon : `fa-${caborIcon}`;
+                        return `<span class="flex items-center gap-2 inline-flex"><i class="fa-solid ${iconClass} text-sm text-muted-foreground"></i><span>${caborName}${posisi}</span></span>`;
+                    }
+                    return `<span>${caborName}${posisi}</span>`;
+                });
+                return caborItems.join(', ');
             }
             return '-';
         },

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import DataTableShow from '@/pages/modules/components/DataTableShow.vue';
+import { formatCaborWithIcon } from '@/utils/caborFormatter';
 import { ref, watch } from 'vue';
 
 interface CaborData {
@@ -14,6 +15,7 @@ interface CaborData {
         id: number;
         nama: string;
         deskripsi: string;
+        icon?: string | null;
     };
     cabor_kategori: {
         id: number;
@@ -51,7 +53,10 @@ const columns = [
     {
         key: 'cabor.nama',
         label: 'Cabor',
-        format: (row: CaborData) => row.cabor?.nama || '-',
+        format: (row: CaborData) => formatCaborWithIcon({ 
+            nama: row.cabor?.nama, 
+            icon: row.cabor?.icon 
+        }),
     },
     {
         key: 'cabor_kategori.nama',

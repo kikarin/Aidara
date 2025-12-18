@@ -112,6 +112,7 @@ const props = defineProps<{
     showFilter?: boolean;
     showBulkApprove?: boolean;
     showBulkReject?: boolean;
+    baseUrl?: string; // Base URL untuk detail/edit (optional, default: convert moduleName to URL format)
 }>();
 
 const emit = defineEmits(['search', 'update:selected', 'import', 'setKehadiran', 'filter', 'bulk-approve', 'bulk-reject']);
@@ -120,6 +121,15 @@ const localSelected = ref<number[]>([]);
 
 // Filter state
 const currentFilters = ref<any>({});
+
+// Convert moduleName to URL format (e.g., "Program Latihan" -> "program-latihan")
+const baseUrl = computed(() => {
+    if (props.baseUrl) {
+        return props.baseUrl;
+    }
+    // Convert moduleName to URL format: lowercase and replace spaces with dashes
+    return props.moduleName.toLowerCase().replace(/\s+/g, '-');
+});
 
 // Generate permissions otomatis dari moduleName jika tidak diberikan
 const computedPermissions = computed(() => {
@@ -339,8 +349,8 @@ defineExpose({ fetchData, handleFilterFromParent });
                         @update:page="handlePageChange"
                         @update:perPage="(val: any) => handleSearch({ limit: Number(val), page: 1 })"
                         @deleted="fetchData()"
-                        @detail="(id: string | number) => router.visit(`/${moduleName}/${id}`)"
-                        @edit="(id: string | number) => router.visit(`/${moduleName}/${id}/edit`)"
+                        @detail="(id: string | number) => router.visit(`/${baseUrl}/${id}`)"
+                        @edit="(id: string | number) => router.visit(`/${baseUrl}/${id}/edit`)"
                         @delete="(id: string | number) => handleDeleteRow({ id })"
                         :on-delete-row="handleDeleteRow"
                         :hide-pagination="props.hidePagination"

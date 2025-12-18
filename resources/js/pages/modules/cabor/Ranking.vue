@@ -27,6 +27,12 @@ const isModalOpen = ref(false);
 const modalAspekList = ref<any[]>([]);
 const modalVisualisasiData = ref<any>(null);
 
+// State untuk modal perbandingan 3 tes terakhir
+const isComparisonModalOpen = ref(false);
+const comparisonData = ref<any[]>([]);
+const comparisonAspekList = ref<any[]>([]);
+const loadingComparison = ref(false);
+
 // Fetch ranking data
 const fetchRankingData = async () => {
     loadingRanking.value = true;
@@ -37,7 +43,6 @@ const fetchRankingData = async () => {
         console.error('Error fetching ranking data:', error);
         toast({
             title: 'Gagal mengambil data ranking',
-            description: error.response?.data?.message || error.message,
             variant: 'destructive',
         });
         rankingData.value = null;
@@ -135,7 +140,6 @@ const openModal = async (peserta: any, pemeriksaanId?: number) => {
             console.error('Error loading visualisasi data:', error);
             toast({
                 title: 'Gagal memuat data visualisasi',
-                description: error.response?.data?.message || error.message,
                 variant: 'destructive',
             });
         }
@@ -147,6 +151,60 @@ const closeModal = () => {
     selectedPesertaForModal.value = null;
     modalVisualisasiData.value = null;
     modalAspekList.value = [];
+};
+
+// Open modal perbandingan 3 tes terakhir
+const openComparisonModal = async (peserta: any, event?: Event) => {
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    selectedPesertaForModal.value = peserta;
+    isComparisonModalOpen.value = true;
+    comparisonData.value = [];
+    comparisonAspekList.value = [];
+    loadingComparison.value = true;
+
+    try {
+        const response = await axios.get(`/api/cabor/${props.caborId}/atlet/${peserta.peserta_id}/last-three-pemeriksaan`);
+        if (response.data.success && response.data.data.length > 0) {
+            const data = response.data.data;
+            // Pastikan data diurutkan dari terbaru ke terlama (sudah diurutkan di backend)
+            comparisonData.value = data;
+            
+            // Ambil aspek list dari pemeriksaan pertama (semua pemeriksaan harus punya aspek yang sama)
+            if (data[0]?.aspek_list && data[0].aspek_list.length > 0) {
+                comparisonAspekList.value = data[0].aspek_list;
+            } else {
+                // Fallback: ambil dari pemeriksaan manapun yang punya aspek_list
+                const pemeriksaanDenganAspek = data.find((p: any) => p.aspek_list && p.aspek_list.length > 0);
+                if (pemeriksaanDenganAspek) {
+                    comparisonAspekList.value = pemeriksaanDenganAspek.aspek_list;
+                }
+            }
+            
+        } else {
+            toast({
+                title: 'Tidak ada data',
+                variant: 'default',
+            });
+        }
+    } catch (error: any) {
+        console.error('Error loading comparison data:', error);
+        toast({
+            title: 'Gagal memuat data perbandingan',
+            variant: 'destructive',
+        });
+    } finally {
+        loadingComparison.value = false;
+    }
+};
+
+const closeComparisonModal = () => {
+    isComparisonModalOpen.value = false;
+    selectedPesertaForModal.value = null;
+    comparisonData.value = [];
+    comparisonAspekList.value = [];
 };
 
 // Helper: Convert to number safely
@@ -217,6 +275,121 @@ const modalRadarChartOptions = computed(() => {
         },
         colors: ['#3b82f6'],
     };
+});
+
+// Helper: Get tes label (TES I, TES II, TES III) - terbalik karena data sudah diurutkan desc
+const getTesLabel = (index: number, total: number): string => {
+    const tesNumber = total - index;
+    if (tesNumber === 1) return 'TES I';
+    if (tesNumber === 2) return 'TES II';
+    if (tesNumber === 3) return 'TES III';
+    return `TES ${tesNumber}`;
+};
+
+// Radar chart options untuk modal perbandingan
+const comparisonRadarChartOptions = computed(() => {
+    const isDark = document.documentElement.classList.contains('dark');
+
+    return {
+        chart: {
+            type: 'radar',
+            toolbar: { show: false },
+            background: 'transparent',
+        },
+        stroke: {
+            width: 2,
+        },
+        fill: {
+            opacity: 0.3,
+        },
+        markers: {
+            size: 4,
+        },
+        xaxis: {
+            categories: comparisonAspekList.value.length > 0 
+                ? comparisonAspekList.value.map((a: any) => a.nama) 
+                : [''],
+            labels: {
+                style: {
+                    colors: isDark ? '#9ca3af' : '#6b7280',
+                    fontSize: '12px',
+                },
+            },
+        },
+        yaxis: {
+            min: 0,
+            max: 100,
+            tickAmount: 5,
+            labels: {
+                style: {
+                    colors: isDark ? '#9ca3af' : '#6b7280',
+                },
+                formatter: (val: number) => `${val}%`,
+            },
+        },
+        tooltip: {
+            theme: isDark ? 'dark' : 'light',
+            y: {
+                formatter: (val: any) => {
+                    const num = toNumber(val);
+                    return num !== null ? `${num.toFixed(1)}%` : '0%';
+                },
+            },
+        },
+        plotOptions: {
+            radar: {
+                polygons: {
+                    strokeColors: isDark ? '#374151' : '#e5e7eb',
+                    connectorColors: isDark ? '#374151' : '#e5e7eb',
+                    fill: {
+                        colors: isDark ? ['#1f2937'] : ['#f9fafb'],
+                    },
+                },
+            },
+        },
+        colors: ['#3b82f6', '#10b981', '#f59e0b'], // Biru (terbaru), Hijau, Orange (terlama)
+        legend: {
+            show: true,
+            position: 'bottom',
+            labels: {
+                colors: isDark ? '#9ca3af' : '#6b7280',
+            },
+        },
+    };
+});
+
+// Radar chart series untuk modal perbandingan
+const comparisonRadarChartSeries = computed(() => {
+    if (!comparisonData.value.length || comparisonAspekList.value.length === 0) return [];
+
+    return comparisonData.value.map((pemeriksaan: any, index: number) => {
+        const tesLabel = getTesLabel(index, comparisonData.value.length);
+        const tanggal = new Date(pemeriksaan.tanggal_pemeriksaan).toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+        });
+        const label = `${tesLabel} (${tanggal})`;
+        
+        // Mapping data berdasarkan nama aspek (karena aspek_id bisa berbeda antar pemeriksaan)
+        return {
+            name: label,
+            data: comparisonAspekList.value.map((aspek: any) => {
+                // Normalisasi nama untuk matching yang lebih baik
+                const aspekNamaNormalized = (aspek.nama || '').trim().toLowerCase();
+                
+                // Cari hasil aspek berdasarkan nama aspek (dengan normalisasi)
+                const hasilAspek = pemeriksaan.aspek?.find((a: any) => {
+                    const aNamaNormalized = (a.nama || '').trim().toLowerCase();
+                    return aNamaNormalized === aspekNamaNormalized;
+                });
+                
+                const nilai = toNumber(hasilAspek?.nilai_performa);
+                // Jika tidak ada nilai, return 0 agar chart tetap muncul
+                return nilai !== null && nilai !== undefined ? nilai : 0;
+            }),
+        };
+    });
 });
 
 // Radar chart series untuk modal
@@ -316,14 +489,14 @@ onMounted(() => {
                                 <TableHead class="text-center">Nilai</TableHead>
                                 <TableHead class="text-center">Predikat</TableHead>
                                 <TableHead v-if="activeSubTab !== 'total-rata-rata'" class="text-center">Tanggal Tes</TableHead>
+                                <TableHead class="text-center w-32">Aksi</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             <TableRow
                                 v-for="(item, index) in currentRankingData"
                                 :key="item.peserta_id"
-                                class="cursor-pointer hover:bg-muted/50"
-                                @click="openModal(item, activeSubTab !== 'total-rata-rata' ? currentPemeriksaanInfo?.id : null)"
+                                class="hover:bg-muted/50"
                             >
                                 <TableCell class="text-center">
                                     <Badge :class="getRankBadgeColor(index + 1)" class="px-3 py-1">
@@ -351,6 +524,28 @@ onMounted(() => {
                                 <TableCell v-if="activeSubTab !== 'total-rata-rata'" class="text-center">
                                     {{ currentPemeriksaanInfo ? new Date(currentPemeriksaanInfo.tanggal_pemeriksaan).toLocaleDateString('id-ID') : '-' }}
                                 </TableCell>
+                                <TableCell class="text-center">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            @click="openModal(item, activeSubTab !== 'total-rata-rata' ? currentPemeriksaanInfo?.id : null)"
+                                            class="h-8"
+                                        >
+                                            <TrendingUp class="h-4 w-4 mr-1" />
+                                            Grafik
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            @click="openComparisonModal(item, $event)"
+                                            class="h-8"
+                                        >
+                                            <Award class="h-4 w-4 mr-1" />
+                                            Perbandingan
+                                        </Button>
+                                    </div>
+                                </TableCell>
                             </TableRow>
                         </TableBody>
                     </Table>
@@ -368,7 +563,7 @@ onMounted(() => {
         </Card>
 
         <!-- Modal Radar Chart -->
-        <Dialog :open="isModalOpen" @update:open="(val) => !val && closeModal()">
+        <Dialog :open="isModalOpen" @update:open="(val: boolean) => !val && closeModal()">
             <DialogContent class="max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle class="flex items-center gap-2">
@@ -381,6 +576,70 @@ onMounted(() => {
                 </div>
                 <div v-else class="flex items-center justify-center py-8">
                     <Loader2 class="h-8 w-8 animate-spin" />
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Modal Radar Chart Perbandingan 3 Tes Terakhir -->
+        <Dialog :open="isComparisonModalOpen" @update:open="(val: boolean) => !val && closeComparisonModal()">
+            <DialogContent class="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center gap-2">
+                        <Award class="h-5 w-5" />
+                        Perbandingan 3 Tes Terakhir - {{ selectedPesertaForModal?.nama }}
+                    </DialogTitle>
+                </DialogHeader>
+                <div v-if="loadingComparison" class="flex items-center justify-center py-8">
+                    <Loader2 class="h-8 w-8 animate-spin" />
+                </div>
+                <div v-else-if="comparisonData.length > 0 && comparisonAspekList.length > 0" class="space-y-4">
+                    <!-- Informasi Tes -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                        <div
+                            v-for="(pemeriksaan, index) in comparisonData"
+                            :key="pemeriksaan.pemeriksaan_id"
+                            class="p-4 border-2 rounded-lg"
+                            :class="{
+                                'border-blue-500 bg-blue-500/10': index === 0,
+                                'border-green-500 bg-green-500/10': index === 1,
+                                'border-orange-500 bg-orange-500/10': index === 2,
+                            }"
+                        >
+                            <p class="font-bold text-lg mb-2"
+                                :class="{
+                                    'text-blue-700 dark:text-blue-400': index === 0,
+                                    'text-green-700 dark:text-green-400': index === 1,
+                                    'text-orange-700 dark:text-orange-400': index === 2,
+                                }"
+                            >
+                                {{ getTesLabel(index, comparisonData.length) }}
+                            </p>
+                            <p class="text-sm text-muted-foreground mb-1">
+                                {{ new Date(pemeriksaan.tanggal_pemeriksaan).toLocaleDateString('id-ID', {
+                                    weekday: 'long',
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                }) }}
+                            </p>
+                            <p class="text-sm font-semibold"
+                                :class="{
+                                    'text-blue-700 dark:text-blue-400': index === 0,
+                                    'text-green-700 dark:text-green-400': index === 1,
+                                    'text-orange-700 dark:text-orange-400': index === 2,
+                                }"
+                            >
+                                Nilai: {{ formatPersentase(pemeriksaan.nilai_keseluruhan) }}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Radar Chart -->
+                    <ApexChart :options="comparisonRadarChartOptions" :series="comparisonRadarChartSeries" />
+                </div>
+                <div v-else class="text-center py-8 text-muted-foreground">
+                    <p>Tidak ada data perbandingan tersedia</p>
+                    <p class="text-sm mt-2">Atlet ini belum memiliki 3 pemeriksaan khusus</p>
                 </div>
             </DialogContent>
         </Dialog>

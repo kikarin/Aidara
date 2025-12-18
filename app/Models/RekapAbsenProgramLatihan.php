@@ -26,6 +26,7 @@ class RekapAbsenProgramLatihan extends Model implements HasMedia
     protected $fillable = [
         'program_latihan_id',
         'tanggal',
+        'jenis_latihan',
         'keterangan',
         'created_by',
         'updated_by',
@@ -35,6 +36,11 @@ class RekapAbsenProgramLatihan extends Model implements HasMedia
     public function programLatihan()
     {
         return $this->belongsTo(ProgramLatihan::class, 'program_latihan_id');
+    }
+
+    public function createdByUser()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function getActivitylogOptions(): LogOptions

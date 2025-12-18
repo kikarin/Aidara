@@ -662,7 +662,10 @@ defineExpose({
                                     if (!input.disabled) {
                                     console.log(`FormInput: Select ${input.name} updated to:`, val);
                                     form[input.name] = val;
+                                    // Emit field-updated immediately
                                     emit('field-updated', { field: input.name, value: val });
+                                    // Also emit update:modelValue to sync with parent
+                                    emit('update:modelValue', form.data());
                                     console.log(`FormInput: Form data after select update:`, form.data());
                                     }
                                 }

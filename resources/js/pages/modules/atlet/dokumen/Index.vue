@@ -13,10 +13,11 @@ import { computed, onMounted, ref, watch } from 'vue';
 
 const props = defineProps<{ atletId: number }>();
 const { toast } = useToast();
-const page = usePage();
+const pageInertia = usePage();
+const page = ref(1);
 
 // Ambil user registration_status dari props
-const user = computed(() => (page.props as any)?.auth?.user);
+const user = computed(() => (pageInertia.props as any)?.auth?.user);
 const registrationStatus = computed(() => user.value?.registration_status);
 const isPendingRegistration = computed(() => registrationStatus.value === 'pending');
 
@@ -166,12 +167,6 @@ const tabsConfig = computed(() => {
             label: 'Atlet',
             onClick: () => router.visit(`/atlet/${props.atletId}/edit?tab=atlet-data`),
             allowedForPending: true, // Data diri bisa diakses
-        },
-        {
-            value: 'parameter-umum-data',
-            label: 'Parameter Umum',
-            onClick: () => router.visit(`/atlet/${props.atletId}/edit?tab=parameter-umum-data`),
-            allowedForPending: false, // TIDAK bisa diakses untuk pending
         },
         {
             value: 'orang-tua-data',

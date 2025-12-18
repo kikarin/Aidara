@@ -15,14 +15,18 @@ class PelatihPrestasiRequest extends FormRequest
     {
         $rules = [
             'pelatih_id'                     => 'required|exists:pelatihs,id',
+            'jenis_prestasi'                 => 'required|in:individu,ganda/mixed/beregu/double',
+            'juara'                          => 'nullable|string|max:255',
+            'medali'                         => 'nullable|in:Emas,Perak,Perunggu',
             'kategori_prestasi_pelatih_id'   => 'nullable|exists:mst_kategori_prestasi_pelatih,id',
             'kategori_atlet_id'              => 'nullable|exists:mst_kategori_atlet,id',
             'nama_event'                     => 'required|string|max:255',
             'tingkat_id'                     => 'nullable|integer',
             'tanggal'                        => 'nullable|date',
-            'peringkat'                      => 'nullable|string|max:255',
             'keterangan'                     => 'nullable|string',
             'bonus'                          => 'nullable|numeric|min:0',
+            'anggota_beregu'                 => 'nullable|array',
+            'anggota_beregu.*'               => 'required|integer|exists:pelatihs,id',
         ];
 
         if ($this->isMethod('patch') || $this->isMethod('put')) {

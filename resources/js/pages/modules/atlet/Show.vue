@@ -2,6 +2,7 @@
 import AppTabs from '@/components/AppTabs.vue';
 import { useToast } from '@/components/ui/toast/useToast';
 import PageShow from '@/pages/modules/base-page/PageShow.vue';
+import { formatCaborWithIcon } from '@/utils/caborFormatter';
 import { router, usePage } from '@inertiajs/vue3';
 import { Pencil, Plus } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
@@ -10,7 +11,7 @@ import ShowPrestasi from './prestasi/ShowPrestasi.vue';
 import ShowSertifikat from './sertifikat/ShowSertifikat.vue';
 import ShowKesehatan from './ShowKesehatan.vue';
 import ShowOrangTua from './ShowOrangTua.vue';
-import ShowParameterUmum from './ShowParameterUmum.vue';
+import ShowPemeriksaanKhusus from './ShowPemeriksaanKhusus.vue';
 
 const { toast } = useToast();
 
@@ -32,8 +33,10 @@ interface Prestasi {
     atlet_id: number;
     nama_event: string;
     tingkat_id?: number;
+    tingkat?: { id: number; nama: string };
     tanggal?: string;
-    peringkat?: string;
+    juara?: string;
+    medali?: string;
     keterangan?: string;
     created_at: string;
     updated_at: string;
@@ -121,6 +124,7 @@ const props = defineProps<{
                 id: number;
                 nama: string;
                 kategori_peserta_id: number | null;
+                icon?: string | null;
             };
             caborKategori?: {
                 id: number;
@@ -171,8 +175,8 @@ const dynamicTitle = computed(() => {
         return `Dokumen : ${props.item.nama}`;
     } else if (activeTab.value === 'kesehatan-data') {
         return `Kesehatan : ${props.item.nama}`;
-    } else if (activeTab.value === 'parameter-umum-data') {
-        return `Parameter Umum : ${props.item.nama}`;
+    } else if (activeTab.value === 'pemeriksaan-khusus-data') {
+        return `Pemeriksaan Khusus : ${props.item.nama}`;
     }
     return `Atlet: ${props.item.nama}`;
 });
@@ -237,12 +241,30 @@ const fields = computed(() => {
         {
             label: 'Cabang Olahraga',
             value: props.item?.cabor_kategori_atlet && props.item.cabor_kategori_atlet.length > 0
-                ? props.item.cabor_kategori_atlet.map((c: any) => {
-                    const caborName = c.cabor?.nama || 'Cabor tidak diketahui';
-                    const kategoriName = c.caborKategori?.nama ? ` - ${c.caborKategori.nama}` : '';
-                    const posisi = c.posisi_atlet ? ` (${c.posisi_atlet})` : '';
-                    return `${caborName}${kategoriName}${posisi}`;
-                }).join(', ')
+                ? (() => {
+                    // Filter untuk menghindari duplikasi berdasarkan cabor_id
+                    const uniqueCaborMap = new Map();
+                    props.item.cabor_kategori_atlet.forEach((c: any) => {
+                        const caborId = c.cabor_id;
+                        if (caborId && !uniqueCaborMap.has(caborId)) {
+                            uniqueCaborMap.set(caborId, c);
+                        }
+                    });
+                    
+                    // Convert map values ke array dan format
+                    return Array.from(uniqueCaborMap.values()).map((c: any) => {
+                        const caborName = c.cabor?.nama || 'Cabor tidak diketahui';
+                        const caborIcon = c.cabor?.icon || null;
+                        const posisi = c.posisi_atlet ? ` (${c.posisi_atlet})` : '';
+                        
+                        // Format dengan icon - hanya nama cabor dan posisi (tanpa kategori)
+                        if (caborIcon) {
+                            const iconClass = caborIcon.startsWith('fa-') ? caborIcon : `fa-${caborIcon}`;
+                            return `<span class="flex items-center gap-2 inline-flex"><i class="fa-solid ${iconClass} text-sm text-muted-foreground"></i><span>${caborName}${posisi}</span></span>`;
+                        }
+                        return `${caborName}${posisi}`;
+                    }).join(', ');
+                })()
                 : '-',
             className: 'sm:col-span-2',
         },
@@ -347,8 +369,8 @@ const tabsConfig = [
         label: 'Kesehatan',
     },
     {
-        value: 'parameter-umum-data',
-        label: 'Parameter Umum',
+        value: 'pemeriksaan-khusus-data',
+        label: 'Pemeriksaan Khusus',
     },
 ];
 
@@ -417,7 +439,7 @@ const currentOnEditHandler = computed(() => {
         return undefined;
     } else if (activeTab.value === 'kesehatan-data') {
         return handleEditKesehatan;
-    } else if (activeTab.value === 'parameter-umum-data') {
+    } else if (activeTab.value === 'pemeriksaan-khusus-data') {
         return undefined;
     }
     return undefined;
@@ -436,7 +458,7 @@ const currentOnDeleteHandler = computed(() => {
         return undefined;
     } else if (activeTab.value === 'kesehatan-data') {
         return props.item.kesehatan ? handleDeleteKesehatan : undefined;
-    } else if (activeTab.value === 'parameter-umum-data') {
+    } else if (activeTab.value === 'pemeriksaan-khusus-data') {
         return undefined;
     }
     return undefined;
@@ -469,7 +491,7 @@ function getLamaBergabung(tanggalBergabung: string) {
             activeTab === 'sertifikat-data' ||
             activeTab === 'prestasi-data' ||
             activeTab === 'dokumen-data' ||
-            activeTab === 'parameter-umum-data'
+            activeTab === 'pemeriksaan-khusus-data'
                 ? []
                 : activeTab === 'atlet-data'
                   ? actionFields
@@ -483,14 +505,14 @@ function getLamaBergabung(tanggalBergabung: string) {
         :on-edit-label="
             (activeTab === 'orang-tua-data' && !props.item.atlet_orang_tua) || (activeTab === 'kesehatan-data' && !props.item.kesehatan)
                 ? 'Create'
-                : activeTab === 'parameter-umum-data'
+                : activeTab === 'pemeriksaan-khusus-data'
                   ? undefined
                   : 'Edit'
         "
         :on-edit-icon="
             (activeTab === 'orang-tua-data' && !props.item.atlet_orang_tua) || (activeTab === 'kesehatan-data' && !props.item.kesehatan)
                 ? Plus
-                : activeTab === 'parameter-umum-data'
+                : activeTab === 'pemeriksaan-khusus-data'
                   ? undefined
                   : Pencil
         "
@@ -541,8 +563,8 @@ function getLamaBergabung(tanggalBergabung: string) {
             <div v-if="activeTab === 'kesehatan-data'">
                 <ShowKesehatan :kesehatan="props.item.kesehatan || null" />
             </div>
-            <div v-if="activeTab === 'parameter-umum-data'">
-                <ShowParameterUmum :atlet-id="props.item.id" />
+            <div v-if="activeTab === 'pemeriksaan-khusus-data'">
+                <ShowPemeriksaanKhusus :atlet-id="props.item.id" />
             </div>
         </template>
     </PageShow>

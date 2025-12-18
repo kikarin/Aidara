@@ -2,6 +2,7 @@
 import AppTabs from '@/components/AppTabs.vue';
 import { useToast } from '@/components/ui/toast/useToast';
 import PageShow from '@/pages/modules/base-page/PageShow.vue';
+import { formatCaborWithIcon } from '@/utils/caborFormatter';
 import { router, usePage } from '@inertiajs/vue3';
 import { Pencil, Plus } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
@@ -117,6 +118,7 @@ const props = defineProps<{
                 id: number;
                 nama: string;
                 kategori_peserta_id: number | null;
+                icon?: string | null;
             };
             caborKategori?: {
                 id: number;
@@ -224,9 +226,13 @@ const fields = computed(() => {
             value: props.item?.cabor_kategori_tenaga_pendukung && props.item.cabor_kategori_tenaga_pendukung.length > 0
                 ? props.item.cabor_kategori_tenaga_pendukung.map((c: any) => {
                     const caborName = c.cabor?.nama || 'Cabor tidak diketahui';
+                    const caborIcon = c.cabor?.icon || null;
                     const kategoriName = c.caborKategori?.nama ? ` - ${c.caborKategori.nama}` : '';
                     const jenisTenagaPendukung = c.jenis_tenaga_pendukung ? ` (${c.jenis_tenaga_pendukung})` : '';
-                    return `${caborName}${kategoriName}${jenisTenagaPendukung}`;
+                    
+                    // Format dengan icon
+                    const formattedCabor = formatCaborWithIcon({ nama: caborName, icon: caborIcon });
+                    return `${formattedCabor}${kategoriName}${jenisTenagaPendukung}`;
                 }).join(', ')
                 : '-',
             className: 'sm:col-span-2',

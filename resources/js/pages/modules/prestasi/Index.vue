@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Tabs from '@/components/ui/tabs/Tabs.vue';
 import TabsContent from '@/components/ui/tabs/TabsContent.vue';
@@ -26,9 +28,33 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const loading = ref(false);
 const prestasiData = ref<any[]>([]);
-const eventNames = ref<string[]>([]);
-const selectedEvent = ref<string>('all');
+const kategoriPesertaList = ref<{ id: number; nama: string }[]>([]);
+const selectedKategoriPeserta = ref<string | number>('all');
+const selectedJenisPrestasi = ref<string>('all'); // 'all', 'individu', 'ganda/mixed/beregu/double'
 const totalBonus = ref(0);
+
+// Modal untuk list anggota beregu
+const showBereguModal = ref(false);
+const anggotaBereguList = ref<{ id: number; nama: string; peserta_type: string }[]>([]);
+
+// Total medali dari semua kategori peserta
+const totalMedaliAll = computed(() => {
+    const medali = {
+        Emas: 0,
+        Perak: 0,
+        Perunggu: 0,
+    };
+    
+    prestasiData.value.forEach((kategori: any) => {
+        if (kategori.total_medali) {
+            medali.Emas += kategori.total_medali.Emas || 0;
+            medali.Perak += kategori.total_medali.Perak || 0;
+            medali.Perunggu += kategori.total_medali.Perunggu || 0;
+        }
+    });
+    
+    return medali;
+});
 
 // Format rupiah
 const formatRupiah = (value: number | null | undefined): string => {
@@ -40,12 +66,15 @@ const formatRupiah = (value: number | null | undefined): string => {
     }).format(value);
 };
 
-const fetchPrestasi = async (eventName: string = '', limit: number = 0) => {
+const fetchPrestasi = async (kategoriPesertaId: string | number = 'all', limit: number = 0) => {
     loading.value = true;
     try {
         const params: any = {};
-        if (eventName && eventName !== 'all') {
-            params.event_name = eventName;
+        if (kategoriPesertaId && kategoriPesertaId !== 'all') {
+            params.kategori_peserta_id = kategoriPesertaId;
+        }
+        if (selectedJenisPrestasi.value && selectedJenisPrestasi.value !== 'all') {
+            params.jenis_prestasi = selectedJenisPrestasi.value;
         }
         if (limit > 0) {
             params.limit = limit;
@@ -53,7 +82,7 @@ const fetchPrestasi = async (eventName: string = '', limit: number = 0) => {
         
         const response = await axios.get('/api/prestasi', { params });
         prestasiData.value = response.data.data || [];
-        eventNames.value = response.data.event_names || [];
+        kategoriPesertaList.value = response.data.kategori_peserta_list || [];
         totalBonus.value = response.data.total_bonus || 0;
     } catch (error) {
         console.error('Error fetching prestasi:', error);
@@ -62,15 +91,20 @@ const fetchPrestasi = async (eventName: string = '', limit: number = 0) => {
     }
 };
 
-const handleEventChange = (eventName: string) => {
-    selectedEvent.value = eventName;
-    fetchPrestasi(eventName === 'all' ? '' : eventName, 0); // 0 means no limit
+const handleKategoriPesertaChange = (kategoriId: string | number) => {
+    selectedKategoriPeserta.value = kategoriId;
+    fetchPrestasi(kategoriId === 'all' ? 'all' : kategoriId, 0); // 0 means no limit
+};
+
+const handleJenisPrestasiChange = (jenisPrestasi: string) => {
+    selectedJenisPrestasi.value = jenisPrestasi;
+    fetchPrestasi(selectedKategoriPeserta.value, 0);
 };
 
 // Get columns for all prestasi - check if any prestasi has NPCI or SOIna
 const columns = computed(() => {
-    // Check all prestasi across all events
-    const allPrestasi = prestasiData.value.flatMap((event: any) => event.prestasi || []);
+    // Check all prestasi across all kategori
+    const allPrestasi = prestasiData.value.flatMap((kategori: any) => kategori.prestasi || []);
     const hasNPCI = allPrestasi.some((p: any) => 
         p.kategori_peserta && p.kategori_peserta.includes('NPCI')
     );
@@ -82,7 +116,8 @@ const columns = computed(() => {
         { key: 'nama', label: 'Nama' },
         { key: 'cabor', label: 'Cabor' },
         { key: 'nomor_posisi', label: 'Nomor/Posisi' },
-        { key: 'juara_medali', label: 'Juara/Medali' },
+        { key: 'juara', label: 'Juara' },
+        { key: 'medali', label: 'Medali' },
         { key: 'kategori_peserta', label: 'Kategori Peserta' },
     ];
     
@@ -105,34 +140,64 @@ const columns = computed(() => {
     return baseColumns;
 });
 
-// Get current event data
-const currentEventData = computed(() => {
-    if (selectedEvent.value === 'all' || !selectedEvent.value) {
-        return null; // Show all events
+// Get current kategori data
+const currentKategoriData = computed(() => {
+    if (selectedKategoriPeserta.value === 'all' || !selectedKategoriPeserta.value) {
+        return null; // Show all kategori
     }
-    return prestasiData.value.find((event: any) => event.event_name === selectedEvent.value) || null;
+    return prestasiData.value.find((kategori: any) => kategori.kategori_peserta_id == selectedKategoriPeserta.value) || null;
 });
 
-// Get all prestasi for display
-const displayPrestasi = computed(() => {
-    if (selectedEvent.value === 'all' || !selectedEvent.value) {
-        // Show all prestasi from all events
-        return prestasiData.value.flatMap((event: any) => 
-            (event.prestasi || []).map((p: any) => ({ ...p, event_name: event.event_name }))
-        );
+// Get medali badge color
+const getMedaliBadgeColor = (medali: string | null | undefined) => {
+    if (!medali || medali === '-') return 'secondary';
+    if (medali === 'Emas') return 'default';
+    if (medali === 'Perak') return 'secondary';
+    if (medali === 'Perunggu') return 'outline';
+    return 'secondary';
+};
+
+// Open modal untuk list anggota beregu
+const openBereguModal = (anggotaList: { id: number; nama: string; peserta_type: string }[]) => {
+    anggotaBereguList.value = anggotaList;
+    showBereguModal.value = true;
+};
+
+// Navigate to peserta detail
+const goToPesertaDetail = (anggota: { id: number; nama: string; peserta_type: string }) => {
+    let url = '';
+    switch (anggota.peserta_type) {
+        case 'atlet':
+            url = `/atlet/${anggota.id}`;
+            break;
+        case 'pelatih':
+            url = `/pelatih/${anggota.id}`;
+            break;
+        case 'tenaga_pendukung':
+            url = `/tenaga-pendukung/${anggota.id}`;
+            break;
+        default:
+            return;
     }
-    return currentEventData.value?.prestasi || [];
-});
+    router.visit(url);
+};
+
+// Close modal
+const closeBereguModal = () => {
+    showBereguModal.value = false;
+    anggotaBereguList.value = [];
+};
+
 
 onMounted(() => {
-    // Check if there's event parameter in URL
+    // Check if there's kategori parameter in URL
     const urlParams = new URLSearchParams(window.location.search);
-    const eventParam = urlParams.get('event');
-    if (eventParam) {
-        selectedEvent.value = eventParam;
-        fetchPrestasi(eventParam, 0);
+    const kategoriParam = urlParams.get('kategori');
+    if (kategoriParam) {
+        selectedKategoriPeserta.value = kategoriParam;
+        fetchPrestasi(kategoriParam, 0);
     } else {
-        fetchPrestasi('', 0); // Load all without limit
+        fetchPrestasi('all', 0); // Load all without limit
     }
 });
 </script>
@@ -147,29 +212,67 @@ onMounted(() => {
                     <h1 class="text-2xl font-bold">List Prestasi</h1>
                     <p class="text-muted-foreground mt-1">Daftar semua prestasi peserta (Atlet, Pelatih, Tenaga Pendukung)</p>
                 </div>
-                <div class="text-right">
-                    <div class="text-sm text-muted-foreground">Total Bonus</div>
-                    <div class="text-2xl font-bold text-green-600">{{ formatRupiah(totalBonus) }}</div>
+                <div class="flex items-center gap-6">
+                    <div class="text-right">
+                        <div class="text-sm text-muted-foreground">Total Bonus</div>
+                        <div class="text-2xl font-bold text-green-600">{{ formatRupiah(totalBonus) }}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm text-muted-foreground mb-2">Total Medali (Semua Kategori)</div>
+                        <div class="flex items-center gap-2">
+                            <Badge variant="default">🥇 {{ totalMedaliAll.Emas }}</Badge>
+                            <Badge variant="secondary">🥈 {{ totalMedaliAll.Perak }}</Badge>
+                            <Badge variant="outline">🥉 {{ totalMedaliAll.Perunggu }}</Badge>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Jenis Prestasi -->
+            <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-muted-foreground">Filter Jenis Prestasi:</span>
+                <div class="flex items-center gap-2">
+                    <Button
+                        :variant="selectedJenisPrestasi === 'all' ? 'default' : 'outline'"
+                        size="sm"
+                        @click="handleJenisPrestasiChange('all')"
+                    >
+                        Semua
+                    </Button>
+                    <Button
+                        :variant="selectedJenisPrestasi === 'individu' ? 'default' : 'outline'"
+                        size="sm"
+                        @click="handleJenisPrestasiChange('individu')"
+                    >
+                        Individu
+                    </Button>
+                    <Button
+                        :variant="selectedJenisPrestasi === 'ganda/mixed/beregu/double' ? 'default' : 'outline'"
+                        size="sm"
+                        @click="handleJenisPrestasiChange('ganda/mixed/beregu/double')"
+                    >
+                        Ganda/Mixed/Beregu/Double
+                    </Button>
                 </div>
             </div>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Prestasi per Event</CardTitle>
+                    <CardTitle>Prestasi per Kategori Peserta</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Tabs :model-value="selectedEvent" @update:model-value="handleEventChange" class="w-full">
-                        <TabsList class="grid w-full overflow-x-auto" :style="{ gridTemplateColumns: `repeat(${Math.min(eventNames.length + 1, 10)}, minmax(150px, 1fr))` }">
-                            <TabsTrigger value="all" @click="handleEventChange('all')">
+                    <Tabs :model-value="selectedKategoriPeserta" @update:model-value="handleKategoriPesertaChange" class="w-full">
+                        <TabsList class="grid w-full overflow-x-auto bg-background" :style="{ gridTemplateColumns: `repeat(${Math.min(kategoriPesertaList.length + 1, 10)}, minmax(150px, 1fr))` }">
+                            <TabsTrigger value="all" @click="handleKategoriPesertaChange('all')">
                                 Semua
                             </TabsTrigger>
                             <TabsTrigger 
-                                v-for="eventName in eventNames" 
-                                :key="eventName" 
-                                :value="eventName"
-                                @click="handleEventChange(eventName)"
+                                v-for="kategori in kategoriPesertaList" 
+                                :key="kategori.id" 
+                                :value="kategori.id"
+                                @click="handleKategoriPesertaChange(kategori.id)"
                             >
-                                {{ eventName }}
+                                {{ kategori.nama }}
                             </TabsTrigger>
                         </TabsList>
 
@@ -179,11 +282,23 @@ onMounted(() => {
                                 Tidak ada data prestasi
                             </div>
                             <div v-else class="space-y-4">
-                                <div v-for="event in prestasiData" :key="event.event_name" class="space-y-2">
+                                <div v-for="kategori in prestasiData" :key="kategori.kategori_peserta_id" class="space-y-2">
                                     <div class="flex items-center justify-between border-b pb-2">
-                                        <h3 class="text-lg font-semibold">{{ event.event_name }}</h3>
-                                        <div class="text-sm text-muted-foreground">
-                                            {{ event.count }} prestasi • Total: {{ formatRupiah(event.total_bonus) }}
+                                        <div>
+                                            <h3 class="text-lg font-semibold">{{ kategori.kategori_peserta_nama }}</h3>
+                                            <div class="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                                                <span>{{ kategori.count }} prestasi</span>
+                                                <span>•</span>
+                                                <span>Total: {{ formatRupiah(kategori.total_bonus) }}</span>
+                                                <span v-if="kategori.total_medali" class="flex items-center gap-2">
+                                                    <span>•</span>
+                                                    <span class="flex items-center gap-1">
+                                                        <Badge variant="default">🥇 {{ kategori.total_medali.Emas || 0 }}</Badge>
+                                                        <Badge variant="secondary">🥈 {{ kategori.total_medali.Perak || 0 }}</Badge>
+                                                        <Badge variant="outline">🥉 {{ kategori.total_medali.Perunggu || 0 }}</Badge>
+                                                    </span>
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                     
@@ -195,9 +310,32 @@ onMounted(() => {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                <TableRow v-for="prestasi in event.prestasi" :key="`${prestasi.peserta_type}-${prestasi.peserta_id}-${prestasi.id}`">
+                                                <TableRow 
+                                                    v-for="prestasi in kategori.prestasi" 
+                                                    :key="`${prestasi.peserta_type}-${prestasi.peserta_id}-${prestasi.id}`"
+                                                    :class="{ 'bg-muted/50': prestasi.is_beregu }"
+                                                >
                                                     <TableCell v-for="col in columns" :key="col.key">
-                                                        <template v-if="col.format">
+                                                        <template v-if="col.key === 'nama'">
+                                                            <div class="flex items-center gap-2">
+                                                                <span>{{ prestasi.nama || '-' }}</span>
+                                                                <Badge 
+                                                                    v-if="prestasi.is_beregu && prestasi.jumlah_anggota > 1" 
+                                                                    variant="secondary" 
+                                                                    class="cursor-pointer hover:bg-secondary/80"
+                                                                    @click="openBereguModal(prestasi.anggota_beregu || [])"
+                                                                >
+                                                                    {{ prestasi.jumlah_anggota }} peserta
+                                                                </Badge>
+                                                            </div>
+                                                        </template>
+                                                        <template v-else-if="col.key === 'medali'">
+                                                            <Badge v-if="prestasi.medali && prestasi.medali !== '-'" :variant="getMedaliBadgeColor(prestasi.medali)">
+                                                                {{ prestasi.medali }}
+                                                            </Badge>
+                                                            <span v-else>-</span>
+                                                        </template>
+                                                        <template v-else-if="col.format">
                                                             {{ col.format(prestasi) }}
                                                         </template>
                                                         <template v-else>
@@ -214,20 +352,32 @@ onMounted(() => {
                         </TabsContent>
 
                         <TabsContent 
-                            v-for="eventName in eventNames" 
-                            :key="eventName" 
-                            :value="eventName"
+                            v-for="kategori in kategoriPesertaList" 
+                            :key="kategori.id" 
+                            :value="kategori.id"
                             class="mt-4"
                         >
                             <div v-if="loading" class="text-center py-8">Memuat data...</div>
-                            <div v-else-if="!currentEventData" class="text-center py-8 text-muted-foreground">
-                                Tidak ada data untuk event ini
+                            <div v-else-if="!currentKategoriData" class="text-center py-8 text-muted-foreground">
+                                Tidak ada data untuk kategori ini
                             </div>
                             <div v-else class="space-y-4">
                                 <div class="flex items-center justify-between border-b pb-2">
-                                    <h3 class="text-lg font-semibold">{{ currentEventData.event_name }}</h3>
-                                    <div class="text-sm text-muted-foreground">
-                                        {{ currentEventData.count }} prestasi • Total: {{ formatRupiah(currentEventData.total_bonus) }}
+                                    <div>
+                                        <h3 class="text-lg font-semibold">{{ currentKategoriData.kategori_peserta_nama }}</h3>
+                                        <div class="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                                            <span>{{ currentKategoriData.count }} prestasi</span>
+                                            <span>•</span>
+                                            <span>Total: {{ formatRupiah(currentKategoriData.total_bonus) }}</span>
+                                            <span v-if="currentKategoriData.total_medali" class="flex items-center gap-2">
+                                                <span>•</span>
+                                                <span class="flex items-center gap-1">
+                                                    <Badge variant="default">🥇 {{ currentKategoriData.total_medali.Emas || 0 }}</Badge>
+                                                    <Badge variant="secondary">🥈 {{ currentKategoriData.total_medali.Perak || 0 }}</Badge>
+                                                    <Badge variant="outline">🥉 {{ currentKategoriData.total_medali.Perunggu || 0 }}</Badge>
+                                                </span>
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -239,9 +389,32 @@ onMounted(() => {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            <TableRow v-for="prestasi in currentEventData.prestasi" :key="`${prestasi.peserta_type}-${prestasi.peserta_id}-${prestasi.id}`">
+                                            <TableRow 
+                                                v-for="prestasi in currentKategoriData.prestasi" 
+                                                :key="`${prestasi.peserta_type}-${prestasi.peserta_id}-${prestasi.id}`"
+                                                :class="{ 'bg-muted/50': prestasi.is_beregu }"
+                                            >
                                                 <TableCell v-for="col in columns" :key="col.key">
-                                                    <template v-if="col.format">
+                                                    <template v-if="col.key === 'nama'">
+                                                        <div class="flex items-center gap-2">
+                                                            <span>{{ prestasi.nama || '-' }}</span>
+                                                            <Badge 
+                                                                v-if="prestasi.is_beregu && prestasi.jumlah_anggota > 1" 
+                                                                variant="secondary" 
+                                                                class="cursor-pointer hover:bg-secondary/80"
+                                                                @click="openBereguModal(prestasi.anggota_beregu || [])"
+                                                            >
+                                                                {{ prestasi.jumlah_anggota }} peserta
+                                                            </Badge>
+                                                        </div>
+                                                    </template>
+                                                    <template v-else-if="col.key === 'medali'">
+                                                        <Badge v-if="prestasi.medali && prestasi.medali !== '-'" :variant="getMedaliBadgeColor(prestasi.medali)">
+                                                            {{ prestasi.medali }}
+                                                        </Badge>
+                                                        <span v-else>-</span>
+                                                    </template>
+                                                    <template v-else-if="col.format">
                                                         {{ col.format(prestasi) }}
                                                     </template>
                                                     <template v-else>
@@ -258,6 +431,37 @@ onMounted(() => {
                 </CardContent>
             </Card>
         </div>
+
+        <!-- Modal List Anggota Beregu -->
+        <Dialog :open="showBereguModal" @update:open="showBereguModal = $event">
+            <DialogContent class="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle class="text-xl font-semibold">
+                        Daftar Anggota Beregu
+                    </DialogTitle>
+                </DialogHeader>
+
+                <div class="mt-4">
+                    <div v-if="anggotaBereguList.length === 0" class="text-center py-8 text-muted-foreground">
+                        Tidak ada data anggota
+                    </div>
+                    <div v-else class="space-y-2">
+                        <div
+                            v-for="(anggota, index) in anggotaBereguList"
+                            :key="anggota.id"
+                            class="flex items-center rounded-lg border p-3 hover:bg-accent cursor-pointer transition-colors"
+                            @click="goToPesertaDetail(anggota)"
+                        >
+                            <span class="mr-3 text-sm font-medium text-muted-foreground">{{ index + 1 }}.</span>
+                            <span class="flex-1 font-medium text-sm">{{ anggota.nama }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end">
+                    <Button variant="outline" @click="closeBereguModal">Tutup</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
     </AppLayout>
 </template>
-

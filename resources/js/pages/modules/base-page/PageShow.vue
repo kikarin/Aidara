@@ -108,7 +108,7 @@ const confirmDelete = () => {
                                 </div>
                                 <!-- Text Field with HTML support -->
                                 <div
-                                    v-else-if="field.value && field.value.startsWith && field.value.startsWith('<div')"
+                                    v-else-if="field.value && field.value.startsWith && (field.value.startsWith('<div') || field.value.startsWith('<span'))"
                                     :class="['text-foreground text-sm font-semibold break-words whitespace-pre-wrap', field.className]"
                                     v-html="field.value"
                                 ></div>

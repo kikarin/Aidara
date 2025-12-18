@@ -155,6 +155,7 @@ const handleFilter = (filters: any) => {
     <PageIndex
         title="Program Latihan"
         module-name="Program Latihan"
+        base-url="program-latihan"
         :breadcrumbs="breadcrumbs"
         :columns="columns"
         :create-url="'/program-latihan/create'"

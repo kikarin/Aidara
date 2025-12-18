@@ -12,9 +12,14 @@ const props = defineProps<{
         id: number;
         nama_event: string;
         tingkat_id?: number;
+        tingkat?: { id: number; nama: string };
         tanggal?: string;
-        peringkat?: string;
+        juara?: string;
+        medali?: string;
+        jenis_prestasi?: string;
+        kategori_peserta?: { id: number; nama: string };
         keterangan?: string;
+        bonus?: number;
         created_at: string;
         created_by_user?: { name: string } | null;
         updated_at: string;
@@ -37,8 +42,15 @@ const formatRupiah = (value: number | null | undefined): string => {
     }).format(value);
 };
 
+const getJenisPrestasiLabel = (jenis: string | undefined) => {
+    if (!jenis) return '-';
+    return jenis === 'individu' ? 'Individu' : 'Ganda/Mixed/Beregu/Double';
+};
+
 const fields = computed(() => [
     { label: 'Nama Event', value: props.item?.nama_event || '-' },
+    { label: 'Kategori Peserta', value: props.item?.kategori_peserta?.nama || '-' },
+    { label: 'Jenis Prestasi', value: getJenisPrestasiLabel(props.item?.jenis_prestasi) },
     { label: 'Tingkat', value: props.item?.tingkat?.nama || '-' },
     {
         label: 'Tanggal',
@@ -46,7 +58,8 @@ const fields = computed(() => [
             ? new Date(props.item.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'numeric', year: 'numeric' })
             : '-',
     },
-    { label: 'Peringkat', value: props.item?.peringkat || '-' },
+    { label: 'Juara', value: props.item?.juara || '-' },
+    { label: 'Medali', value: props.item?.medali || '-' },
     { label: 'Bonus', value: formatRupiah(props.item?.bonus || 0) },
     { label: 'Keterangan', value: props.item?.keterangan || '-', className: 'sm:col-span-2' },
 ]);

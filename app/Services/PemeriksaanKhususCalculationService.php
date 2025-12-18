@@ -5,7 +5,7 @@ namespace App\Services;
 class PemeriksaanKhususCalculationService
 {
     /**
-     * Parse number dengan support comma dan dot sebagai decimal separator
+     * Parse number dengan support comma, dot, dan format waktu (mm:ss atau hh:mm:ss)
      */
     public static function parseNumber($value): ?float
     {
@@ -18,11 +18,44 @@ class PemeriksaanKhususCalculationService
             return null;
         }
 
+        // Deteksi format waktu (ada titik dua)
+        if (strpos($strValue, ':') !== false) {
+            return self::parseTimeToSeconds($strValue);
+        }
+
         // Replace comma with dot (Indonesian format)
         $normalizedValue = str_replace(',', '.', $strValue);
         $parsed = (float) $normalizedValue;
 
         return is_nan($parsed) ? null : $parsed;
+    }
+
+    /**
+     * Konversi format waktu ke detik
+     * Support format: mm:ss atau hh:mm:ss
+     * Contoh: "00:45" = 45 detik, "02:30" = 150 detik, "01:02:30" = 3750 detik
+     * 
+     * @param string $timeString
+     * @return float|null
+     */
+    private static function parseTimeToSeconds(string $timeString): ?float
+    {
+        $parts = explode(':', $timeString);
+        
+        if (count($parts) === 2) {
+            // Format mm:ss
+            $minutes = (int) $parts[0];
+            $seconds = (int) $parts[1];
+            return (float) (($minutes * 60) + $seconds);
+        } elseif (count($parts) === 3) {
+            // Format hh:mm:ss
+            $hours = (int) $parts[0];
+            $minutes = (int) $parts[1];
+            $seconds = (int) $parts[2];
+            return (float) (($hours * 3600) + ($minutes * 60) + $seconds);
+        }
+        
+        return null;
     }
 
     /**
@@ -86,7 +119,9 @@ class PemeriksaanKhususCalculationService
             return 'sedang';
         } elseif ($persentase >= 60 && $persentase < 80) {
             return 'mendekati_target';
-        } else { // >= 80
+        } elseif ($persentase >= 80 && $persentase < 100) {
+            return 'mendekati_target';
+        } else { // >= 100
             return 'target';
         }
     }

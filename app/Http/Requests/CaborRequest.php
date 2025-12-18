@@ -16,6 +16,7 @@ class CaborRequest extends FormRequest
         $rules = [
             'nama'      => 'required|string|max:255',
             'deskripsi' => 'nullable|string',
+            'icon'      => 'nullable|string|max:255',
         ];
         if ($this->isMethod('patch') || $this->isMethod('put')) {
             $rules['nama'] = 'required|string|max:255|unique:cabor,nama,'.$this->id;
