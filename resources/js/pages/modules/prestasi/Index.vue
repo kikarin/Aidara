@@ -103,17 +103,10 @@ const handleJenisPrestasiChange = (jenisPrestasi: string) => {
 
 // Get columns for all prestasi - check if any prestasi has NPCI or SOIna
 const columns = computed(() => {
-    // Check all prestasi across all kategori
-    const allPrestasi = prestasiData.value.flatMap((kategori: any) => kategori.prestasi || []);
-    const hasNPCI = allPrestasi.some((p: any) => 
-        p.kategori_peserta && p.kategori_peserta.includes('NPCI')
-    );
-    const hasSOIna = allPrestasi.some((p: any) => 
-        p.kategori_peserta && p.kategori_peserta.includes('SOIna')
-    );
-    
     const baseColumns = [
         { key: 'nama', label: 'Nama' },
+        { key: 'nama_event', label: 'Nama Event' },
+        { key: 'tingkat', label: 'Tingkat' },
         { key: 'cabor', label: 'Cabor' },
         { key: 'nomor_posisi', label: 'Nomor/Posisi' },
         { key: 'juara', label: 'Juara' },
@@ -121,13 +114,31 @@ const columns = computed(() => {
         { key: 'kategori_peserta', label: 'Kategori Peserta' },
     ];
     
-    if (hasNPCI || hasSOIna) {
-        baseColumns.push({ key: 'disabilitas', label: 'Disabilitas' });
-        if (hasNPCI) {
-            baseColumns.push({ key: 'klasifikasi', label: 'Klasifikasi' });
-        }
-        if (hasSOIna) {
-            baseColumns.push({ key: 'iq', label: 'IQ' });
+    // Hanya tampilkan kolom Disabilitas, Klasifikasi, dan IQ jika filter kategori spesifik dipilih (bukan "Semua")
+    if (selectedKategoriPeserta.value !== 'all' && selectedKategoriPeserta.value) {
+        // Check prestasi di kategori yang dipilih
+        const currentKategori = prestasiData.value.find((k: any) => 
+            k.kategori_peserta_id == selectedKategoriPeserta.value
+        );
+        
+        if (currentKategori && currentKategori.prestasi) {
+            const prestasiInKategori = currentKategori.prestasi;
+            const hasNPCI = prestasiInKategori.some((p: any) => 
+                p.kategori_peserta && p.kategori_peserta.includes('NPCI')
+            );
+            const hasSOIna = prestasiInKategori.some((p: any) => 
+                p.kategori_peserta && p.kategori_peserta.includes('SOIna')
+            );
+            
+            if (hasNPCI || hasSOIna) {
+                baseColumns.push({ key: 'disabilitas', label: 'Disabilitas' });
+                if (hasNPCI) {
+                    baseColumns.push({ key: 'klasifikasi', label: 'Klasifikasi' });
+                }
+                if (hasSOIna) {
+                    baseColumns.push({ key: 'iq', label: 'IQ' });
+                }
+            }
         }
     }
     

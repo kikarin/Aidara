@@ -441,7 +441,12 @@ class ProfileController extends Controller
                 ], 404);
             }
 
-            $prestasi = $peserta->prestasi()->with('tingkat', 'created_by_user', 'updated_by_user')->get();
+            $prestasi = $peserta->prestasi()->with([
+                'tingkat', 
+                'kategoriPeserta',
+                'created_by_user', 
+                'updated_by_user'
+            ])->get();
             
             $formattedPrestasi = $prestasi->map(function ($item) use ($user) {
                 $data = [
@@ -452,9 +457,17 @@ class ProfileController extends Controller
                         'nama' => $item->tingkat->nama,
                     ] : null,
                     'tanggal' => $item->tanggal,
-                    'peringkat' => $item->peringkat,
+                    'peringkat' => $item->peringkat, // Legacy field, masih support
+                    'juara' => $item->juara ?? null, // Field baru
+                    'medali' => $item->medali ?? null, // Field baru
+                    'jenis_prestasi' => $item->jenis_prestasi ?? 'individu', // Field baru
+                    'kategori_peserta' => $item->kategoriPeserta ? [
+                        'id' => $item->kategoriPeserta->id,
+                        'nama' => $item->kategoriPeserta->nama,
+                    ] : null, // Field baru
                     'keterangan' => $item->keterangan,
-                    'bonus' => $item->bonus,
+                    'bonus' => $item->bonus ?? 0,
+                    'prestasi_group_id' => $item->prestasi_group_id ?? null, // Untuk beregu
                 ];
 
                 // Tambahkan field khusus untuk Pelatih
@@ -467,6 +480,22 @@ class ProfileController extends Controller
                         'id' => $item->kategoriAtlet->id,
                         'nama' => $item->kategoriAtlet->nama,
                     ] : null;
+                }
+
+                // Untuk beregu, load anggota jika ada
+                if ($item->jenis_prestasi === 'ganda/mixed/beregu/double' && $item->prestasi_group_id) {
+                    // Load anggota beregu (hanya untuk atlet)
+                    if ($user->peserta_type === 'atlet' && method_exists($item, 'anggotaBeregu')) {
+                        $item->load('anggotaBeregu.atlet');
+                        $data['anggota_beregu'] = $item->anggotaBeregu->map(function ($anggota) {
+                            return [
+                                'id' => $anggota->atlet->id ?? null,
+                                'nama' => $anggota->atlet->nama ?? null,
+                            ];
+                        })->filter(function ($anggota) {
+                            return $anggota['id'] !== null;
+                        })->values();
+                    }
                 }
 
                 return $data;
@@ -523,6 +552,31 @@ class ProfileController extends Controller
 
             $data = $request->validated();
             
+            // Validasi anggota_beregu jika ada
+            if (isset($data['anggota_beregu']) && is_array($data['anggota_beregu'])) {
+                // Validasi bahwa semua ID anggota valid berdasarkan role
+                $anggotaBeregu = $data['anggota_beregu'];
+                $validIds = [];
+                
+                switch ($user->peserta_type) {
+                    case 'atlet':
+                        $validIds = Atlet::whereIn('id', $anggotaBeregu)
+                            ->whereNull('deleted_at')
+                            ->pluck('id')
+                            ->toArray();
+                        break;
+                    case 'pelatih':
+                        $validIds = Pelatih::whereIn('id', $anggotaBeregu)
+                            ->whereNull('deleted_at')
+                            ->pluck('id')
+                            ->toArray();
+                        break;
+                }
+                
+                // Filter hanya ID yang valid
+                $data['anggota_beregu'] = array_intersect($anggotaBeregu, $validIds);
+            }
+            
             // Create prestasi berdasarkan role
             $prestasi = $this->createPrestasi($peserta, $data, $user->peserta_type);
 
@@ -532,6 +586,9 @@ class ProfileController extends Controller
                 'prestasi_id' => $prestasi->id,
             ]);
 
+            // Reload dengan relasi yang diperlukan
+            $prestasi->load('tingkat', 'kategoriPeserta');
+            
             $formattedPrestasi = [
                 'id' => $prestasi->id,
                 'nama_event' => $prestasi->nama_event,
@@ -540,9 +597,17 @@ class ProfileController extends Controller
                     'nama' => $prestasi->tingkat->nama,
                 ] : null,
                 'tanggal' => $prestasi->tanggal,
-                'peringkat' => $prestasi->peringkat,
+                'peringkat' => $prestasi->peringkat, // Legacy field
+                'juara' => $prestasi->juara ?? null, // Field baru
+                'medali' => $prestasi->medali ?? null, // Field baru
+                'jenis_prestasi' => $prestasi->jenis_prestasi ?? 'individu', // Field baru
+                'kategori_peserta' => $prestasi->kategoriPeserta ? [
+                    'id' => $prestasi->kategoriPeserta->id,
+                    'nama' => $prestasi->kategoriPeserta->nama,
+                ] : null, // Field baru
                 'keterangan' => $prestasi->keterangan,
-                'bonus' => $prestasi->bonus,
+                'bonus' => $prestasi->bonus ?? 0,
+                'prestasi_group_id' => $prestasi->prestasi_group_id ?? null, // Untuk beregu
             ];
 
             // Tambahkan field khusus untuk Pelatih
@@ -1067,6 +1132,14 @@ class ProfileController extends Controller
             'updated_by' => auth()->id(),
         ];
 
+        // Field yang required berdasarkan role (tidak boleh null di database)
+        $requiredFields = [];
+        if ($pesertaType === 'pelatih' || $pesertaType === 'tenaga_pendukung') {
+            $requiredFields = ['nik', 'nama', 'jenis_kelamin'];
+        } elseif ($pesertaType === 'atlet') {
+            $requiredFields = ['nama', 'jenis_kelamin']; // nik nullable untuk atlet
+        }
+
         // Hanya update field yang dikirim (partial update)
         $commonFields = [
             'nik', 'nama', 'jenis_kelamin', 'tempat_lahir', 'tanggal_lahir',
@@ -1076,6 +1149,10 @@ class ProfileController extends Controller
 
         foreach ($commonFields as $field) {
             if (array_key_exists($field, $data)) {
+                // Skip field required jika nilainya null (untuk mencegah error NOT NULL constraint)
+                if (in_array($field, $requiredFields) && $data[$field] === null) {
+                    continue; // Jangan update field required ke null
+                }
                 $updateData[$field] = $data[$field];
             }
         }
@@ -1204,25 +1281,84 @@ class ProfileController extends Controller
             'nama_event' => $data['nama_event'],
             'tingkat_id' => $data['tingkat_id'] ?? null,
             'tanggal' => $data['tanggal'] ?? null,
-            'peringkat' => $data['peringkat'] ?? null,
+            'peringkat' => $data['peringkat'] ?? null, // Legacy field
+            'juara' => $data['juara'] ?? null, // Field baru
+            'medali' => $data['medali'] ?? null, // Field baru
+            'jenis_prestasi' => $data['jenis_prestasi'] ?? 'individu', // Field baru
+            'kategori_peserta_id' => $data['kategori_peserta_id'] ?? null, // Field baru
             'keterangan' => $data['keterangan'] ?? null,
             'bonus' => $data['bonus'] ?? null,
             'created_by' => auth()->id(),
             'updated_by' => auth()->id(),
         ];
 
+        $prestasi = null;
+        $anggotaBeregu = $data['anggota_beregu'] ?? [];
+
         switch ($pesertaType) {
             case 'atlet':
                 $prestasiData['atlet_id'] = $peserta->id;
-                return AtletPrestasi::create($prestasiData);
+                $prestasi = AtletPrestasi::create($prestasiData);
+                
+                // Handle beregu jika jenis_prestasi = ganda/mixed/beregu/double
+                if ($prestasiData['jenis_prestasi'] === 'ganda/mixed/beregu/double' && !empty($anggotaBeregu)) {
+                    // Set prestasi_group_id ke id prestasi utama
+                    $prestasi->prestasi_group_id = $prestasi->id;
+                    $prestasi->save();
+                    
+                    // Create prestasi untuk setiap anggota beregu
+                    foreach ($anggotaBeregu as $atletId) {
+                        // Skip jika atlet_id sama dengan peserta (sudah dibuat sebagai prestasi utama)
+                        if ($atletId == $peserta->id) {
+                            continue;
+                        }
+                        
+                        // Create prestasi untuk anggota beregu
+                        $anggotaPrestasiData = $prestasiData;
+                        $anggotaPrestasiData['atlet_id'] = $atletId;
+                        $anggotaPrestasiData['prestasi_group_id'] = $prestasi->id;
+                        $anggotaPrestasiData['created_by'] = auth()->id();
+                        $anggotaPrestasiData['updated_by'] = auth()->id();
+                        
+                        AtletPrestasi::create($anggotaPrestasiData);
+                    }
+                }
+                
+                return $prestasi;
+                
             case 'pelatih':
                 $prestasiData['pelatih_id'] = $peserta->id;
                 $prestasiData['kategori_prestasi_pelatih_id'] = $data['kategori_prestasi_pelatih_id'] ?? null;
                 $prestasiData['kategori_atlet_id'] = $data['kategori_atlet_id'] ?? null;
-                return PelatihPrestasi::create($prestasiData);
+                $prestasi = PelatihPrestasi::create($prestasiData);
+                
+                // Handle beregu untuk pelatih (jika diperlukan)
+                if ($prestasiData['jenis_prestasi'] === 'ganda/mixed/beregu/double' && !empty($anggotaBeregu)) {
+                    $prestasi->prestasi_group_id = $prestasi->id;
+                    $prestasi->save();
+                    
+                    // Create prestasi untuk setiap anggota beregu (pelatih lain)
+                    foreach ($anggotaBeregu as $pelatihId) {
+                        if ($pelatihId == $peserta->id) {
+                            continue;
+                        }
+                        
+                        $anggotaPrestasiData = $prestasiData;
+                        $anggotaPrestasiData['pelatih_id'] = $pelatihId;
+                        $anggotaPrestasiData['prestasi_group_id'] = $prestasi->id;
+                        $anggotaPrestasiData['created_by'] = auth()->id();
+                        $anggotaPrestasiData['updated_by'] = auth()->id();
+                        
+                        PelatihPrestasi::create($anggotaPrestasiData);
+                    }
+                }
+                
+                return $prestasi;
+                
             case 'tenaga_pendukung':
                 $prestasiData['tenaga_pendukung_id'] = $peserta->id;
                 return TenagaPendukungPrestasi::create($prestasiData);
+                
             default:
                 throw new \Exception('Invalid peserta type');
         }

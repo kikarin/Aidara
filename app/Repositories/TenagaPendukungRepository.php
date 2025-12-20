@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\CaborKategori;
+use App\Models\CaborKategoriTenagaPendukung;
 
 class TenagaPendukungRepository
 {

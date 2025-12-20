@@ -524,4 +524,76 @@ class PelatihController extends Controller implements HasMiddleware
             return response()->json(['success' => false, 'message' => 'Terjadi kesalahan saat mengambil data'], 500);
         }
     }
+
+    public function apiGetBereguAvailable($id, Request $request)
+    {
+        try {
+            $pelatih = Pelatih::with('caborKategoriPelatih.cabor')->find($id);
+            if (!$pelatih) {
+                return response()->json(['success' => false, 'message' => 'Pelatih tidak ditemukan'], 404);
+            }
+
+            $caborKategoriPelatih = $pelatih->caborKategoriPelatih->first();
+            if (!$caborKategoriPelatih || !$caborKategoriPelatih->cabor) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [],
+                    'meta' => ['total' => 0],
+                ]);
+            }
+
+            $caborId = $caborKategoriPelatih->cabor_id;
+            
+            // Get all pelatih from same cabor (exclude current pelatih)
+            $query = Pelatih::whereHas('caborKategoriPelatih', function ($q) use ($caborId) {
+                $q->where('cabor_id', $caborId)->whereNull('deleted_at');
+            })->where('id', '!=', $id)->whereNull('deleted_at');
+
+            // Search filter
+            if ($request->has('search') && $request->search) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('nama', 'like', "%{$search}%");
+                });
+            }
+
+            // Pagination - default per_page lebih besar untuk modal
+            $perPage = $request->input('per_page', 100); // Default 100 untuk menampilkan lebih banyak pelatih
+            $page = $request->input('page', 1);
+            
+            $total = $query->count();
+            $pelatihs = $query->select('id', 'nama', 'jenis_kelamin', 'tanggal_lahir')
+                ->orderBy('nama')
+                ->skip(($page - 1) * $perPage)
+                ->take($perPage)
+                ->get();
+
+            // Calculate age
+            $data = $pelatihs->map(function ($item) {
+                $usia = null;
+                if ($item->tanggal_lahir) {
+                    $usia = \Carbon\Carbon::parse($item->tanggal_lahir)->age;
+                }
+                return [
+                    'id' => $item->id,
+                    'nama' => $item->nama,
+                    'jenis_kelamin' => $item->jenis_kelamin,
+                    'usia' => $usia,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'meta' => [
+                    'total' => $total,
+                    'per_page' => $perPage,
+                    'current_page' => $page,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching available beregu pelatih: '.$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan saat mengambil data', 'error' => $e->getMessage()], 500);
+        }
+    }
 }

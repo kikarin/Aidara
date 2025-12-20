@@ -42,16 +42,38 @@ const parseTimeToSeconds = (timeString: string): number | null => {
     const parts = timeString.split(':');
     
     if (parts.length === 2) {
-        // Format mm:ss
+        // Format mm:ss atau mm:ss.mmm
         const minutes = parseInt(parts[0], 10);
-        const seconds = parseInt(parts[1], 10);
+        const secondsPart = parts[1];
+        
+        // Cek apakah ada milidetik di bagian detik
+        let seconds: number;
+        if (secondsPart.includes('.')) {
+            // Ada milidetik, parse sebagai float
+            seconds = parseFloat(secondsPart);
+        } else {
+            // Tidak ada milidetik, parse sebagai integer
+            seconds = parseInt(secondsPart, 10);
+        }
+        
         if (isNaN(minutes) || isNaN(seconds)) return null;
         return (minutes * 60) + seconds;
     } else if (parts.length === 3) {
-        // Format hh:mm:ss
+        // Format hh:mm:ss atau hh:mm:ss.mmm
         const hours = parseInt(parts[0], 10);
         const minutes = parseInt(parts[1], 10);
-        const seconds = parseInt(parts[2], 10);
+        const secondsPart = parts[2];
+        
+        // Cek apakah ada milidetik di bagian detik
+        let seconds: number;
+        if (secondsPart.includes('.')) {
+            // Ada milidetik, parse sebagai float
+            seconds = parseFloat(secondsPart);
+        } else {
+            // Tidak ada milidetik, parse sebagai integer
+            seconds = parseInt(secondsPart, 10);
+        }
+        
         if (isNaN(hours) || isNaN(minutes) || isNaN(seconds)) return null;
         return (hours * 3600) + (minutes * 60) + seconds;
     }
@@ -106,11 +128,10 @@ const calculatePerforma = (nilaiAktual: string | null, target: string | null, pe
 // Helper: Get predikat berdasarkan persentase
 const getPredikat = (persentase: number | null): string | null => {
     if (persentase === null) return null;
-    if (persentase >= 0 && persentase < 20) return 'sangat_kurang';
-    if (persentase >= 20 && persentase < 40) return 'kurang';
-    if (persentase >= 40 && persentase < 60) return 'sedang';
-    if (persentase >= 60 && persentase < 80) return 'mendekati_target';
-    if (persentase >= 80 && persentase < 100) return 'mendekati_target';
+    if (persentase >= 0 && persentase < 30) return 'sangat_kurang';
+    if (persentase >= 30 && persentase < 60) return 'kurang';
+    if (persentase >= 60 && persentase < 85) return 'sedang';
+    if (persentase >= 85 && persentase < 100) return 'mendekati_target';
     return 'target'; // >= 100
 };
 

@@ -2,7 +2,6 @@
 import AppTabs from '@/components/AppTabs.vue';
 import { useToast } from '@/components/ui/toast/useToast';
 import PageShow from '@/pages/modules/base-page/PageShow.vue';
-import { formatCaborWithIcon } from '@/utils/caborFormatter';
 import { router, usePage } from '@inertiajs/vue3';
 import { Pencil, Plus } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';

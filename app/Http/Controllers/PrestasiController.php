@@ -355,4 +355,170 @@ class PrestasiController extends Controller implements HasMiddleware
             ],
         ]);
     }
+
+    public function apiSummary(Request $request)
+    {
+        try {
+            // Gunakan logika yang sama dengan apiIndex untuk menghitung bonus dan medali
+            // Ini penting untuk menghindari double counting pada prestasi beregu
+            
+            // Get all prestasi from atlet, pelatih, and tenaga pendukung
+            $atletPrestasi = AtletPrestasi::with([
+                'atlet' => function ($query) {
+                    $query->withTrashed();
+                },
+            ])
+                ->whereNull('deleted_at')
+                ->get()
+                ->filter(function ($prestasi) {
+                    return $prestasi->atlet !== null && $prestasi->atlet->deleted_at === null;
+                })
+                ->map(function ($prestasi) {
+                    return [
+                        'id' => $prestasi->id,
+                        'prestasi_group_id' => $prestasi->prestasi_group_id,
+                        'jenis_prestasi' => $prestasi->jenis_prestasi,
+                        'medali' => $prestasi->medali ?? '-',
+                        'bonus' => $prestasi->bonus ?? 0,
+                    ];
+                });
+            
+            $pelatihPrestasi = PelatihPrestasi::with([
+                'pelatih' => function ($query) {
+                    $query->withTrashed();
+                },
+            ])
+                ->whereNull('deleted_at')
+                ->get()
+                ->filter(function ($prestasi) {
+                    return $prestasi->pelatih !== null && $prestasi->pelatih->deleted_at === null;
+                })
+                ->map(function ($prestasi) {
+                    return [
+                        'id' => $prestasi->id,
+                        'prestasi_group_id' => $prestasi->prestasi_group_id,
+                        'jenis_prestasi' => $prestasi->jenis_prestasi,
+                        'medali' => $prestasi->medali ?? '-',
+                        'bonus' => $prestasi->bonus ?? 0,
+                    ];
+                });
+            
+            $tenagaPendukungPrestasi = TenagaPendukungPrestasi::with([
+                'tenaga_pendukung' => function ($query) {
+                    $query->withTrashed();
+                },
+            ])
+                ->whereNull('deleted_at')
+                ->get()
+                ->filter(function ($prestasi) {
+                    return $prestasi->tenaga_pendukung !== null && $prestasi->tenaga_pendukung->deleted_at === null;
+                })
+                ->map(function ($prestasi) {
+                    return [
+                        'id' => $prestasi->id,
+                        'prestasi_group_id' => $prestasi->prestasi_group_id,
+                        'jenis_prestasi' => $prestasi->jenis_prestasi,
+                        'medali' => $prestasi->medali ?? '-',
+                        'bonus' => $prestasi->bonus ?? 0,
+                    ];
+                });
+            
+            // Combine all prestasi
+            $allPrestasi = $atletPrestasi->concat($pelatihPrestasi)->concat($tenagaPendukungPrestasi);
+            
+            // Handle beregu: Group by prestasi_group_id and create unified rows (sama seperti apiIndex)
+            $processedPrestasi = [];
+            $processedGroupIds = [];
+            
+            $allPrestasiCollection = collect($allPrestasi);
+            
+            // Get all unique prestasi_group_id untuk beregu
+            $bereguGroupIds = $allPrestasiCollection
+                ->where('jenis_prestasi', 'ganda/mixed/beregu/double')
+                ->whereNotNull('prestasi_group_id')
+                ->pluck('prestasi_group_id')
+                ->unique()
+                ->values();
+            
+            // Process beregu groups
+            foreach ($bereguGroupIds as $groupId) {
+                $anggotaBeregu = $allPrestasiCollection->filter(function ($p) use ($groupId) {
+                    return isset($p['prestasi_group_id']) && $p['prestasi_group_id'] == $groupId;
+                });
+                
+                if ($anggotaBeregu->isEmpty()) {
+                    continue;
+                }
+                
+                // Ambil prestasi utama (yang id == prestasi_group_id)
+                $prestasiUtama = $anggotaBeregu->firstWhere('id', $groupId);
+                if (!$prestasiUtama) {
+                    continue;
+                }
+                
+                // Untuk beregu, hanya ambil bonus dan medali dari prestasi utama (1 per regu)
+                $processedPrestasi[] = [
+                    'id' => $prestasiUtama['id'],
+                    'medali' => $prestasiUtama['medali'],
+                    'bonus' => $prestasiUtama['bonus'],
+                ];
+                
+                $processedGroupIds[] = $groupId;
+            }
+            
+            // Process prestasi individu (yang tidak beregu atau belum diproses)
+            foreach ($allPrestasiCollection as $prestasi) {
+                // Skip jika sudah diproses sebagai beregu
+                if ($prestasi['prestasi_group_id'] && in_array($prestasi['prestasi_group_id'], $processedGroupIds)) {
+                    continue;
+                }
+                
+                // Skip anggota beregu
+                if ($prestasi['prestasi_group_id'] && $prestasi['id'] != $prestasi['prestasi_group_id']) {
+                    continue;
+                }
+                
+                // Prestasi individu
+                $processedPrestasi[] = [
+                    'id' => $prestasi['id'],
+                    'medali' => $prestasi['medali'],
+                    'bonus' => $prestasi['bonus'],
+                ];
+            }
+            
+            // Hitung total bonus dari processed prestasi (sudah handle beregu)
+            $totalBonus = collect($processedPrestasi)->sum('bonus');
+            
+            // Hitung total medali dari processed prestasi (sudah handle beregu)
+            $totalMedali = [
+                'Emas' => 0,
+                'Perak' => 0,
+                'Perunggu' => 0,
+            ];
+            
+            foreach ($processedPrestasi as $prestasi) {
+                if ($prestasi['medali'] && $prestasi['medali'] !== '-') {
+                    $medali = $prestasi['medali'];
+                    if (isset($totalMedali[$medali])) {
+                        $totalMedali[$medali]++;
+                    }
+                }
+            }
+            
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'total_bonus' => $totalBonus,
+                    'total_medali' => $totalMedali,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching prestasi summary: '.$e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengambil data',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

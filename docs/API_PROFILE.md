@@ -490,8 +490,17 @@ Accept: application/json
         },
         "tanggal": "2024-01-01",
         "peringkat": "Juara 1",
+        "juara": "Juara 1",
+        "medali": "Emas",
+        "jenis_prestasi": "individu",
+        "kategori_peserta": {
+          "id": 1,
+          "nama": "KONI"
+        },
         "keterangan": "Medali Emas",
-        "bonus": 1000000
+        "bonus": 1000000,
+        "prestasi_group_id": null,
+        "anggota_beregu": []
       }
     ],
     "permissions": [ ... ]
@@ -522,8 +531,57 @@ Accept: application/json
         },
         "tanggal": "2024-01-01",
         "peringkat": "Juara 1",
+        "juara": "Juara 1",
+        "medali": "Emas",
+        "jenis_prestasi": "individu",
+        "kategori_peserta": {
+          "id": 1,
+          "nama": "KONI"
+        },
         "keterangan": "Medali Emas",
-        "bonus": 1000000
+        "bonus": 1000000,
+        "prestasi_group_id": null
+      }
+    ],
+    "permissions": [ ... ]
+  }
+}
+```
+
+**Response Success (200) - Prestasi Beregu (Atlet):**
+```json
+{
+  "status": "success",
+  "data": {
+    "prestasi": [
+      {
+        "id": 1,
+        "nama_event": "Kejuaraan Nasional",
+        "tingkat": {
+          "id": 1,
+          "nama": "Nasional"
+        },
+        "tanggal": "2024-01-01",
+        "juara": "Juara 1",
+        "medali": "Emas",
+        "jenis_prestasi": "ganda/mixed/beregu/double",
+        "kategori_peserta": {
+          "id": 1,
+          "nama": "KONI"
+        },
+        "keterangan": "Medali Emas",
+        "bonus": 1000000,
+        "prestasi_group_id": 1,
+        "anggota_beregu": [
+          {
+            "id": 2,
+            "nama": "Nama Anggota 1"
+          },
+          {
+            "id": 3,
+            "nama": "Nama Anggota 2"
+          }
+        ]
       }
     ],
     "permissions": [ ... ]
@@ -546,19 +604,39 @@ Accept: application/json
 Content-Type: application/json
 ```
 
-**Request Body (Atlet/Tenaga Pendukung):**
+**Request Body (Atlet/Tenaga Pendukung) - Prestasi Individu:**
 ```json
 {
   "nama_event": "Kejuaraan Nasional",
   "tingkat_id": 1,
   "tanggal": "2024-01-01",
   "peringkat": "Juara 1",
+  "juara": "Juara 1",
+  "medali": "Emas",
+  "jenis_prestasi": "individu",
+  "kategori_peserta_id": 1,
   "keterangan": "Medali Emas",
   "bonus": 1000000
 }
 ```
 
-**Request Body (Pelatih):**
+**Request Body (Atlet) - Prestasi Beregu:**
+```json
+{
+  "nama_event": "Kejuaraan Nasional",
+  "tingkat_id": 1,
+  "tanggal": "2024-01-01",
+  "juara": "Juara 1",
+  "medali": "Emas",
+  "jenis_prestasi": "ganda/mixed/beregu/double",
+  "kategori_peserta_id": 1,
+  "keterangan": "Medali Emas Beregu",
+  "bonus": 1000000,
+  "anggota_beregu": [2, 3, 4]
+}
+```
+
+**Request Body (Pelatih) - Prestasi Individu:**
 ```json
 {
   "nama_event": "Kejuaraan Nasional",
@@ -567,8 +645,80 @@ Content-Type: application/json
   "tingkat_id": 1,
   "tanggal": "2024-01-01",
   "peringkat": "Juara 1",
+  "juara": "Juara 1",
+  "medali": "Emas",
+  "jenis_prestasi": "individu",
+  "kategori_peserta_id": 1,
   "keterangan": "Medali Emas",
   "bonus": 1000000
+}
+```
+
+**Request Body (Pelatih) - Prestasi Beregu:**
+```json
+{
+  "nama_event": "Kejuaraan Nasional",
+  "kategori_prestasi_pelatih_id": 1,
+  "kategori_atlet_id": 1,
+  "tingkat_id": 1,
+  "tanggal": "2024-01-01",
+  "juara": "Juara 1",
+  "medali": "Emas",
+  "jenis_prestasi": "ganda/mixed/beregu/double",
+  "kategori_peserta_id": 1,
+  "keterangan": "Medali Emas Beregu",
+  "bonus": 1000000,
+  "anggota_beregu": [2, 3, 4]
+}
+```
+
+**Catatan Field:**
+- `peringkat`: Field legacy, masih support tapi disarankan gunakan `juara`
+- `juara`: Field baru (contoh: "Juara 1", "Juara 2", "Juara 3")
+- `medali`: Field baru, nilai: `"Emas"`, `"Perak"`, atau `"Perunggu"`
+- `jenis_prestasi`: Field baru, nilai: `"individu"` atau `"ganda/mixed/beregu/double"`
+- `kategori_peserta_id`: Field baru, ID kategori peserta (KONI, NPCI, PPOPM, SOIna)
+- `anggota_beregu`: Array of IDs (hanya untuk jenis_prestasi = "ganda/mixed/beregu/double")
+  - Untuk **Atlet**: Berisi array ID atlet lain yang menjadi anggota beregu
+  - Untuk **Pelatih**: Berisi array ID pelatih lain yang menjadi anggota beregu
+  - ID yang tidak valid akan otomatis di-filter oleh sistem
+  - ID yang sama dengan user yang login akan di-skip (karena sudah menjadi prestasi utama)
+
+**Endpoint untuk Mendapatkan Available Beregu Members:**
+
+Sebelum membuat prestasi beregu, mobile app bisa mendapatkan daftar peserta yang tersedia untuk beregu menggunakan endpoint berikut:
+
+**Untuk Atlet:**
+- `GET /api/atlet/{id}/beregu/available?search={nama}&page={page}&per_page={per_page}`
+- Return: List atlet dari cabor yang sama (exclude atlet yang sedang login)
+
+**Untuk Pelatih:**
+- `GET /api/pelatih/{id}/beregu/available?search={nama}&page={page}&per_page={per_page}`
+- Return: List pelatih dari cabor yang sama (exclude pelatih yang sedang login)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 2,
+      "nama": "Nama Anggota 1",
+      "jenis_kelamin": "L",
+      "usia": 25
+    },
+    {
+      "id": 3,
+      "nama": "Nama Anggota 2",
+      "jenis_kelamin": "P",
+      "usia": 23
+    }
+  ],
+  "meta": {
+    "total": 10,
+    "per_page": 100,
+    "current_page": 1
+  }
 }
 ```
 
@@ -578,7 +728,25 @@ Content-Type: application/json
   "status": "success",
   "message": "Prestasi berhasil ditambahkan.",
   "data": {
-    "prestasi": { ... },
+    "prestasi": {
+      "id": 1,
+      "nama_event": "Kejuaraan Nasional",
+      "tingkat": {
+        "id": 1,
+        "nama": "Nasional"
+      },
+      "tanggal": "2024-01-01",
+      "juara": "Juara 1",
+      "medali": "Emas",
+      "jenis_prestasi": "individu",
+      "kategori_peserta": {
+        "id": 1,
+        "nama": "KONI"
+      },
+      "keterangan": "Medali Emas",
+      "bonus": 1000000,
+      "prestasi_group_id": null
+    },
     "permissions": [ ... ]
   }
 }

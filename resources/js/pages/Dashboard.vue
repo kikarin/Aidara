@@ -399,7 +399,7 @@ const chartOptions = {
                             <p class="text-muted-foreground text-sm mt-1">Daftar prestasi semua peserta</p>
                         </div>
                         <Button variant="secondary" @click="router.visit('/prestasi')">
-                            Lihat Semua
+                            Lihat Prestasi
                         </Button>
                     </div>
                 </CardHeader>

@@ -11,8 +11,11 @@ use App\Models\MstKategoriAtlet;
 use App\Models\MstKategoriPeserta;
 use App\Models\MstKategoriPrestasiPelatih;
 use App\Models\MstKecamatan;
+use App\Models\MstParameter;
 use App\Models\MstPosisiAtlet;
 use App\Models\MstTingkat;
+use App\Models\RefStatusPemeriksaan;
+use App\Models\TenagaPendukung;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -255,6 +258,105 @@ class OptionsController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Terjadi kesalahan saat mengambil data cabor kategori.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Get Tenaga Pendukung list (untuk Pemeriksaan)
+     */
+    public function getTenagaPendukung(Request $request): JsonResponse
+    {
+        try {
+            $query = TenagaPendukung::withoutGlobalScopes()
+                ->whereNull('tenaga_pendukungs.deleted_at') // Exclude soft deleted
+                ->select('id', 'nama')
+                ->orderBy('nama');
+
+            // Filter by cabor_kategori_id jika ada (opsional)
+            $caborKategoriId = $request->get('cabor_kategori_id');
+            if ($caborKategoriId && $caborKategoriId !== 'all') {
+                $query->whereHas('caborKategoriTenagaPendukung', function ($q) use ($caborKategoriId) {
+                    $q->where('cabor_kategori_id', $caborKategoriId)
+                        ->whereNull('cabor_kategori_tenaga_pendukung.deleted_at');
+                });
+            }
+
+            $data = $query->get();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get Tenaga Pendukung error: ' . $e->getMessage(), [
+                'exception' => $e,
+            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil data tenaga pendukung.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Get Parameter Pemeriksaan list (untuk Pemeriksaan)
+     * Exclude kategori 'umum' karena kategori umum untuk atlet parameter umum, bukan pemeriksaan
+     */
+    public function getParameterPemeriksaan(): JsonResponse
+    {
+        try {
+            $data = MstParameter::withoutGlobalScopes()
+                ->where('kategori', '!=', 'umum')
+                ->select('id', 'nama', 'satuan', 'kategori')
+                ->orderBy('nama')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'nama' => $item->nama,
+                        'satuan' => $item->satuan,
+                        'kategori' => $item->kategori,
+                        'label' => $item->nama . ' (' . $item->satuan . ')',
+                    ];
+                });
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get Parameter Pemeriksaan error: ' . $e->getMessage(), [
+                'exception' => $e,
+            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil data parameter pemeriksaan.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Get Ref Status Pemeriksaan list (untuk Pemeriksaan Peserta)
+     */
+    public function getRefStatusPemeriksaan(): JsonResponse
+    {
+        try {
+            $data = RefStatusPemeriksaan::select('id', 'nama')
+                ->orderBy('nama')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get Ref Status Pemeriksaan error: ' . $e->getMessage(), [
+                'exception' => $e,
+            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil data status pemeriksaan.',
             ], 500);
         }
     }

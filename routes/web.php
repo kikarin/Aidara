@@ -97,6 +97,7 @@ Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['aut
 Route::middleware(['auth', 'verified', 'check.registration.status'])->group(function () {
     Route::get('/prestasi', [PrestasiController::class, 'index'])->name('prestasi.index');
     Route::get('/api/prestasi', [PrestasiController::class, 'apiIndex'])->name('prestasi.apiIndex');
+    Route::get('/api/prestasi/summary', [PrestasiController::class, 'apiSummary'])->name('prestasi.apiSummary');
 });
 
 // =====================
@@ -569,6 +570,7 @@ Route::get('/api/pelatih/{pelatih_id}/prestasi', [PelatihPrestasiController::cla
 Route::get('/api/pelatih/{pelatih_id}/dokumen', [PelatihDokumenController::class, 'apiIndex']);
 Route::get('/api/pelatih/{pelatih_id}/riwayat-pemeriksaan', [PelatihController::class, 'apiRiwayatPemeriksaan']);
 Route::get('/api/pelatih/{id}/cabor', [PelatihController::class, 'apiGetCabor'])->name('api.pelatih.cabor');
+Route::get('/api/pelatih/{id}/beregu/available', [PelatihController::class, 'apiGetBereguAvailable'])->name('api.pelatih.beregu.available');
 
 // API endpoint untuk sertifikat tenaga pendukung
 Route::get('/api/tenaga-pendukung/{tenaga_pendukung_id}/sertifikat', [TenagaPendukungSertifikatController::class, 'apiIndex']);

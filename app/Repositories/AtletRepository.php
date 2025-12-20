@@ -546,7 +546,8 @@ class AtletRepository
             Log::info('AtletRepository: Starting file upload process', [
                 'method'         => $method,
                 'has_file'       => isset($data['file']),
-                'file_data'      => $data['file'] ? 'File exists' : 'No file',
+                'file_type'      => isset($data['file']) ? gettype($data['file']) : 'N/A',
+                'is_uploaded_file' => isset($data['file']) && $data['file'] instanceof \Illuminate\Http\UploadedFile,
                 'is_delete_foto' => @$data['is_delete_foto'],
             ]);
 
@@ -556,23 +557,49 @@ class AtletRepository
                 Log::info('AtletRepository: Cleared media collection');
             }
 
-            if (@$data['file']) {
-                Log::info('AtletRepository: Adding media file', [
-                    'file_name' => $data['file']->getClientOriginalName(),
-                    'file_size' => $data['file']->getSize(),
-                    'model_id'  => $model->id,
-                ]);
+            // Validasi file sebelum memproses - pastikan adalah UploadedFile instance yang valid
+            if (isset($data['file']) && $data['file'] instanceof \Illuminate\Http\UploadedFile) {
+                // Pastikan file valid dan ter-upload dengan benar
+                if ($data['file']->isValid()) {
+                    try {
+                        Log::info('AtletRepository: Adding media file', [
+                            'file_name' => $data['file']->getClientOriginalName(),
+                            'file_size' => $data['file']->getSize(),
+                            'mime_type' => $data['file']->getMimeType(),
+                            'model_id'  => $model->id,
+                        ]);
 
-                $media = $model->addMedia($data['file'])
-                    ->usingName($data['nama'])
-                    ->toMediaCollection('images');
+                        $media = $model->addMedia($data['file'])
+                            ->usingName($data['nama'] ?? 'Foto Atlet')
+                            ->toMediaCollection('images');
 
-                Log::info('AtletRepository: Media added successfully', [
-                    'media_id'  => $media->id,
-                    'file_name' => $media->file_name,
-                    'disk'      => $media->disk,
-                    'path'      => $media->getPath(),
+                        Log::info('AtletRepository: Media added successfully', [
+                            'media_id'  => $media->id,
+                            'file_name' => $media->file_name,
+                            'disk'      => $media->disk,
+                            'path'      => $media->getPath(),
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error('AtletRepository: Error adding media', [
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
+                        throw $e;
+                    }
+                } else {
+                    Log::warning('AtletRepository: File upload is not valid', [
+                        'error' => $data['file']->getError(),
+                        'error_message' => $data['file']->getErrorMessage(),
+                    ]);
+                    // Jangan throw error, hanya log warning karena mungkin file tidak ter-upload dengan benar
+                }
+            } elseif (isset($data['file'])) {
+                // File ada tapi bukan UploadedFile instance (mungkin string path yang tidak valid)
+                Log::warning('AtletRepository: File is not a valid UploadedFile instance', [
+                    'file_type' => gettype($data['file']),
+                    'file_value' => is_string($data['file']) ? $data['file'] : 'Not a string',
                 ]);
+                // Jangan proses file jika bukan UploadedFile instance untuk menghindari error
             }
 
             // Handle AtletOrangTua data

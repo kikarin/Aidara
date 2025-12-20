@@ -224,16 +224,32 @@ const fields = computed(() => {
         {
             label: 'Cabang Olahraga',
             value: props.item?.cabor_kategori_tenaga_pendukung && props.item.cabor_kategori_tenaga_pendukung.length > 0
-                ? props.item.cabor_kategori_tenaga_pendukung.map((c: any) => {
-                    const caborName = c.cabor?.nama || 'Cabor tidak diketahui';
-                    const caborIcon = c.cabor?.icon || null;
-                    const kategoriName = c.caborKategori?.nama ? ` - ${c.caborKategori.nama}` : '';
-                    const jenisTenagaPendukung = c.jenis_tenaga_pendukung ? ` (${c.jenis_tenaga_pendukung})` : '';
+                ? (() => {
+                    // Filter unique berdasarkan cabor_id untuk menghindari duplikasi
+                    const uniqueCaborMap = new Map();
+                    props.item.cabor_kategori_tenaga_pendukung.forEach((c: any) => {
+                        const caborId = c.cabor_id;
+                        if (caborId && !uniqueCaborMap.has(caborId)) {
+                            uniqueCaborMap.set(caborId, c);
+                        }
+                    });
                     
-                    // Format dengan icon
-                    const formattedCabor = formatCaborWithIcon({ nama: caborName, icon: caborIcon });
-                    return `${formattedCabor}${kategoriName}${jenisTenagaPendukung}`;
-                }).join(', ')
+                    // Format setiap cabor dengan icon dan gabungkan
+                    const caborItems = Array.from(uniqueCaborMap.values()).map((c: any) => {
+                        const caborName = c.cabor?.nama || 'Cabor tidak diketahui';
+                        const caborIcon = c.cabor?.icon || null;
+                        const posisi = c.jenis_tenaga_pendukung ? ` (${c.jenis_tenaga_pendukung})` : '';
+                        
+                        // Format dengan icon - hanya nama cabor dan posisi (tanpa kategori)
+                        if (caborIcon) {
+                            const iconClass = caborIcon.startsWith('fa-') ? caborIcon : `fa-${caborIcon}`;
+                            return `<span class="flex items-center gap-2 inline-flex"><i class="fa-solid ${iconClass} text-sm text-muted-foreground"></i><span>${caborName}${posisi}</span></span>`;
+                        }
+                        return `<span>${caborName}${posisi}</span>`;
+                    });
+                    // Join dengan separator yang tidak merusak HTML
+                    return caborItems.join(', ');
+                })()
                 : '-',
             className: 'sm:col-span-2',
         },

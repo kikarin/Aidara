@@ -232,16 +232,21 @@ const fields = computed(() => {
                             uniqueCaborMap.set(caborId, c);
                         }
                     });
-                    return Array.from(uniqueCaborMap.values()).map((c: any) => {
+                    // Format setiap cabor dengan icon dan gabungkan
+                    const caborItems = Array.from(uniqueCaborMap.values()).map((c: any) => {
                         const caborName = c.cabor?.nama || 'Cabor tidak diketahui';
                         const caborIcon = c.cabor?.icon || null;
-                        const kategoriName = c.caborKategori?.nama ? ` - ${c.caborKategori.nama}` : '';
-                        const jenisPelatih = c.jenis_pelatih ? ` (${c.jenis_pelatih})` : '';
+                        const posisi = c.jenis_pelatih ? ` (${c.jenis_pelatih})` : '';
                         
-                        // Format dengan icon
-                        const formattedCabor = formatCaborWithIcon({ nama: caborName, icon: caborIcon });
-                        return `${formattedCabor}${kategoriName}${jenisPelatih}`;
-                    }).join(', ');
+                        // Format dengan icon - hanya nama cabor dan posisi (tanpa kategori)
+                        if (caborIcon) {
+                            const iconClass = caborIcon.startsWith('fa-') ? caborIcon : `fa-${caborIcon}`;
+                            return `<span class="flex items-center gap-2 inline-flex"><i class="fa-solid ${iconClass} text-sm text-muted-foreground"></i><span>${caborName}${posisi}</span></span>`;
+                        }
+                        return `<span>${caborName}${posisi}</span>`;
+                    });
+                    // Join dengan separator yang tidak merusak HTML
+                    return caborItems.join(', ');
                 })()
                 : '-',
             className: 'sm:col-span-2',

@@ -135,6 +135,25 @@ class AtletController extends Controller implements HasMiddleware
         $this->repository->customProperty(__FUNCTION__, ['id' => $this->request->id]);
         $data   = $this->request->validate($this->request->rules());
         $data   = $this->request->all();
+        
+        // Pastikan file hanya di-pass jika valid UploadedFile instance
+        if ($this->request->hasFile('file')) {
+            $file = $this->request->file('file');
+            if ($file && $file->isValid()) {
+                $data['file'] = $file;
+            } else {
+                // Hapus file dari data jika tidak valid
+                unset($data['file']);
+                Log::warning('AtletController: File upload is not valid', [
+                    'error' => $file ? $file->getError() : 'File is null',
+                    'error_message' => $file ? $file->getErrorMessage() : 'No file',
+                ]);
+            }
+        } else {
+            // Hapus file dari data jika tidak ada file di request
+            unset($data['file']);
+        }
+        
         $before = $this->repository->callbackBeforeStoreOrUpdate($data, 'update');
         if ($before['error'] != 0) {
             return redirect()->back()->with('error', $before['message'])->withInput();
