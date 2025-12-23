@@ -383,7 +383,7 @@ const formInputs = computed(() => {
             placeholder: 'Pilih Cabang Olahraga (Opsional)',
             required: false,
             options: caborOptions.value,
-            help: 'Pilih cabang olahraga jika atlet sudah ditentukan cabornya',
+            help: 'Cabang Olahraga bisa dipilih setelah akun anda disetujui oleh admin.',
         },
         {
             name: 'posisi_atlet',
@@ -391,7 +391,7 @@ const formInputs = computed(() => {
             type: 'text' as const,
             placeholder: 'Contoh: Striker, 100m, Kelas 55kg',
             required: false,
-            help: 'Masukkan posisi, nomor pertandingan, atau kelas atlet',
+            help: 'Masukkan posisi, nomor, atau kelas atlet setelah memilih cabang olahraga.',
         }
     );
     

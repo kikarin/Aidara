@@ -294,7 +294,7 @@ const formInputs = computed(() => [
         placeholder: 'Pilih Cabang Olahraga (Opsional)',
         required: false,
         options: caborOptions.value,
-        help: 'Pilih satu atau lebih cabang olahraga untuk tenaga pendukung ini',
+        help: 'Cabang Olahraga bisa dipilih setelah akun anda disetujui oleh admin.',
     },
     {
         name: 'jenis_tenaga_pendukung',
@@ -302,7 +302,7 @@ const formInputs = computed(() => [
         type: 'text' as const,
         placeholder: 'Contoh: Fisioterapis, Dokter Tim, Manajer',
         required: false,
-        help: 'Masukkan jenis atau spesialisasi tenaga pendukung',
+        help: 'Masukkan jenis atau spesialisasi tenaga pendukung setelah memilih cabang olahraga.',
     },
     {
         name: 'is_active',

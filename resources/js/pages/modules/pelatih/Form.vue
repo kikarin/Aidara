@@ -288,7 +288,7 @@ const formInputs = computed(() => [
         placeholder: 'Pilih Cabang Olahraga (Opsional)',
         required: false,
         options: caborOptions.value,
-        help: 'Pilih satu atau lebih cabang olahraga untuk pelatih ini',
+        help: 'Cabor bisa dipilih setelah akun anda disetujui oleh admin.',
     },
     {
         name: 'jenis_pelatih',
@@ -296,7 +296,7 @@ const formInputs = computed(() => [
         type: 'text' as const,
         placeholder: 'Contoh: Pelatih Kepala, Asisten Pelatih, Pelatih Fisik',
         required: false,
-        help: 'Masukkan jenis atau spesialisasi pelatih',
+        help: 'Jenis Pelatih bisa di isi setelah memilih Cabang Olahraga',
     },
     {
         name: 'is_active',

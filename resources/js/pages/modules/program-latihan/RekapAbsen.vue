@@ -5,7 +5,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { X, Upload, FileText, Image as ImageIcon, Trash2, Download, ChevronDown, ChevronUp, Eye } from 'lucide-vue-next';
+import { X, Upload, FileText, Image as ImageIcon, Trash2, Download, ChevronDown, ChevronUp, Eye, Camera, MapPin, Clock, Calendar as CalendarIcon } from 'lucide-vue-next';
 import axios from 'axios';
 import AppLayout from '@/layouts/AppLayout.vue';
 import jsPDF from 'jspdf';
@@ -52,6 +52,16 @@ const fotoPreviewUrls = ref<string[]>([]);
 const deletedMediaIds = ref<number[]>([]);
 // Track expanded dates for show detail
 const expandedDates = ref<Set<string>>(new Set());
+
+// Camera and location states
+const isCameraOpen = ref(false);
+const videoStream = ref<MediaStream | null>(null);
+const videoRef = ref<HTMLVideoElement | null>(null);
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+const currentLocation = ref<GeolocationCoordinates | null>(null);
+const locationError = ref<string | null>(null);
+const isGettingLocation = ref(false);
+const locationAddress = ref<string>('');
 
 // Create reactive copy of calendar_data
 const calendarData = ref([...props.calendar_data]);
@@ -101,13 +111,41 @@ const getDayName = (dateStr: string) => {
     return days[date.getDay()];
 };
 
-// Get today's date in YYYY-MM-DD format
-const getTodayDate = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+// Get current time in HH:MM format (Asia/Jakarta timezone)
+const getCurrentTime = () => {
+    const now = new Date();
+    return now.toLocaleTimeString('id-ID', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'Asia/Jakarta'
+    });
 };
 
-// Check if date is today
+// Get formatted date for display (hari, tanggal bulan tahun)
+const getFormattedDateTime = () => {
+    const dateToFormat = selectedDate.value || getTodayDate();
+    const dayName = getDayName(dateToFormat);
+    const formattedDate = formatDate(dateToFormat);
+    return `${dayName}, ${formattedDate}`;
+};
+
+// Get today's date in YYYY-MM-DD format (Asia/Jakarta timezone)
+// Menggunakan tanggal kalender biasa, setelah jam 00:00 tanggal sudah berubah
+const getTodayDate = () => {
+    const now = new Date();
+    // Dapatkan tanggal di timezone Asia/Jakarta
+    const jakartaDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(now);
+    
+    return jakartaDate;
+};
+
+// Check if date is today (menggunakan logika jam 7)
 const isToday = (dateStr: string) => {
     return dateStr === getTodayDate();
 };
@@ -150,10 +188,168 @@ const openEditDialog = (item: typeof calendarData.value[0]) => {
     fileNilaiFiles.value = [];
     fotoPreviewUrls.value = [];
     deletedMediaIds.value = []; // Reset deleted media IDs
+    // Reset location state
+    currentLocation.value = null;
+    locationError.value = null;
+    locationAddress.value = '';
     isDialogOpen.value = true;
 };
 
-// Handle file selection
+// Get location before taking photo
+const getLocation = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error('Geolocation tidak didukung oleh browser Anda'));
+            return;
+        }
+
+        isGettingLocation.value = true;
+        locationError.value = null;
+
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                currentLocation.value = position.coords;
+                isGettingLocation.value = false;
+
+                // Reverse geocoding untuk mendapatkan alamat
+                try {
+                    const response = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}&zoom=18&addressdetails=1`,
+                        {
+                            headers: {
+                                'User-Agent': 'Aidara App'
+                            }
+                        }
+                    );
+                    const data = await response.json();
+                    if (data && data.display_name) {
+                        locationAddress.value = data.display_name;
+                    } else {
+                        locationAddress.value = `${position.coords.latitude}, ${position.coords.longitude}`;
+                    }
+                } catch (error) {
+                    locationAddress.value = `${position.coords.latitude}, ${position.coords.longitude}`;
+                }
+
+                resolve();
+            },
+            (error) => {
+                isGettingLocation.value = false;
+                let errorMessage = 'Gagal mendapatkan lokasi';
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage = 'Akses lokasi ditolak. Silakan izinkan akses lokasi untuk melanjutkan.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage = 'Informasi lokasi tidak tersedia.';
+                        break;
+                    case error.TIMEOUT:
+                        errorMessage = 'Waktu permintaan lokasi habis.';
+                        break;
+                }
+                locationError.value = errorMessage;
+                reject(new Error(errorMessage));
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    });
+};
+
+// Open camera for photo capture
+const openCamera = async () => {
+    try {
+        // First, get location
+        await getLocation();
+        
+        // Then open camera
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' } // Use back camera on mobile
+        });
+        
+        videoStream.value = stream;
+        isCameraOpen.value = true;
+        
+        // Wait for next tick to ensure video element is rendered
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if (videoRef.value) {
+            videoRef.value.srcObject = stream;
+        }
+    } catch (error: any) {
+        if (error.message.includes('lokasi')) {
+            toast({
+                title: error.message,
+                variant: 'destructive',
+            });
+        } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+            toast({
+                title: 'Akses kamera ditolak. Silakan izinkan akses kamera untuk mengambil foto.',
+                variant: 'destructive',
+            });
+        } else {
+            toast({
+                title: 'Gagal membuka kamera. Pastikan perangkat Anda memiliki kamera dan akses telah diizinkan.',
+                variant: 'destructive',
+            });
+        }
+    }
+};
+
+// Close camera
+const closeCamera = () => {
+    if (videoStream.value) {
+        videoStream.value.getTracks().forEach(track => track.stop());
+        videoStream.value = null;
+    }
+    isCameraOpen.value = false;
+    if (videoRef.value) {
+        videoRef.value.srcObject = null;
+    }
+};
+
+// Capture photo from camera
+const capturePhoto = () => {
+    if (!videoRef.value || !canvasRef.value) return;
+
+    const video = videoRef.value;
+    const canvas = canvasRef.value;
+    const context = canvas.getContext('2d');
+
+    if (!context) return;
+
+    // Set canvas dimensions to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Draw video frame to canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Convert canvas to blob
+    canvas.toBlob((blob) => {
+        if (!blob) return;
+
+        // Create File from blob with timestamp and location in name
+        const now = new Date();
+        const timestamp = now.toISOString().replace(/[:.]/g, '-');
+        const fileName = `foto-absen-${timestamp}.jpg`;
+        const file = new File([blob], fileName, { type: 'image/jpeg' });
+
+        // Add to fotoFiles
+        fotoFiles.value.push(file);
+        
+        // Create preview URL
+        const previewUrl = URL.createObjectURL(blob);
+        fotoPreviewUrls.value.push(previewUrl);
+
+        // Close camera
+        closeCamera();
+    }, 'image/jpeg', 0.9);
+};
+
+// Handle file selection (kept for compatibility, but won't be used for foto absen)
 const handleFotoChange = (e: Event) => {
     const target = e.target as HTMLInputElement;
     if (target.files) {
@@ -330,13 +526,22 @@ watch(() => props.calendar_data, (newData) => {
     calendarData.value = [...newData];
 }, { deep: true, immediate: true });
 
-// Cleanup preview URLs on unmount
+// Watch dialog open/close to close camera if needed
+watch(() => isDialogOpen.value, (isOpen) => {
+    if (!isOpen && isCameraOpen.value) {
+        closeCamera();
+    }
+});
+
+// Cleanup preview URLs and camera stream on unmount
 onBeforeUnmount(() => {
     fotoPreviewUrls.value.forEach(url => {
         if (url && typeof URL !== 'undefined' && URL.revokeObjectURL) {
             URL.revokeObjectURL(url);
         }
     });
+    // Close camera if open
+    closeCamera();
 });
 
 // Export PDF function
@@ -534,7 +739,7 @@ const exportToPDF = () => {
                 </div>
                 <div class="flex gap-2">
                     <Button 
-                        v-if="calendarData.some((item: typeof calendarData.value[0]) => hasData(item))"
+                        v-if="calendarData.some((item) => hasData(item))"
                         variant="default"
                         @click="exportToPDF"
                     >
@@ -542,7 +747,7 @@ const exportToPDF = () => {
                         Export PDF
                     </Button>
                     <Button 
-                        v-if="calendarData.some((item: typeof calendarData.value[0]) => hasData(item))"
+                        v-if="calendarData.some((item) => hasData(item))"
                         variant="outline"
                         @click="router.visit(`/program-latihan/${program_latihan.id}/rekap-absen/detail`)"
                     >
@@ -801,17 +1006,19 @@ const exportToPDF = () => {
                                     </Button>
                                 </div>
                             </div>
-                            <!-- Upload button -->
+                            <!-- Camera button -->
                             <div>
-                                <Input
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    @change="handleFotoChange"
-                                    class="cursor-pointer"
-                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    @click="openCamera"
+                                    class="w-full"
+                                >
+                                    <Camera class="h-4 w-4 mr-2" />
+                                    Ambil Foto dengan Kamera
+                                </Button>
                                 <p class="text-xs text-muted-foreground mt-1">
-                                    Format: JPEG, PNG, GIF (maks 5MB per file)
+                                    Lokasi harus diaktifkan sebelum mengambil foto
                                 </p>
                             </div>
                         </div>
@@ -888,6 +1095,73 @@ const exportToPDF = () => {
                         <Button @click="submitForm" :disabled="isSubmitting">
                             <Upload class="h-4 w-4 mr-2" />
                             {{ isSubmitting ? 'Menyimpan...' : 'Simpan' }}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Camera Dialog -->
+        <Dialog v-model:open="isCameraOpen">
+            <DialogContent class="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Ambil Foto Absen</DialogTitle>
+                </DialogHeader>
+
+                <div class="space-y-4">
+                    <!-- Location and time info -->
+                    <div v-if="currentLocation" class="bg-muted p-4 rounded-lg border border-border space-y-2">
+                        <div class="flex items-center gap-2 text-sm">
+                            <Clock class="h-4 w-4 text-primary" />
+                            <span class="font-medium">{{ getCurrentTime() }}</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-sm">
+                            <CalendarIcon class="h-4 w-4 text-primary" />
+                            <span class="font-medium">{{ getFormattedDateTime() }}</span>
+                        </div>
+                        <div class="flex items-start gap-2 text-sm">
+                            <MapPin class="h-4 w-4 text-primary mt-0.5" />
+                            <span class="font-medium break-words">{{ locationAddress || (currentLocation ? `${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}` : 'Memuat lokasi...') }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Location error -->
+                    <div v-if="locationError" class="bg-destructive/10 text-destructive p-4 rounded-lg border border-destructive/20">
+                        <p class="text-sm font-medium">{{ locationError }}</p>
+                        <p class="text-xs mt-1">Silakan aktifkan lokasi dan coba lagi.</p>
+                    </div>
+
+                    <!-- Loading location -->
+                    <div v-if="isGettingLocation" class="bg-muted p-4 rounded-lg border border-border text-center">
+                        <p class="text-sm text-muted-foreground">Mengambil lokasi...</p>
+                    </div>
+
+                    <!-- Video preview -->
+                    <div v-if="!isGettingLocation && !locationError" class="relative bg-black rounded-lg overflow-hidden" style="aspect-ratio: 4/3;">
+                        <video
+                            ref="videoRef"
+                            autoplay
+                            playsinline
+                            class="w-full h-full object-cover"
+                        />
+                        <canvas ref="canvasRef" class="hidden" />
+                    </div>
+
+                    <!-- Camera controls -->
+                    <div class="flex justify-center gap-2">
+                        <Button
+                            variant="outline"
+                            @click="closeCamera"
+                        >
+                            Batal
+                        </Button>
+                        <Button
+                            v-if="currentLocation && !isGettingLocation && !locationError"
+                            @click="capturePhoto"
+                            class="bg-primary"
+                        >
+                            <Camera class="h-4 w-4 mr-2" />
+                            Ambil Foto
                         </Button>
                     </div>
                 </div>

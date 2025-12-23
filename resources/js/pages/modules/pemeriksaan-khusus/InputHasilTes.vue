@@ -26,7 +26,7 @@ const props = defineProps<{
 const { toast } = useToast();
 
 const breadcrumbs = [
-    { title: 'Pemeriksaan Khusus', href: '/pemeriksaan-khusus' },
+    { title: 'Pemeriksaan Khusus Kondisi Fisik/Kebugaran', href: '/pemeriksaan-khusus' },
     { title: 'Input Hasil Tes', href: `/pemeriksaan-khusus/${props.item.id}/input-hasil-tes` },
 ];
 

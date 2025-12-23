@@ -227,8 +227,9 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
             return back()->withErrors(['tanggal' => 'Tanggal harus dalam periode program latihan']);
         }
 
-        // Validasi: Hanya bisa input untuk tanggal hari ini
-        $today = now()->format('Y-m-d');
+        // Validasi: Hanya bisa input untuk tanggal hari ini (Asia/Jakarta timezone)
+        $today = \Carbon\Carbon::now('Asia/Jakarta')->format('Y-m-d');
+        
         if ($request->tanggal !== $today) {
             return back()->withErrors(['tanggal' => 'Hanya dapat input rekap absen untuk tanggal hari ini']);
         }
@@ -290,8 +291,9 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
         $rekapAbsen = RekapAbsenProgramLatihan::where('program_latihan_id', $program_id)
             ->findOrFail($rekap_id);
 
-        // Validasi: Hanya bisa update untuk tanggal hari ini
-        $today = now()->format('Y-m-d');
+        // Validasi: Hanya bisa update untuk tanggal hari ini (Asia/Jakarta timezone)
+        $today = \Carbon\Carbon::now('Asia/Jakarta')->format('Y-m-d');
+        
         if ($rekapAbsen->tanggal !== $today) {
             return back()->withErrors(['tanggal' => 'Hanya dapat mengupdate rekap absen untuk tanggal hari ini']);
         }

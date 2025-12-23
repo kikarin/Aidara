@@ -5,8 +5,8 @@ import Form from './Form.vue';
 const props = defineProps<{ item: Record<string, any> }>();
 
 const breadcrumbs = [
-    { title: 'Pemeriksaan Khusus', href: '/pemeriksaan-khusus' },
-    { title: 'Edit Pemeriksaan Khusus', href: `/pemeriksaan-khusus/${props.item.id}/edit` },
+    { title: 'Pemeriksaan Kondisi Fisik/Kebugaran', href: '/pemeriksaan-khusus' },
+    { title: 'Edit Pemeriksaan Kondisi Fisik', href: `/pemeriksaan-khusus/${props.item.id}/edit` },
 ];
 </script>
 

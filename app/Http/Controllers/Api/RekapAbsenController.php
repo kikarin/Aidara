@@ -138,7 +138,7 @@ class RekapAbsenController extends Controller
                 ], 403);
             }
             
-            $today = now()->format('Y-m-d');
+            $today = \Carbon\Carbon::now('Asia/Jakarta')->format('Y-m-d');
             
             // Cari rekap absen untuk hari ini
             $rekapAbsen = RekapAbsenProgramLatihan::where('program_latihan_id', $programId)
@@ -224,8 +224,8 @@ class RekapAbsenController extends Controller
                 ], 403);
             }
             
-            // Validasi: Hanya bisa input untuk tanggal hari ini (sudah di validation request)
-            $today = now()->format('Y-m-d');
+            // Validasi: Hanya bisa input untuk tanggal hari ini (Asia/Jakarta timezone)
+            $today = \Carbon\Carbon::now('Asia/Jakarta')->format('Y-m-d');
             if ($request->tanggal !== $today) {
                 return response()->json([
                     'status' => 'error',
@@ -358,8 +358,8 @@ class RekapAbsenController extends Controller
                 ], 403);
             }
             
-            // Validasi: Hanya bisa update untuk tanggal hari ini
-            $today = now()->format('Y-m-d');
+            // Validasi: Hanya bisa update untuk tanggal hari ini (Asia/Jakarta timezone)
+            $today = \Carbon\Carbon::now('Asia/Jakarta')->format('Y-m-d');
             if ($rekapAbsen->tanggal !== $today) {
                 return response()->json([
                     'status' => 'error',
@@ -591,8 +591,8 @@ class RekapAbsenController extends Controller
                 ], 403);
             }
             
-            // Validasi: Hanya bisa delete media untuk tanggal hari ini
-            $today = now()->format('Y-m-d');
+            // Validasi: Hanya bisa delete media untuk tanggal hari ini (Asia/Jakarta timezone)
+            $today = \Carbon\Carbon::now('Asia/Jakarta')->format('Y-m-d');
             if ($rekapAbsen->tanggal !== $today) {
                 return response()->json([
                     'status' => 'error',
