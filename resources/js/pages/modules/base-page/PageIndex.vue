@@ -112,10 +112,13 @@ const props = defineProps<{
     showFilter?: boolean;
     showBulkApprove?: boolean;
     showBulkReject?: boolean;
+    showExport?: boolean;
     baseUrl?: string; // Base URL untuk detail/edit (optional, default: convert moduleName to URL format)
 }>();
 
-const emit = defineEmits(['search', 'update:selected', 'import', 'setKehadiran', 'filter', 'bulk-approve', 'bulk-reject']);
+const emit = defineEmits(['search', 'update:selected', 'import', 'setKehadiran', 'filter', 'bulk-approve', 'bulk-reject', 'export']);
+
+const exportLoading = ref(false);
 
 const localSelected = ref<number[]>([]);
 
@@ -291,8 +294,18 @@ const handleFilterFromParent = (filters: any) => {
     fetchData();
 };
 
+// Get current params for export
+const getCurrentParams = () => {
+    return {
+        search: search.value,
+        sort: sort.value.key,
+        order: sort.value.order,
+        filters: currentFilters.value,
+    };
+};
+
 // Expose filter handler
-defineExpose({ fetchData, handleFilterFromParent });
+defineExpose({ fetchData, handleFilterFromParent, getCurrentParams, search, sort, currentFilters, exportLoading });
 </script>
 
 <template>
@@ -322,11 +335,14 @@ defineExpose({ fetchData, handleFilterFromParent });
                         :showFilter="props.showFilter"
                         :showBulkApprove="props.showBulkApprove"
                         :showBulkReject="props.showBulkReject"
+                        :showExport="props.showExport"
+                        :exportLoading="exportLoading"
                         @import="$emit('import')"
                         @setKehadiran="(status: boolean) => $emit('setKehadiran', status)"
                         @filter="$emit('filter')"
                         @bulk-approve="$emit('bulk-approve')"
                         @bulk-reject="$emit('bulk-reject')"
+                        @export="$emit('export')"
                     />
                 </div>
                 <div class="mx-4 rounded-xl bg-white pt-4 shadow dark:bg-neutral-900">

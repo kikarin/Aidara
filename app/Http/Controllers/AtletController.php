@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\AtletExport;
 use App\Http\Requests\AtletRequest;
 use App\Imports\AtletImport;
 use App\Models\Atlet;
@@ -78,6 +79,7 @@ class AtletController extends Controller implements HasMiddleware
             new Middleware("can:$permission Detail", only: ['show']),
             new Middleware("can:$permission Edit", only: ['edit', 'update' ]),
             new Middleware("can:$permission Delete", only: ['destroy', 'destroy_selected']),
+            new Middleware("can:$permission Show", only: ['export']), // Export menggunakan permission Show
         ];
     }
 
@@ -101,6 +103,23 @@ class AtletController extends Controller implements HasMiddleware
                 'order'        => $data['order'],
             ],
         ]);
+    }
+
+    public function export()
+    {
+        // Export menggunakan filter yang sama seperti datatable
+        $request = request()->all();
+        
+        $fileName = 'Data_Atlet_' . date('Y-m-d_His') . '.xlsx';
+        
+        return Excel::download(
+            new AtletExport($this->repository, $request),
+            $fileName,
+            \Maatwebsite\Excel\Excel::XLSX,
+            [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]
+        );
     }
 
     public function show($id)

@@ -282,10 +282,11 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::get('/atlet/karakteristik', [AtletController::class, 'karakteristik'])->name('atlet.karakteristik');
     Route::post('/atlet/api-karakteristik', [AtletController::class, 'apiKarakteristik'])->name('atlet.api-karakteristik');
 
-    Route::resource('/atlet', AtletController::class)->names('atlet');
     Route::get('/api/atlet', [AtletController::class, 'apiIndex']);
-    Route::post('/atlet/destroy-selected', [AtletController::class, 'destroy_selected'])->name('atlet.destroy_selected');
+    Route::get('/atlet/export', [AtletController::class, 'export'])->name('atlet.export');
     Route::post('/atlet/import', [AtletController::class, 'import'])->name('atlet.import');
+    Route::post('/atlet/destroy-selected', [AtletController::class, 'destroy_selected'])->name('atlet.destroy_selected');
+    Route::resource('/atlet', AtletController::class)->names('atlet');
     Route::prefix('atlet/{atlet_id}')->group(function () {
         Route::get('orang-tua', [AtletOrangTuaController::class, 'getByAtletId'])->name('atlet.orang-tua.show');
         Route::post('orang-tua', [AtletOrangTuaController::class, 'store'])->name('atlet.orang-tua.store');

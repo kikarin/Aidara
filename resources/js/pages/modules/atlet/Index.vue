@@ -320,6 +320,62 @@ const handleFilter = (filters: any) => {
     pageIndex.value.handleFilterFromParent(filters);
     toast({ title: 'Filter berhasil diterapkan', variant: 'success' });
 };
+
+const exportLoading = ref(false);
+
+const handleExport = async () => {
+    exportLoading.value = true;
+    try {
+        // Get current params from pageIndex
+        const currentParams = pageIndex.value?.getCurrentParams();
+        
+        const params: any = {
+            search: currentParams?.search || '',
+            sort: currentParams?.sort || '',
+            order: currentParams?.order || 'asc',
+        };
+
+        // Add filters to params
+        if (currentParams?.filters) {
+            Object.keys(currentParams.filters).forEach((key) => {
+                if (currentParams.filters[key]) {
+                    params[key] = currentParams.filters[key];
+                }
+            });
+        }
+
+        // Build query string
+        const queryString = new URLSearchParams(params).toString();
+        
+        // Use axios to download file with proper responseType
+        const response = await axios.get(`/atlet/export?${queryString}`, {
+            responseType: 'blob',
+            headers: {
+                'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            }
+        });
+        
+        // Create blob and download
+        const blob = new Blob([response.data], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Data_Atlet_${new Date().toISOString().split('T')[0]}_${Date.now()}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        toast({ title: 'Export berhasil!', variant: 'success' });
+    } catch (error: any) {
+        console.error('Export error:', error);
+        toast({ title: error.response?.data?.message || 'Gagal export data', variant: 'destructive' });
+    } finally {
+        pageIndex.value.exportLoading = false;
+    }
+};
 </script>
 
 <template>
@@ -343,7 +399,9 @@ const handleFilter = (filters: any) => {
             :showStatistik="true"
             statistik-url="/atlet/karakteristik"
             :showFilter="true"
+            :showExport="true"
             @filter="bukaFilterModal"
+            @export="handleExport"
         />
 
         <!-- Filter Modal -->
