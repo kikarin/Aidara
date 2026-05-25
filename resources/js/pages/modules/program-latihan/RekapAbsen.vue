@@ -26,7 +26,7 @@ const props = defineProps<{
         rekap_id?: number;
         jenis_latihan?: string;
         keterangan?: string;
-        foto_absen: Array<{ id: number; url: string; name: string }>;
+        foto_absen: Array<{ id: number; url: string; name: string; lokasi?: string | null; latitude?: number | null; longitude?: number | null; waktu_foto?: string | null }>;
         file_nilai: Array<{ id: number; url: string; name: string }>;
     }>;
     pelatih_data?: {
@@ -48,6 +48,7 @@ const fotoFiles = ref<File[]>([]);
 const fileNilaiFiles = ref<File[]>([]);
 const isSubmitting = ref(false);
 const fotoPreviewUrls = ref<string[]>([]);
+const fotoLocations = ref<Array<{ latitude?: number; longitude?: number; lokasi?: string; waktu_foto: string }>>([]);
 // Store deleted media IDs to be sent on save
 const deletedMediaIds = ref<number[]>([]);
 // Track expanded dates for show detail
@@ -150,6 +151,27 @@ const isToday = (dateStr: string) => {
     return dateStr === getTodayDate();
 };
 
+const getFotoLokasiLabel = (foto: { lokasi?: string | null; latitude?: number | null; longitude?: number | null }): string | null => {
+    if (foto.lokasi) {
+        return foto.lokasi;
+    }
+    if (foto.latitude != null && foto.longitude != null) {
+        return `${Number(foto.latitude).toFixed(6)}, ${Number(foto.longitude).toFixed(6)}`;
+    }
+    return null;
+};
+
+const getFotoMapsUrl = (foto: { latitude?: number | null; longitude?: number | null }): string | null => {
+    if (foto.latitude == null || foto.longitude == null) {
+        return null;
+    }
+    return `https://www.google.com/maps?q=${foto.latitude},${foto.longitude}`;
+};
+
+const getFotoWaktuLabel = (foto: { waktu_foto?: string | null }): string | null => {
+    return foto.waktu_foto ? `${foto.waktu_foto} WIB` : null;
+};
+
 // Get jenis latihan label
 const getJenisLatihanLabel = (value: string | null | undefined): string => {
     const labels: Record<string, string> = {
@@ -187,6 +209,7 @@ const openEditDialog = (item: typeof calendarData.value[0]) => {
     fotoFiles.value = [];
     fileNilaiFiles.value = [];
     fotoPreviewUrls.value = [];
+    fotoLocations.value = [];
     deletedMediaIds.value = []; // Reset deleted media IDs
     // Reset location state
     currentLocation.value = null;
@@ -339,6 +362,17 @@ const capturePhoto = () => {
 
         // Add to fotoFiles
         fotoFiles.value.push(file);
+
+        fotoLocations.value.push({
+            waktu_foto: getCurrentTime(),
+            ...(currentLocation.value
+                ? {
+                    latitude: currentLocation.value.latitude,
+                    longitude: currentLocation.value.longitude,
+                    lokasi: locationAddress.value || `${currentLocation.value.latitude.toFixed(6)}, ${currentLocation.value.longitude.toFixed(6)}`,
+                }
+                : {}),
+        });
         
         // Create preview URL
         const previewUrl = URL.createObjectURL(blob);
@@ -380,6 +414,7 @@ const removeFotoFile = (index: number) => {
     }
     fotoFiles.value.splice(index, 1);
     fotoPreviewUrls.value.splice(index, 1);
+    fotoLocations.value.splice(index, 1);
 };
 
 const removeFileNilai = (index: number) => {
@@ -406,9 +441,14 @@ const submitForm = async () => {
         formData.append('jenis_latihan', jenisLatihan.value);
         formData.append('keterangan', keterangan.value);
 
-        // Add foto files
-        fotoFiles.value.forEach((file) => {
+        fotoFiles.value.forEach((file, index) => {
             formData.append('foto_absen[]', file);
+            const lokasi = fotoLocations.value[index];
+            if (lokasi) {
+                formData.append('foto_lokasi[]', JSON.stringify(lokasi));
+            } else {
+                formData.append('foto_lokasi[]', '');
+            }
         });
 
         // Add file nilai files
@@ -442,6 +482,7 @@ const submitForm = async () => {
             }
         });
         fotoPreviewUrls.value = [];
+        fotoLocations.value = [];
         deletedMediaIds.value = []; // Reset deleted media IDs
         
         // Reload data dari server untuk sync
@@ -862,11 +903,11 @@ const exportToPDF = () => {
                                 <label class="text-sm font-medium text-foreground mb-2 block">
                                     Foto Absen ({{ item.foto_absen.length }}):
                                 </label>
-                                <div class="grid grid-cols-4 gap-2">
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                                     <div
                                         v-for="foto in item.foto_absen"
                                         :key="foto.id"
-                                        class="relative group"
+                                        class="space-y-2"
                                     >
                                         <a
                                             :href="foto.url"
@@ -879,6 +920,25 @@ const exportToPDF = () => {
                                                 class="w-full h-full object-cover"
                                             />
                                         </a>
+                                        <div v-if="getFotoWaktuLabel(foto)" class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                            <Clock class="h-3.5 w-3.5 shrink-0" />
+                                            <span>{{ getFotoWaktuLabel(foto) }}</span>
+                                        </div>
+                                        <div v-if="getFotoLokasiLabel(foto)" class="flex items-start gap-1.5 text-xs text-muted-foreground">
+                                            <MapPin class="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                                            <a
+                                                v-if="getFotoMapsUrl(foto)"
+                                                :href="getFotoMapsUrl(foto)!"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="hover:underline break-words"
+                                            >
+                                                {{ getFotoLokasiLabel(foto) }}
+                                            </a>
+                                            <span v-else class="break-words">{{ getFotoLokasiLabel(foto) }}</span>
+                                        </div>
+                                        <p v-if="!getFotoLokasiLabel(foto)" class="text-xs text-muted-foreground italic">Lokasi tidak tersedia</p>
+                                        <p v-if="!getFotoWaktuLabel(foto)" class="text-xs text-muted-foreground italic">Jam tidak tersedia</p>
                                     </div>
                                 </div>
                             </div>
@@ -957,53 +1017,73 @@ const exportToPDF = () => {
                         <label class="text-sm font-medium mb-2 block">Foto Absen</label>
                         <div class="space-y-2">
                             <!-- Existing photos -->
-                            <div v-if="selectedRekap?.foto_absen?.length > 0" class="grid grid-cols-4 gap-2">
+                            <div v-if="selectedRekap?.foto_absen?.length > 0" class="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <div
                                     v-for="foto in selectedRekap.foto_absen"
                                     :key="foto.id"
-                                    class="relative group"
+                                    class="space-y-1"
                                 >
-                                    <a
-                                        :href="foto.url"
-                                        target="_blank"
-                                        class="block w-full h-24 rounded border overflow-hidden hover:opacity-80 transition-opacity"
-                                    >
-                                        <img
-                                            :src="foto.url"
-                                            :alt="foto.name"
-                                            class="w-full h-full object-cover"
-                                        />
-                                    </a>
-                                    <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        @click.stop="deleteMedia(foto.id)"
-                                    >
-                                        <Trash2 class="h-3 w-3" />
-                                    </Button>
+                                    <div class="relative group">
+                                        <a
+                                            :href="foto.url"
+                                            target="_blank"
+                                            class="block w-full h-24 rounded border overflow-hidden hover:opacity-80 transition-opacity"
+                                        >
+                                            <img
+                                                :src="foto.url"
+                                                :alt="foto.name"
+                                                class="w-full h-full object-cover"
+                                            />
+                                        </a>
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            @click.stop="deleteMedia(foto.id)"
+                                        >
+                                            <Trash2 class="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                    <div v-if="getFotoWaktuLabel(foto)" class="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <Clock class="h-3 w-3 shrink-0" />
+                                        <span>{{ getFotoWaktuLabel(foto) }}</span>
+                                    </div>
+                                    <div v-if="getFotoLokasiLabel(foto)" class="flex items-start gap-1 text-xs text-muted-foreground">
+                                        <MapPin class="h-3 w-3 shrink-0 mt-0.5" />
+                                        <span class="break-words">{{ getFotoLokasiLabel(foto) }}</span>
+                                    </div>
                                 </div>
                             </div>
                             <!-- New photo files -->
-                            <div v-if="fotoFiles.length > 0" class="grid grid-cols-4 gap-2">
+                            <div v-if="fotoFiles.length > 0" class="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <div
                                     v-for="(file, index) in fotoFiles"
                                     :key="index"
-                                    class="relative"
+                                    class="space-y-1"
                                 >
-                                    <img
-                                        :src="fotoPreviewUrls[index] || ''"
-                                        :alt="file.name"
-                                        class="w-full h-24 object-cover rounded border"
-                                    />
-                                    <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        class="absolute top-1 right-1"
-                                        @click="removeFotoFile(index)"
-                                    >
-                                        <X class="h-3 w-3" />
-                                    </Button>
+                                    <div class="relative">
+                                        <img
+                                            :src="fotoPreviewUrls[index] || ''"
+                                            :alt="file.name"
+                                            class="w-full h-24 object-cover rounded border"
+                                        />
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            class="absolute top-1 right-1"
+                                            @click="removeFotoFile(index)"
+                                        >
+                                            <X class="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                    <div v-if="fotoLocations[index]?.waktu_foto" class="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <Clock class="h-3 w-3 shrink-0" />
+                                        <span>{{ fotoLocations[index].waktu_foto }} WIB</span>
+                                    </div>
+                                    <div v-if="fotoLocations[index]?.lokasi" class="flex items-start gap-1 text-xs text-muted-foreground">
+                                        <MapPin class="h-3 w-3 shrink-0 mt-0.5" />
+                                        <span class="break-words">{{ fotoLocations[index].lokasi }}</span>
+                                    </div>
                                 </div>
                             </div>
                             <!-- Camera button -->

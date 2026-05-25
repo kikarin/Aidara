@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { router } from '@inertiajs/vue3';
-import { FileText, Image as ImageIcon, ArrowLeft, Calendar, User, Award } from 'lucide-vue-next';
+import { FileText, Image as ImageIcon, ArrowLeft, Calendar, User, Award, MapPin, Clock } from 'lucide-vue-next';
 
 const props = defineProps<{
     program_latihan: {
@@ -21,7 +21,7 @@ const props = defineProps<{
         tanggal: string;
         jenis_latihan?: string;
         keterangan?: string;
-        foto_absen: Array<{ id: number; url: string; name: string }>;
+        foto_absen: Array<{ id: number; url: string; name: string; lokasi?: string | null; latitude?: number | null; longitude?: number | null; waktu_foto?: string | null }>;
         file_nilai: Array<{ id: number; url: string; name: string }>;
     }>;
     pelatih_data?: {
@@ -56,6 +56,27 @@ const formatDate = (dateStr: string) => {
     const month = months[date.getMonth()];
     const year = date.getFullYear();
     return `${day} ${month} ${year}`;
+};
+
+const getFotoLokasiLabel = (foto: { lokasi?: string | null; latitude?: number | null; longitude?: number | null }): string | null => {
+    if (foto.lokasi) {
+        return foto.lokasi;
+    }
+    if (foto.latitude != null && foto.longitude != null) {
+        return `${Number(foto.latitude).toFixed(6)}, ${Number(foto.longitude).toFixed(6)}`;
+    }
+    return null;
+};
+
+const getFotoMapsUrl = (foto: { latitude?: number | null; longitude?: number | null }): string | null => {
+    if (foto.latitude == null || foto.longitude == null) {
+        return null;
+    }
+    return `https://www.google.com/maps?q=${foto.latitude},${foto.longitude}`;
+};
+
+const getFotoWaktuLabel = (foto: { waktu_foto?: string | null }): string | null => {
+    return foto.waktu_foto ? `${foto.waktu_foto} WIB` : null;
 };
 
 // Get jenis latihan label
@@ -228,22 +249,45 @@ const getJenisLatihanBadge = (value: string | null | undefined): string => {
                                     Foto Absen ({{ rekap.foto_absen.length }}):
                                 </p>
                                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    <a
+                                    <div
                                         v-for="foto in rekap.foto_absen"
                                         :key="foto.id"
-                                        :href="foto.url"
-                                        target="_blank"
-                                        class="relative group block w-full h-40 rounded-lg border overflow-hidden hover:opacity-90 transition-opacity"
+                                        class="space-y-2"
                                     >
-                                        <img
-                                            :src="foto.url"
-                                            :alt="foto.name"
-                                            class="w-full h-full object-cover"
-                                        />
-                                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                            <ImageIcon class="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <a
+                                            :href="foto.url"
+                                            target="_blank"
+                                            class="relative group block w-full h-40 rounded-lg border overflow-hidden hover:opacity-90 transition-opacity"
+                                        >
+                                            <img
+                                                :src="foto.url"
+                                                :alt="foto.name"
+                                                class="w-full h-full object-cover"
+                                            />
+                                            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                                <ImageIcon class="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </div>
+                                        </a>
+                                        <div v-if="getFotoWaktuLabel(foto)" class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                            <Clock class="h-3.5 w-3.5 shrink-0" />
+                                            <span>{{ getFotoWaktuLabel(foto) }}</span>
                                         </div>
-                                    </a>
+                                        <div v-if="getFotoLokasiLabel(foto)" class="flex items-start gap-1.5 text-xs text-muted-foreground">
+                                            <MapPin class="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                                            <a
+                                                v-if="getFotoMapsUrl(foto)"
+                                                :href="getFotoMapsUrl(foto)!"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="hover:underline break-words"
+                                            >
+                                                {{ getFotoLokasiLabel(foto) }}
+                                            </a>
+                                            <span v-else class="break-words">{{ getFotoLokasiLabel(foto) }}</span>
+                                        </div>
+                                        <p v-if="!getFotoLokasiLabel(foto)" class="text-xs text-muted-foreground italic">Lokasi tidak tersedia</p>
+                                        <p v-if="!getFotoWaktuLabel(foto)" class="text-xs text-muted-foreground italic">Jam tidak tersedia</p>
+                                    </div>
                                 </div>
                             </div>
                             

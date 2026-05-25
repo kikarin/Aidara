@@ -18,6 +18,8 @@ class UpdateRekapAbsenRequest extends FormRequest
             'keterangan' => 'nullable|string',
             'foto_absen' => 'nullable|array',
             'foto_absen.*' => 'nullable|image|mimes:jpeg,png,gif|max:5120',
+            'foto_lokasi' => 'nullable|array',
+            'foto_lokasi.*' => 'nullable|string',
             'file_nilai' => 'nullable|array',
             'file_nilai.*' => 'nullable|file|mimes:pdf,xls,xlsx|max:10240',
             'deleted_media_ids' => 'nullable|array',

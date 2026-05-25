@@ -27,6 +27,8 @@ class StoreRekapAbsenRequest extends FormRequest
             'jenis_latihan' => 'required|in:latihan_fisik,latihan_strategi,latihan_teknik,latihan_mental,latihan_pemulihan',
             'keterangan' => 'nullable|string',
             'foto_absen.*' => 'nullable|image|mimes:jpeg,png,gif|max:5120',
+            'foto_lokasi' => 'nullable|array',
+            'foto_lokasi.*' => 'nullable|string',
             'file_nilai.*' => 'nullable|file|mimes:pdf,xls,xlsx|max:10240',
         ];
     }

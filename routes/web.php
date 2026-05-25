@@ -49,6 +49,7 @@ use App\Http\Controllers\TenagaPendukungKesehatanController;
 use App\Http\Controllers\TenagaPendukungPrestasiController;
 use App\Http\Controllers\TenagaPendukungSertifikatController;
 use App\Http\Controllers\UsersController;
+use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\UsersMenuController;
 use App\Http\Controllers\MstJenisUnitPendukungController;
 use App\Http\Controllers\MstParameterController;
@@ -92,6 +93,11 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'ensure.email.verified', 'check.registration.status'])->name('dashboard');
+
+// Chatbot bantuan Aplikasi (Gemini)
+Route::middleware(['auth', 'verified', 'check.registration.status', 'throttle:gemini-chat'])->group(function () {
+    Route::post('/api/chatbot/message', [ChatbotController::class, 'message'])->name('chatbot.message');
+});
 
 // Prestasi
 Route::middleware(['auth', 'verified', 'check.registration.status'])->group(function () {

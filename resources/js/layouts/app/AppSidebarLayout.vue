@@ -8,6 +8,7 @@ import AppSidebarHeader from '@/components/AppSidebarHeader.vue';
 import { usePage } from '@inertiajs/vue3';
 import { useToast } from '@/components/ui/toast/useToast';
 import { computed, watch } from 'vue';
+import ChatbotWidget from '@/components/chatbot/ChatbotWidget.vue';
 import type { BreadcrumbItemType } from '@/types';
 
 interface Props {
@@ -48,5 +49,6 @@ watch(flash, (newFlash) => {
             </div>
             <slot />
         </AppContent>
+        <ChatbotWidget />
     </AppShell>
 </template>

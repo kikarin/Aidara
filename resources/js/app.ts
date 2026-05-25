@@ -12,6 +12,15 @@ import axios from 'axios';
 axios.defaults.withCredentials = true;
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
+axios.interceptors.request.use((config) => {
+    const xsrfCookie = document.cookie.split('; ').find((row) => row.startsWith('XSRF-TOKEN='));
+    if (xsrfCookie) {
+        config.headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfCookie.split('=')[1] ?? '');
+    }
+
+    return config;
+});
+
 // Extend ImportMeta interface for Vite...
 declare module 'vite/client' {
     interface ImportMetaEnv {

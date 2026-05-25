@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ProgramLatihan;
 use App\Models\RekapAbsenProgramLatihan;
 use App\Traits\BaseTrait;
+use App\Traits\ManagesRekapAbsenFoto;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -14,7 +15,7 @@ use Inertia\Inertia;
 
 class RekapAbsenProgramLatihanController extends Controller implements HasMiddleware
 {
-    use BaseTrait;
+    use BaseTrait, ManagesRekapAbsenFoto;
 
     public function __construct()
     {
@@ -52,19 +53,7 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
                 'rekap_id' => $rekap?->id,
                 'jenis_latihan' => $rekap?->jenis_latihan,
                 'keterangan' => $rekap?->keterangan,
-                'foto_absen' => $rekap ? $rekap->getMedia('foto_absen')->map(function ($media) use ($rekap) {
-                    // Gunakan getPath() untuk mendapatkan full path, lalu extract relative path
-                    $fullPath = $media->getPath();
-                    $mediaRoot = storage_path('app/media');
-                    $relativePath = str_replace($mediaRoot . '/', '', $fullPath);
-                    // Gunakan Storage::disk('media')->url() untuk mendapatkan URL dengan APP_URL
-                    $url = Storage::disk('media')->url($relativePath);
-                    return [
-                        'id' => $media->id,
-                        'url' => $url,
-                        'name' => $media->name,
-                    ];
-                })->toArray() : [],
+                'foto_absen' => $rekap ? $rekap->getMedia('foto_absen')->map(fn ($media) => $this->formatFotoAbsenMedia($media, true))->toArray() : [],
                 'file_nilai' => $rekap ? $rekap->getMedia('file_nilai')->map(function ($media) use ($rekap) {
                     // Gunakan getPath() untuk mendapatkan full path, lalu extract relative path
                     $fullPath = $media->getPath();
@@ -137,17 +126,7 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
                 'tanggal' => $rekap->tanggal,
                 'jenis_latihan' => $rekap->jenis_latihan,
                 'keterangan' => $rekap->keterangan,
-                'foto_absen' => $rekap->getMedia('foto_absen')->map(function ($media) {
-                    $fullPath = $media->getPath();
-                    $mediaRoot = storage_path('app/media');
-                    $relativePath = str_replace($mediaRoot . '/', '', $fullPath);
-                    $url = Storage::disk('media')->url($relativePath);
-                    return [
-                        'id' => $media->id,
-                        'url' => $url,
-                        'name' => $media->name,
-                    ];
-                })->toArray(),
+                'foto_absen' => $rekap->getMedia('foto_absen')->map(fn ($media) => $this->formatFotoAbsenMedia($media, true))->toArray(),
                 'file_nilai' => $rekap->getMedia('file_nilai')->map(function ($media) {
                     $fullPath = $media->getPath();
                     $mediaRoot = storage_path('app/media');
@@ -217,6 +196,8 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
             'jenis_latihan' => 'required|in:latihan_fisik,latihan_strategi,latihan_teknik,latihan_mental,latihan_pemulihan',
             'keterangan' => 'nullable|string',
             'foto_absen.*' => 'nullable|image|mimes:jpeg,png,gif|max:5120',
+            'foto_lokasi' => 'nullable|array',
+            'foto_lokasi.*' => 'nullable|string',
             'file_nilai.*' => 'nullable|file|mimes:pdf,xls,xlsx|max:10240',
         ]);
 
@@ -256,23 +237,8 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
             ]);
         }
 
-        // Upload foto absen (multiple)
-        if ($request->hasFile('foto_absen')) {
-            foreach ($request->file('foto_absen') as $foto) {
-                $rekapAbsen->addMedia($foto)
-                    ->usingName('Foto Absen ' . $request->tanggal)
-                    ->toMediaCollection('foto_absen');
-            }
-        }
-
-        // Upload file nilai (multiple)
-        if ($request->hasFile('file_nilai')) {
-            foreach ($request->file('file_nilai') as $file) {
-                $rekapAbsen->addMedia($file)
-                    ->usingName('File Nilai ' . $request->tanggal)
-                    ->toMediaCollection('file_nilai');
-            }
-        }
+        $this->uploadFotoAbsenFromRequest($rekapAbsen, $request, $request->tanggal);
+        $this->uploadFileNilaiFromRequest($rekapAbsen, $request, $request->tanggal);
 
         return back()->with('success', 'Rekap absen berhasil disimpan!');
     }
@@ -283,6 +249,8 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
             'jenis_latihan' => 'required|in:latihan_fisik,latihan_strategi,latihan_teknik,latihan_mental,latihan_pemulihan',
             'keterangan' => 'nullable|string',
             'foto_absen.*' => 'nullable|image|mimes:jpeg,png,gif|max:5120',
+            'foto_lokasi' => 'nullable|array',
+            'foto_lokasi.*' => 'nullable|string',
             'file_nilai.*' => 'nullable|file|mimes:pdf,xls,xlsx|max:10240',
             'deleted_media_ids' => 'nullable|array',
             'deleted_media_ids.*' => 'nullable|integer',
@@ -329,23 +297,8 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
             'updated_by' => Auth::id(),
         ]);
 
-        // Upload foto absen (multiple)
-        if ($request->hasFile('foto_absen')) {
-            foreach ($request->file('foto_absen') as $foto) {
-                $rekapAbsen->addMedia($foto)
-                    ->usingName('Foto Absen ' . $rekapAbsen->tanggal)
-                    ->toMediaCollection('foto_absen');
-            }
-        }
-
-        // Upload file nilai (multiple)
-        if ($request->hasFile('file_nilai')) {
-            foreach ($request->file('file_nilai') as $file) {
-                $rekapAbsen->addMedia($file)
-                    ->usingName('File Nilai ' . $rekapAbsen->tanggal)
-                    ->toMediaCollection('file_nilai');
-            }
-        }
+        $this->uploadFotoAbsenFromRequest($rekapAbsen, $request, $rekapAbsen->tanggal);
+        $this->uploadFileNilaiFromRequest($rekapAbsen, $request, $rekapAbsen->tanggal);
 
         return back()->with('success', 'Rekap absen berhasil diperbarui!');
     }

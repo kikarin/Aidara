@@ -7,6 +7,7 @@ use App\Http\Requests\Api\StoreRekapAbsenRequest;
 use App\Http\Requests\Api\UpdateRekapAbsenRequest;
 use App\Models\ProgramLatihan;
 use App\Models\RekapAbsenProgramLatihan;
+use App\Traits\ManagesRekapAbsenFoto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -14,6 +15,8 @@ use Illuminate\Support\Facades\Log;
 
 class RekapAbsenController extends Controller
 {
+    use ManagesRekapAbsenFoto;
+
     /**
      * Get list rekap absen berdasarkan program_latihan_id
      */
@@ -52,30 +55,7 @@ class RekapAbsenController extends Controller
                 ->get();
             
             // Format response
-            $formattedData = $rekapAbsen->map(function ($rekap) {
-                return [
-                    'id' => $rekap->id,
-                    'tanggal' => $rekap->tanggal,
-                    'jenis_latihan' => $rekap->jenis_latihan,
-                    'keterangan' => $rekap->keterangan,
-                    'foto_absen' => $rekap->getMedia('foto_absen')->map(function ($media) {
-                        return [
-                            'id' => $media->id,
-                            'url' => $media->getUrl(),
-                            'name' => $media->name,
-                        ];
-                    })->toArray(),
-                    'file_nilai' => $rekap->getMedia('file_nilai')->map(function ($media) {
-                        return [
-                            'id' => $media->id,
-                            'url' => $media->getUrl(),
-                            'name' => $media->name,
-                        ];
-                    })->toArray(),
-                    'created_at' => $rekap->created_at,
-                    'updated_at' => $rekap->updated_at,
-                ];
-            });
+            $formattedData = $rekapAbsen->map(fn ($rekap) => $this->formatRekapAbsenResponse($rekap));
             
             return response()->json([
                 'status' => 'success',
@@ -153,33 +133,9 @@ class RekapAbsenController extends Controller
                 ]);
             }
             
-            // Format response
-            $formattedData = [
-                'id' => $rekapAbsen->id,
-                'tanggal' => $rekapAbsen->tanggal,
-                'jenis_latihan' => $rekapAbsen->jenis_latihan,
-                'keterangan' => $rekapAbsen->keterangan,
-                'foto_absen' => $rekapAbsen->getMedia('foto_absen')->map(function ($media) {
-                    return [
-                        'id' => $media->id,
-                        'url' => $media->getUrl(),
-                        'name' => $media->name,
-                    ];
-                })->toArray(),
-                'file_nilai' => $rekapAbsen->getMedia('file_nilai')->map(function ($media) {
-                    return [
-                        'id' => $media->id,
-                        'url' => $media->getUrl(),
-                        'name' => $media->name,
-                    ];
-                })->toArray(),
-                'created_at' => $rekapAbsen->created_at,
-                'updated_at' => $rekapAbsen->updated_at,
-            ];
-            
             return response()->json([
                 'status' => 'success',
-                'data' => $formattedData,
+                'data' => $this->formatRekapAbsenResponse($rekapAbsen),
             ]);
         } catch (\Exception $e) {
             Log::error('Get Rekap Absen Today error: ' . $e->getMessage(), [
@@ -263,55 +219,16 @@ class RekapAbsenController extends Controller
                 ]);
             }
             
-            // Upload foto absen (multiple)
-            if ($request->hasFile('foto_absen')) {
-                foreach ($request->file('foto_absen') as $foto) {
-                    $rekapAbsen->addMedia($foto)
-                        ->usingName('Foto Absen ' . $request->tanggal)
-                        ->toMediaCollection('foto_absen');
-                }
-            }
-            
-            // Upload file nilai (multiple)
-            if ($request->hasFile('file_nilai')) {
-                foreach ($request->file('file_nilai') as $file) {
-                    $rekapAbsen->addMedia($file)
-                        ->usingName('File Nilai ' . $request->tanggal)
-                        ->toMediaCollection('file_nilai');
-                }
-            }
+            $this->uploadFotoAbsenFromRequest($rekapAbsen, $request, $request->tanggal);
+            $this->uploadFileNilaiFromRequest($rekapAbsen, $request, $request->tanggal);
             
             // Reload dengan media
             $rekapAbsen->load('media');
             
-            // Format response
-            $formattedData = [
-                'id' => $rekapAbsen->id,
-                'tanggal' => $rekapAbsen->tanggal,
-                'jenis_latihan' => $rekapAbsen->jenis_latihan,
-                'keterangan' => $rekapAbsen->keterangan,
-                'foto_absen' => $rekapAbsen->getMedia('foto_absen')->map(function ($media) {
-                    return [
-                        'id' => $media->id,
-                        'url' => $media->getUrl(),
-                        'name' => $media->name,
-                    ];
-                })->toArray(),
-                'file_nilai' => $rekapAbsen->getMedia('file_nilai')->map(function ($media) {
-                    return [
-                        'id' => $media->id,
-                        'url' => $media->getUrl(),
-                        'name' => $media->name,
-                    ];
-                })->toArray(),
-                'created_at' => $rekapAbsen->created_at,
-                'updated_at' => $rekapAbsen->updated_at,
-            ];
-            
             return response()->json([
                 'status' => 'success',
                 'message' => 'Rekap absen berhasil disimpan.',
-                'data' => $formattedData,
+                'data' => $this->formatRekapAbsenResponse($rekapAbsen),
             ], 201);
         } catch (\Exception $e) {
             Log::error('Store Rekap Absen error: ' . $e->getMessage(), [
@@ -483,25 +400,18 @@ class RekapAbsenController extends Controller
             
             // 3. Upload foto absen baru (multiple) - SETELAH delete
             if (!empty($fotoFiles)) {
-                foreach ($fotoFiles as $foto) {
-                    if ($foto) {
-                        $rekapAbsen->addMedia($foto)
-                            ->usingName('Foto Absen ' . $rekapAbsen->tanggal)
-                            ->toMediaCollection('foto_absen');
-                    }
-                }
+                $this->uploadFotoAbsenBatch(
+                    $rekapAbsen,
+                    array_values($fotoFiles),
+                    $request->input('foto_lokasi', []),
+                    $rekapAbsen->tanggal
+                );
                 $rekapAbsen->touch(); // Update timestamps to trigger media save
             }
             
             // 4. Upload file nilai baru (multiple) - SETELAH delete
             if (!empty($fileNilaiFiles)) {
-                foreach ($fileNilaiFiles as $file) {
-                    if ($file) {
-                        $rekapAbsen->addMedia($file)
-                            ->usingName('File Nilai ' . $rekapAbsen->tanggal)
-                            ->toMediaCollection('file_nilai');
-                    }
-                }
+                $this->uploadFileNilaiBatch($rekapAbsen, array_values($fileNilaiFiles), $rekapAbsen->tanggal);
                 $rekapAbsen->touch(); // Update timestamps to trigger media save
             }
             
@@ -516,34 +426,10 @@ class RekapAbsenController extends Controller
                 ->findOrFail($rekapId);
             $rekapAbsen->load('media');
             
-            // Format response - pastikan mengembalikan SEMUA media (existing yang tidak dihapus + baru)
-            $formattedData = [
-                'id' => $rekapAbsen->id,
-                'tanggal' => $rekapAbsen->tanggal,
-                'jenis_latihan' => $rekapAbsen->jenis_latihan,
-                'keterangan' => $rekapAbsen->keterangan,
-                'foto_absen' => $rekapAbsen->getMedia('foto_absen')->map(function ($media) {
-                    return [
-                        'id' => $media->id,
-                        'url' => $media->getUrl(),
-                        'name' => $media->name,
-                    ];
-                })->toArray(),
-                'file_nilai' => $rekapAbsen->getMedia('file_nilai')->map(function ($media) {
-                    return [
-                        'id' => $media->id,
-                        'url' => $media->getUrl(),
-                        'name' => $media->name,
-                    ];
-                })->toArray(),
-                'created_at' => $rekapAbsen->created_at,
-                'updated_at' => $rekapAbsen->updated_at,
-            ];
-            
             return response()->json([
                 'status' => 'success',
                 'message' => 'Rekap absen berhasil diperbarui.',
-                'data' => $formattedData,
+                'data' => $this->formatRekapAbsenResponse($rekapAbsen),
             ]);
         } catch (\Exception $e) {
             Log::error('Update Rekap Absen error: ' . $e->getMessage(), [
@@ -632,6 +518,28 @@ class RekapAbsenController extends Controller
         }
     }
     
+    private function formatRekapAbsenResponse(RekapAbsenProgramLatihan $rekapAbsen): array
+    {
+        return [
+            'id' => $rekapAbsen->id,
+            'tanggal' => $rekapAbsen->tanggal,
+            'jenis_latihan' => $rekapAbsen->jenis_latihan,
+            'keterangan' => $rekapAbsen->keterangan,
+            'foto_absen' => $rekapAbsen->getMedia('foto_absen')
+                ->map(fn ($media) => $this->formatFotoAbsenMedia($media))
+                ->toArray(),
+            'file_nilai' => $rekapAbsen->getMedia('file_nilai')->map(function ($media) {
+                return [
+                    'id' => $media->id,
+                    'url' => $media->getUrl(),
+                    'name' => $media->name,
+                ];
+            })->toArray(),
+            'created_at' => $rekapAbsen->created_at,
+            'updated_at' => $rekapAbsen->updated_at,
+        ];
+    }
+
     /**
      * Check apakah user punya akses ke program latihan
      */
