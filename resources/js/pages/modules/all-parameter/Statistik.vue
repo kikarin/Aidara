@@ -2,6 +2,7 @@
 import GenericParticipantChartModal from '@/components/GenericParticipantChartModal.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { router, usePage } from '@inertiajs/vue3';
@@ -163,7 +164,7 @@ const getJenisPesertaLabel = (jenisPeserta: string) => {
 
 // Get performa color
 const getPerformaColor = (persentase: number | null) => {
-    if (persentase === null) return 'text-gray-400';
+    if (persentase === null) return 'text-muted-foreground';
     if (persentase > 75) return 'text-red-600';
     if (persentase >= 40) return 'text-yellow-600';
     return 'text-green-600';
@@ -203,7 +204,7 @@ onMounted(async () => {
             </div>
 
             <!-- Info Header -->
-            <Card class="w-sm bg-gray-100 dark:bg-neutral-900">
+            <Card class="w-sm bg-muted/40">
                 <CardContent>
                     <div class="grid-cols-2 gap-4 md:grid-cols-4">
                         <div>
@@ -215,7 +216,7 @@ onMounted(async () => {
             </Card>
 
             <!-- Filter Cabor -->
-            <Card class="bg-white dark:bg-neutral-900">
+            <Card class="bg-card">
                 <CardContent class="pt-6">
                     <div class="flex items-center gap-4">
                         <Label for="cabor_id" class="min-w-[100px]">Pilih Cabor:</Label>
@@ -234,23 +235,18 @@ onMounted(async () => {
             </Card>
 
             <!-- Statistik Table -->
-            <div v-if="selectedCaborId" class="rounded-lg border bg-white dark:bg-neutral-900">
-                <div v-if="loading" class="flex items-center justify-center p-8">
-                    <div class="flex items-center gap-2">
-                        <RefreshCw class="h-4 w-4 animate-spin" />
-                        <span>Memuat data...</span>
-                    </div>
-                </div>
+            <div v-if="selectedCaborId" class="rounded-lg border bg-card">
+                <TableSkeleton v-if="loading" :rows="8" :columns="6" />
 
-                <div v-else-if="statistikData.length === 0" class="rounded-lg border bg-white p-8 text-center dark:bg-neutral-900">
+                <div v-else-if="statistikData.length === 0" class="rounded-lg border bg-card p-8 text-center">
                     <p class="text-muted-foreground">Belum ada data statistik untuk parameter ini.</p>
                 </div>
 
                 <div v-else class="overflow-x-auto">
                     <table class="w-full">
-                        <thead class="bg-gray-100 dark:bg-neutral-800">
+                        <thead class="bg-muted">
                             <tr>
-                                <th class="sticky left-0 z-10 min-w-[200px] bg-gray-100 p-4 text-left font-medium dark:bg-neutral-800">
+                                <th class="sticky left-0 z-10 min-w-[200px] bg-muted p-4 text-left font-medium">
                                     Nama Peserta
                                 </th>
                                 <th v-for="rencana in sortedRencanaPemeriksaan" :key="rencana.id" class="min-w-[120px] p-4 text-center font-medium">
@@ -262,8 +258,8 @@ onMounted(async () => {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="peserta in pesertaList" :key="peserta.id" class="border-b hover:bg-gray-100 dark:hover:bg-neutral-800">
-                                <td class="sticky left-0 z-10 bg-white p-4 dark:bg-neutral-900">
+                            <tr v-for="peserta in pesertaList" :key="peserta.id" class="border-b hover:bg-muted/50">
+                                <td class="sticky left-0 z-10 bg-card p-4">
                                     <div>
                                         <p
                                             class="cursor-pointer font-medium hover:text-blue-800 hover:underline"
@@ -320,7 +316,7 @@ onMounted(async () => {
                                             }}%
                                         </span>
                                     </div>
-                                    <span v-else class="text-gray-400">-</span>
+                                    <span v-else class="text-muted-foreground">-</span>
                                 </td>
                             </tr>
                         </tbody>
@@ -329,7 +325,7 @@ onMounted(async () => {
             </div>
 
             <!-- Pesan jika belum pilih cabor -->
-            <Card v-else class="bg-white dark:bg-neutral-900">
+            <Card v-else class="bg-card">
                 <CardContent class="py-12 text-center">
                     <p class="text-muted-foreground">Silakan pilih Cabor terlebih dahulu untuk melihat data statistik peserta</p>
                 </CardContent>

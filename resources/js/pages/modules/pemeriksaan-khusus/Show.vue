@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/toast/useToast';
+import { ChartSkeleton } from '@/components/ui/skeleton';
 import PageShow from '@/pages/modules/base-page/PageShow.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
@@ -79,15 +80,15 @@ const fields = computed(() => {
         },
         sebagian: {
             label: 'Sebagian',
-            class: 'text-yellow-800 bg-yellow-100',
+            class: 'badge-warning',
         },
         selesai: {
             label: 'Selesai',
-            class: 'text-green-800 bg-green-100',
+            class: 'badge-success',
         },
     };
 
-    const statusValue = statusMap[status as keyof typeof statusMap] || { label: '-', class: 'text-gray-500' };
+    const statusValue = statusMap[status as keyof typeof statusMap] || { label: '-', class: 'text-muted-foreground' };
 
     return [
         { label: 'Cabor', value: props.item?.cabor?.nama || '-' },
@@ -110,10 +111,10 @@ const fields = computed(() => {
 const actionFields = computed(() => {
     if (activeTab.value !== 'informasi-data') return [];
     return [
-        { label: 'Created At', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-        { label: 'Created By', value: props.item.created_by_user?.name || '-' },
-        { label: 'Updated At', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-        { label: 'Updated By', value: props.item.updated_by_user?.name || '-' },
+        { label: 'Dibuat Pada', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+        { label: 'Dibuat Oleh', value: props.item.created_by_user?.name || '-' },
+        { label: 'Diperbarui Pada', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+        { label: 'Diperbarui Oleh', value: props.item.updated_by_user?.name || '-' },
     ];
 });
 
@@ -198,7 +199,7 @@ const getPredikatLabel = (predikat: string | null): string => {
 
 // Helper: Get predikat color
 const getPredikatColor = (predikat: string | null): string => {
-    if (!predikat) return 'bg-gray-300 text-gray-600';
+    if (!predikat) return 'badge-muted';
     const colors: Record<string, string> = {
         sangat_kurang: 'bg-red-500 text-white',
         kurang: 'bg-orange-500 text-white',
@@ -206,7 +207,7 @@ const getPredikatColor = (predikat: string | null): string => {
         mendekati_target: 'bg-green-400 text-white',
         target: 'bg-green-600 text-white',
     };
-    return colors[predikat] || 'bg-gray-500 text-white';
+    return colors[predikat] || 'bg-primary text-primary-foreground';
 };
 
 // Helper: Get predikat color for PDF (RGB array)
@@ -401,7 +402,7 @@ const pesertaCount = computed(() => {
     return { atlet, pelatih, tenagaPendukung, total: peserta.length };
 });
 
-// Export PDF function
+// Ekspor PDF function
 const exportToPDF = () => {
     if (!selectedPeserta.value) {
         toast({
@@ -827,7 +828,7 @@ onMounted(() => {
                     @click="exportToPDF"
                 >
                     <Download class="h-4 w-4 mr-2" />
-                    Export PDF
+                    Ekspor PDF
                 </Button>
                 <Button
                     v-if="canInputHasilTes"
@@ -952,11 +953,7 @@ onMounted(() => {
 
             <!-- Tab Visualisasi -->
             <div v-if="activeTab === 'visualisasi-data'" class="space-y-6">
-                <!-- Loading State -->
-                <div v-if="loadingVisualisasi" class="flex items-center justify-center py-12">
-                    <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
-                    <span class="ml-2 text-muted-foreground">Memuat data visualisasi...</span>
-                </div>
+                <ChartSkeleton v-if="loadingVisualisasi" />
 
                 <!-- Empty State -->
                 <div v-else-if="visualisasiData.length === 0" class="text-center py-12">

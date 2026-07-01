@@ -2,9 +2,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useHandleFormSave } from '@/composables/useHandleFormSave';
+import { CardSkeleton } from '@/components/ui/skeleton';
 import FormInput from '@/pages/modules/base-page/FormInput.vue';
 import axios from 'axios';
-import { Loader2, UserCircle2, Users } from 'lucide-vue-next';
+import { UserCircle2, Users } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 
 const { save } = useHandleFormSave();
@@ -203,11 +204,7 @@ const handleSave = (form: any, setFormErrors: (errors: Record<string, string>) =
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <!-- Loading state -->
-                <div v-if="loadingPeserta" class="flex items-center justify-center py-8">
-                    <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
-                    <span class="ml-2 text-muted-foreground">Memuat peserta...</span>
-                </div>
+                <CardSkeleton v-if="loadingPeserta" :lines="4" />
 
                 <!-- Empty state -->
                 <div v-else-if="totalPeserta === 0" class="py-8 text-center text-muted-foreground">

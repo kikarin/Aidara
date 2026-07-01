@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import SimpleSelect from '@/components/ui/select/SimpleSelect.vue';
 import { useToast } from '@/components/ui/toast/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -135,7 +136,7 @@ const handleSave = async () => {
             { title: 'Pemetaan Parameter Peserta', href: '#' },
         ]"
     >
-        <div class="min-h-screen w-full bg-gray-100 pt-4 dark:bg-neutral-950">
+        <div class="page-surface pt-4">
             <div class="mx-auto max-w-7xl px-4">
                 <!-- Info Card -->
                 <div class="bg-card mb-4 rounded-lg border p-4">
@@ -173,7 +174,7 @@ const handleSave = async () => {
                 </div>
 
                 <!-- Table -->
-                <div v-if="tableState.length && parameterList.length" class="overflow-x-auto rounded-xl bg-white shadow dark:bg-neutral-900">
+                <div v-if="tableState.length && parameterList.length" class="content-panel overflow-x-auto">
                     <table class="w-full min-w-max border-separate border-spacing-0 text-sm">
                         <thead>
                             <tr class="bg-muted">
@@ -251,7 +252,7 @@ const handleSave = async () => {
                     <div>Silakan isi parameter pemeriksaan terlebih dahulu sebelum mengisi nilai peserta.</div>
                     <Button variant="outline" @click="router.visit('/pemeriksaan')"> Ke Daftar Pemeriksaan </Button>
                 </div>
-                <div v-else class="text-muted-foreground py-10 text-center">Loading data...</div>
+                <TableSkeleton v-else :rows="6" :columns="8" />
             </div>
         </div>
     </AppLayout>

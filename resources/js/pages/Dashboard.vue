@@ -6,6 +6,8 @@ import TabsContent from '@/components/ui/tabs/TabsContent.vue';
 import TabsList from '@/components/ui/tabs/TabsList.vue';
 
 import ApexChart from '@/components/ApexChart.vue';
+import StatistikKarakteristikTabs from '@/components/dashboard/StatistikKarakteristikTabs.vue';
+import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 import PrestasiPreview from '@/pages/modules/prestasi/PrestasiPreview.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -27,7 +29,7 @@ const props = defineProps<{
     rekap_data?: Array<{
         id: number;
         cabor_nama: string;
-        nama: string;
+        cabor_jenis?: string | null;
         jumlah_atlet: number;
         jumlah_pelatih: number;
         jumlah_tenaga_pendukung: number;
@@ -37,7 +39,7 @@ const props = defineProps<{
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Dashboard',
+        title: 'Dasbor',
         href: '/dashboard',
     },
 ];
@@ -62,6 +64,14 @@ const chartData = props.chart_data || {
 
 // Rekap data
 const rekapData = props.rekap_data || [];
+
+const formatCaborLabel = (item: { cabor_nama: string; cabor_jenis?: string | null }) => {
+    if (!item.cabor_jenis) {
+        return item.cabor_nama;
+    }
+
+    return `${item.cabor_nama} (${item.cabor_jenis.toLowerCase()})`;
+};
 
 const chartOptions = {
     chart: {
@@ -232,7 +242,7 @@ const chartOptions = {
 </script>
 
 <template>
-    <Head title="Dashboard" />
+    <Head title="Dasbor" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-6 p-6">
@@ -241,7 +251,7 @@ const chartOptions = {
                 <Card
                     v-for="stat in stats"
                     :key="stat.title"
-                    class="cursor-pointer overflow-hidden transition-shadow hover:shadow-md"
+                    class="cursor-pointer overflow-hidden border border-border/60 transition-shadow hover:shadow-md"
                     @click="router.visit(stat.href)"
                 >
                     <CardHeader class="flex items-center justify-between space-y-0">
@@ -330,62 +340,64 @@ const chartOptions = {
                 </CardContent>
             </Card>
 
+            <!-- Statistik Karakteristik Peserta -->
+            <StatistikKarakteristikTabs />
+
             <!-- Rekap Section -->
             <Card>
                 <CardHeader>
-                    <CardTitle>Rekapitulasi Jumlah Peserta berdasarkan Cabor Kategori</CardTitle>
+                    <CardTitle>Rekapitulasi Jumlah Peserta berdasarkan Cabor</CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <div class="space-y-4">
-                        <div class="overflow-hidden rounded-lg border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead class="w-[200px]">Cabor</TableHead>
-                                        <TableHead class="w-[200px]">Kategori</TableHead>
-                                        <TableHead class="w-[100px] text-center">Atlet</TableHead>
-                                        <TableHead class="w-[100px] text-center">Pelatih</TableHead>
-                                        <TableHead class="w-[150px] text-center">Tenaga Pendukung</TableHead>
-                                        <TableHead class="w-[100px] text-center">Total</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    <TableRow v-for="item in rekapData" :key="item.id" class="hover:bg-muted/50">
-                                        <TableCell class="font-medium">{{ item.cabor_nama }}</TableCell>
-                                        <TableCell>{{ item.nama }}</TableCell>
-                                        <TableCell class="text-center">
-                                            <span class="font-semibold text-blue-700 hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-100">
-                                                {{ item.jumlah_atlet }}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell class="text-center">
-                                            <span
-                                                class="font-semibold text-green-700 hover:text-green-800 dark:text-green-300 dark:hover:text-green-100"
-                                            >
-                                                {{ item.jumlah_pelatih }}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell class="text-center">
-                                            <span
-                                                class="font-semibold text-yellow-400 hover:text-yellow-500 dark:text-yellow-300 dark:hover:text-yellow-100"
-                                            >
-                                                {{ item.jumlah_tenaga_pendukung }}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell class="text-center">
-                                            <span class="font-semibold text-gray-800 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100">
-                                                {{ item.total }}
-                                            </span>
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow v-if="rekapData.length === 0">
-                                        <TableCell colspan="6" class="text-muted-foreground py-8 text-center">
-                                            Tidak ada data rekapitulasi
-                                        </TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </div>
+                <CardContent class="p-0 sm:p-6">
+                    <div class="overflow-hidden rounded-lg border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow class="border-b-2 border-border bg-muted/80 hover:bg-muted/80">
+                                    <TableHead class="h-12 w-[240px] px-4 text-xs font-bold tracking-wide uppercase">Cabor</TableHead>
+                                    <TableHead class="h-12 w-[100px] px-4 text-center text-xs font-bold tracking-wide text-[var(--stat-atlet-foreground)] uppercase">
+                                        Atlet
+                                    </TableHead>
+                                    <TableHead class="h-12 w-[100px] px-4 text-center text-xs font-bold tracking-wide text-[var(--stat-pelatih-foreground)] uppercase">
+                                        Pelatih
+                                    </TableHead>
+                                    <TableHead class="h-12 w-[150px] px-4 text-center text-xs font-bold tracking-wide text-[var(--stat-tenaga-foreground)] uppercase">
+                                        Tenaga Pendukung
+                                    </TableHead>
+                                    <TableHead class="h-12 w-[100px] px-4 text-center text-xs font-bold tracking-wide uppercase">Total</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow
+                                    v-for="(item, index) in rekapData"
+                                    :key="item.id"
+                                    class="border-b transition-colors hover:bg-muted/40"
+                                    :class="index % 2 === 0 ? 'bg-background' : 'bg-muted/20'"
+                                >
+                                    <TableCell class="px-4 py-3 font-medium">{{ formatCaborLabel(item) }}</TableCell>
+                                    <TableCell class="px-4 py-3 text-center">
+                                        <span class="stat-chip stat-chip-atlet">{{ item.jumlah_atlet }}</span>
+                                    </TableCell>
+                                    <TableCell class="px-4 py-3 text-center">
+                                        <span class="stat-chip stat-chip-pelatih">{{ item.jumlah_pelatih }}</span>
+                                    </TableCell>
+                                    <TableCell class="px-4 py-3 text-center">
+                                        <span class="stat-chip stat-chip-tenaga">{{ item.jumlah_tenaga_pendukung }}</span>
+                                    </TableCell>
+                                    <TableCell class="px-4 py-3 text-center">
+                                        <span
+                                            class="inline-flex min-w-8 items-center justify-center rounded-md bg-muted px-2 py-1 text-sm font-bold text-foreground"
+                                        >
+                                            {{ item.total }}
+                                        </span>
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow v-if="rekapData.length === 0">
+                                    <TableCell colspan="5" class="text-muted-foreground py-10 text-center">
+                                        Tidak ada data rekapitulasi
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
                     </div>
                 </CardContent>
             </Card>
@@ -487,17 +499,17 @@ const chartOptions = {
                                         {
                                             label: 'Atlet',
                                             value: row.jumlah_atlet || 0,
-                                            colorClass: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
+                                            colorClass: 'stat-chip stat-chip-atlet hover:opacity-90',
                                         },
                                         {
                                             label: 'Pelatih',
                                             value: row.jumlah_pelatih || 0,
-                                            colorClass: 'bg-green-100 text-green-800 hover:bg-green-200',
+                                            colorClass: 'stat-chip stat-chip-pelatih hover:opacity-90',
                                         },
                                         {
                                             label: 'Tenaga Pendukung',
                                             value: row.jumlah_tenaga_pendukung || 0,
-                                            colorClass: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
+                                            colorClass: 'stat-chip stat-chip-tenaga hover:opacity-90',
                                         },
                                     ]" />
                                 </div>

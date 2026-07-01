@@ -86,8 +86,8 @@ const getAvailableActions = computed(() => {
     // Default actions berdasarkan permission (Detail, Edit, Delete)
     // Hanya tambahkan jika belum ada di custom actions
     const hasCustomDetail = props.actions?.some(a => a.label === 'Detail');
-    const hasCustomEdit = props.actions?.some(a => a.label === 'Edit');
-    const hasCustomDelete = props.actions?.some(a => a.label === 'Delete');
+    const hasCustomEdit = props.actions?.some(a => a.label === 'Ubah');
+    const hasCustomDelete = props.actions?.some(a => a.label === 'Hapus');
 
     if (canDetail.value && !hasCustomDetail) {
         actions.push({
@@ -99,7 +99,7 @@ const getAvailableActions = computed(() => {
 
     if (canEdit.value && !hasCustomEdit) {
         actions.push({
-            label: 'Edit',
+            label: 'Ubah',
             action: () => emit('edit', props.id),
             icon: Edit,
         });
@@ -107,7 +107,7 @@ const getAvailableActions = computed(() => {
 
     if (canDelete.value && !hasCustomDelete) {
         actions.push({
-            label: 'Delete',
+            label: 'Hapus',
             action: () => emit('delete', props.id),
             icon: Trash2,
         });
@@ -122,7 +122,7 @@ const getAvailableActions = computed(() => {
                     action: action.onClick,
                     icon: action.label === 'Detail'
                         ? Eye
-                    : action.label === 'Edit'
+                    : action.label === 'Ubah'
                         ? Edit
                     : action.label === 'Edit Posisi'
                         ? Edit
@@ -130,9 +130,9 @@ const getAvailableActions = computed(() => {
                         ? FormInput
                     : action.label === 'Lihat'
                         ? FolderKanban
-                    : action.label === 'Set Permissions'
+                    : action.label === 'Atur Izin'
                         ? Bolt
-                    : action.label === 'Delete'
+                    : action.label === 'Hapus'
                         ? Trash2
                     : action.label === 'Riwayat Pemeriksaan'
                         ? Activity
@@ -200,7 +200,7 @@ const hasActions = computed(() => {
                     :key="item.label"
                     @click="item.action"
                     class="flex items-center gap-2"
-                    :class="item.label === 'Delete' ? 'text-red-600' : ''"
+                    :class="item.label === 'Hapus' ? 'text-red-600' : ''"
                 >
                     <component :is="item.icon" class="h-4 w-4" v-if="item.icon" />
                     {{ item.label }}

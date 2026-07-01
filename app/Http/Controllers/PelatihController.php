@@ -470,7 +470,7 @@ class PelatihController extends Controller implements HasMiddleware
      */
     public function karakteristik()
     {
-        return Inertia::render('modules/pelatih/Karakteristik');
+        return redirect()->route('dashboard', ['statistik' => 'pelatih']);
     }
 
     /**

@@ -2,7 +2,7 @@
 import PageEdit from '@/pages/modules/base-page/PageEdit.vue';
 import SetupAspekItemTes from './SetupAspekItemTes.vue';
 import { router } from '@inertiajs/vue3';
-import { Loader2 } from 'lucide-vue-next';
+import { CardSkeleton } from '@/components/ui/skeleton';
 import { onMounted, ref } from 'vue';
 import axios from 'axios';
 
@@ -46,9 +46,9 @@ onMounted(() => {
 
 <template>
     <PageEdit title="Setup Aspek & Item Tes" :breadcrumbs="breadcrumbs" back-url="/pemeriksaan-khusus">
-        <div v-if="loading" class="flex items-center justify-center py-12">
-            <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
-            <span class="ml-2 text-muted-foreground">Memuat data...</span>
+        <div v-if="loading" class="space-y-4">
+            <CardSkeleton :lines="4" />
+            <CardSkeleton :lines="6" />
         </div>
         <SetupAspekItemTes
             v-else

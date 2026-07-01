@@ -24,9 +24,9 @@ const columns = [
         format: (row: any) => {
             if (row.status === 'belum') return '<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-300 rounded-full">Belum</span>';
             if (row.status === 'sebagian')
-                return '<span class="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">Sebagian</span>';
+                return '<span class="badge-warning">Sebagian</span>';
             if (row.status === 'selesai')
-                return '<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Selesai</span>';
+                return '<span class="badge-success">Selesai</span>';
             return row.status;
         },
     },
@@ -45,12 +45,12 @@ const actions = (row: any) => [
         permission: 'Pemeriksaan Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/pemeriksaan/${row.id}/edit`),
         permission: 'Pemeriksaan Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Pemeriksaan Delete',
     },
@@ -110,7 +110,7 @@ const handleFilter = (filters: any) => {
                     :badges="[
                         {
                             value: row.jumlah_parameter || 0,
-                            colorClass: 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200',
+                            colorClass: 'stat-chip stat-chip-atlet hover:opacity-90',
                             onClick: () => router.visit(`/pemeriksaan/${row.id}/pemeriksaan-parameter`),
                         },
                     ]"
@@ -123,19 +123,19 @@ const handleFilter = (filters: any) => {
                     {
                         label: 'Atlet',
                         value: row.jumlah_atlet || 0,
-                        colorClass: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
+                        colorClass: 'stat-chip stat-chip-atlet hover:opacity-90',
                         onClick: () => router.visit(`/pemeriksaan/${row.id}/peserta?jenis_peserta=atlet`),
                     },
                     {
                         label: 'Pelatih',
                         value: row.jumlah_pelatih || 0,
-                        colorClass: 'bg-green-100 text-green-800 hover:bg-green-200',
+                        colorClass: 'stat-chip stat-chip-pelatih hover:opacity-90',
                         onClick: () => router.visit(`/pemeriksaan/${row.id}/peserta?jenis_peserta=pelatih`),
                     },
                     {
                         label: 'Tenaga Pendukung',
                         value: row.jumlah_tenaga_pendukung || 0,
-                        colorClass: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
+                        colorClass: 'stat-chip stat-chip-tenaga hover:opacity-90',
                         onClick: () => router.visit(`/pemeriksaan/${row.id}/peserta?jenis_peserta=tenaga-pendukung`),
                     },
                 ]"

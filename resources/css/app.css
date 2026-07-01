@@ -8,7 +8,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-sans: Instrument Sans, ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Work Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -56,6 +56,14 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
+    --color-stat-atlet: var(--stat-atlet);
+    --color-stat-atlet-foreground: var(--stat-atlet-foreground);
+    --color-stat-pelatih: var(--stat-pelatih);
+    --color-stat-pelatih-foreground: var(--stat-pelatih-foreground);
+    --color-stat-tenaga: var(--stat-tenaga);
+    --color-stat-tenaga-foreground: var(--stat-tenaga-foreground);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
     --radius-xl: calc(var(--radius) + 4px);
 }
 
@@ -81,48 +89,365 @@
     body,
     html {
         --font-sans:
-            'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+            'Work Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    }
+
+    .page-surface {
+        @apply min-h-screen w-full bg-background;
+    }
+
+    .content-panel {
+        @apply rounded-xl border border-border/60 bg-card shadow-sm;
+    }
+
+    html[data-theme='slate']:not(.dark) .content-panel,
+    html[data-theme='warm']:not(.dark) .content-panel,
+    html[data-theme='sport']:not(.dark) .content-panel,
+    html[data-theme='dispora']:not(.dark) .content-panel {
+        box-shadow:
+            0 1px 2px oklch(0.22 0.014 264 / 0.04),
+            0 8px 24px oklch(0.22 0.014 264 / 0.05);
+    }
+
+    /* Landing page DISPORA */
+    .welcome-content {
+        box-shadow: inset 0 0 0 1px oklch(0.22 0.014 264 / 0.08);
+    }
+
+    .dark .welcome-content {
+        box-shadow: inset 0 0 0 1px oklch(1 0 0 / 0.08);
+    }
+
+    .welcome-hero {
+        background: linear-gradient(
+            135deg,
+            oklch(0.96 0.04 145) 0%,
+            oklch(0.96 0.03 250) 45%,
+            oklch(0.96 0.04 55) 100%
+        );
+    }
+
+    .dark .welcome-hero {
+        background: linear-gradient(135deg, oklch(0.22 0.04 145) 0%, oklch(0.2 0.03 250) 45%, oklch(0.22 0.05 55) 100%);
+    }
+
+    html[data-theme='dispora']:not(.dark) .welcome-title {
+        color: var(--brand-green);
+    }
+
+    html[data-theme='dispora']:not(.dark) .welcome-cta {
+        background-color: var(--brand-green);
+        color: oklch(0.99 0 0);
+    }
+
+    html[data-theme='dispora']:not(.dark) .welcome-cta:hover {
+        background-color: color-mix(in oklch, var(--brand-green) 85%, black);
+    }
+
+    html[data-theme='dispora']:not(.dark) .welcome-hero {
+        background: linear-gradient(
+            135deg,
+            oklch(0.94 0.06 145) 0%,
+            oklch(0.95 0.04 250) 50%,
+            oklch(0.94 0.07 55) 100%
+        );
+    }
+
+    .welcome-cta {
+        @apply bg-primary text-primary-foreground hover:bg-primary/90;
+    }
+
+    .scrollbar-none {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .scrollbar-none::-webkit-scrollbar {
+        display: none;
+    }
+
+    .table-checkbox {
+        @apply bg-background relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-input;
+    }
+
+    .stat-chip {
+        @apply inline-flex min-w-8 items-center justify-center rounded-md px-2 py-1 text-sm font-semibold;
+    }
+
+    .stat-chip-atlet {
+        background-color: var(--stat-atlet);
+        color: var(--stat-atlet-foreground);
+    }
+
+    .stat-chip-pelatih {
+        background-color: var(--stat-pelatih);
+        color: var(--stat-pelatih-foreground);
+    }
+
+    .stat-chip-tenaga {
+        background-color: var(--stat-tenaga);
+        color: var(--stat-tenaga-foreground);
+    }
+
+    .alert-success {
+        @apply rounded-lg border p-4 text-center text-sm font-medium;
+        background-color: var(--success);
+        color: var(--success-foreground);
+        border-color: color-mix(in oklch, var(--success-foreground) 20%, transparent);
+    }
+
+    .badge-success {
+        @apply rounded-full px-2 py-1 text-xs font-semibold;
+        background-color: var(--success);
+        color: var(--success-foreground);
+    }
+
+    .badge-muted {
+        @apply rounded-full bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground;
+    }
+
+    .badge-warning {
+        @apply rounded-full px-2 py-1 text-xs font-semibold;
+        background-color: var(--stat-tenaga);
+        color: var(--stat-tenaga-foreground);
+    }
+
+    .badge-role {
+        background-color: var(--stat-atlet);
+        color: var(--stat-atlet-foreground);
     }
 }
 
-:root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+:root,
+[data-theme='slate'] {
+    --background: oklch(0.94 0.012 250);
+    --foreground: oklch(0.22 0.02 250);
+    --card: oklch(0.975 0.008 250);
+    --card-foreground: oklch(0.22 0.02 250);
+    --popover: oklch(0.975 0.008 250);
+    --popover-foreground: oklch(0.22 0.02 250);
+    --primary: oklch(0.38 0.09 250);
+    --primary-foreground: oklch(0.99 0 0);
+    --secondary: oklch(0.91 0.014 250);
+    --secondary-foreground: oklch(0.28 0.04 250);
+    --muted: oklch(0.91 0.014 250);
+    --muted-foreground: oklch(0.48 0.025 250);
+    --accent: oklch(0.9 0.018 250);
+    --accent-foreground: oklch(0.26 0.035 250);
     --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.646 0.222 41.116);
-    --chart-2: oklch(0.6 0.118 184.704);
-    --chart-3: oklch(0.398 0.07 227.392);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
-    --radius: 0.625rem;
-    --sidebar-background: hsl(0 0% 98%);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-    --sidebar: oklch(0.985 0 0);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.86 0.015 250);
+    --input: oklch(0.86 0.015 250);
+    --ring: oklch(0.52 0.08 250);
+    --chart-1: oklch(0.42 0.1 250);
+    --chart-2: oklch(0.55 0.1 200);
+    --chart-3: oklch(0.58 0.09 165);
+    --chart-4: oklch(0.58 0.1 300);
+    --chart-5: oklch(0.6 0.12 40);
+    --radius: 0.75rem;
+    --sidebar-background: oklch(0.28 0.045 250);
+    --sidebar-foreground: oklch(0.92 0.012 250);
+    --sidebar-primary: oklch(0.55 0.12 250);
+    --sidebar-primary-foreground: oklch(0.99 0 0);
+    --sidebar-accent: oklch(0.34 0.04 250);
+    --sidebar-accent-foreground: oklch(0.95 0.01 250);
+    --sidebar-border: oklch(0.36 0.04 250);
+    --sidebar-ring: oklch(0.55 0.1 250);
+    --sidebar: oklch(0.28 0.045 250);
+    --stat-atlet: oklch(0.94 0.035 250);
+    --stat-atlet-foreground: oklch(0.34 0.07 250);
+    --stat-pelatih: oklch(0.93 0.04 165);
+    --stat-pelatih-foreground: oklch(0.32 0.07 165);
+    --stat-tenaga: oklch(0.94 0.04 75);
+    --stat-tenaga-foreground: oklch(0.38 0.08 75);
+    --success: oklch(0.94 0.04 145);
+    --success-foreground: oklch(0.32 0.08 145);
 }
 
-.dark {
+[data-theme='light'] {
+    --background: oklch(0.985 0.002 264);
+    --foreground: oklch(0.22 0.014 264);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.22 0.014 264);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.22 0.014 264);
+    --primary: oklch(0.32 0.04 264);
+    --primary-foreground: oklch(0.99 0 0);
+    --secondary: oklch(0.962 0.004 264);
+    --secondary-foreground: oklch(0.32 0.04 264);
+    --muted: oklch(0.962 0.004 264);
+    --muted-foreground: oklch(0.52 0.018 264);
+    --accent: oklch(0.955 0.006 264);
+    --accent-foreground: oklch(0.28 0.03 264);
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.918 0.006 264);
+    --input: oklch(0.918 0.006 264);
+    --ring: oklch(0.55 0.04 264);
+    --chart-1: oklch(0.42 0.08 264);
+    --chart-2: oklch(0.55 0.1 200);
+    --chart-3: oklch(0.62 0.08 160);
+    --chart-4: oklch(0.58 0.1 300);
+    --chart-5: oklch(0.6 0.12 40);
+    --radius: 0.75rem;
+    --sidebar-background: oklch(0.978 0.003 264);
+    --sidebar-foreground: oklch(0.28 0.02 264);
+    --sidebar-primary: oklch(0.32 0.04 264);
+    --sidebar-primary-foreground: oklch(0.99 0 0);
+    --sidebar-accent: oklch(0.945 0.008 264);
+    --sidebar-accent-foreground: oklch(0.26 0.025 264);
+    --sidebar-border: oklch(0.91 0.006 264);
+    --sidebar-ring: oklch(0.55 0.04 264);
+    --sidebar: oklch(0.978 0.003 264);
+    --stat-atlet: oklch(0.94 0.035 250);
+    --stat-atlet-foreground: oklch(0.34 0.07 250);
+    --stat-pelatih: oklch(0.93 0.04 165);
+    --stat-pelatih-foreground: oklch(0.32 0.07 165);
+    --stat-tenaga: oklch(0.94 0.04 75);
+    --stat-tenaga-foreground: oklch(0.38 0.08 75);
+    --success: oklch(0.94 0.04 145);
+    --success-foreground: oklch(0.32 0.08 145);
+}
+
+[data-theme='warm'] {
+    --background: oklch(0.96 0.012 85);
+    --foreground: oklch(0.28 0.02 85);
+    --card: oklch(0.99 0.006 85);
+    --card-foreground: oklch(0.28 0.02 85);
+    --popover: oklch(0.99 0.006 85);
+    --popover-foreground: oklch(0.28 0.02 85);
+    --primary: oklch(0.32 0.05 260);
+    --primary-foreground: oklch(0.99 0 0);
+    --secondary: oklch(0.93 0.014 85);
+    --secondary-foreground: oklch(0.32 0.04 260);
+    --muted: oklch(0.93 0.014 85);
+    --muted-foreground: oklch(0.52 0.025 85);
+    --accent: oklch(0.92 0.016 85);
+    --accent-foreground: oklch(0.3 0.03 260);
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.88 0.014 85);
+    --input: oklch(0.88 0.014 85);
+    --ring: oklch(0.55 0.05 260);
+    --chart-1: oklch(0.45 0.08 260);
+    --chart-2: oklch(0.55 0.1 85);
+    --chart-3: oklch(0.6 0.09 160);
+    --chart-4: oklch(0.58 0.1 40);
+    --chart-5: oklch(0.62 0.12 300);
+    --radius: 0.75rem;
+    --sidebar-background: oklch(0.93 0.015 85);
+    --sidebar-foreground: oklch(0.32 0.025 85);
+    --sidebar-primary: oklch(0.32 0.05 260);
+    --sidebar-primary-foreground: oklch(0.99 0 0);
+    --sidebar-accent: oklch(0.9 0.018 85);
+    --sidebar-accent-foreground: oklch(0.28 0.03 85);
+    --sidebar-border: oklch(0.86 0.014 85);
+    --sidebar-ring: oklch(0.55 0.05 260);
+    --sidebar: oklch(0.93 0.015 85);
+    --stat-atlet: oklch(0.94 0.035 250);
+    --stat-atlet-foreground: oklch(0.34 0.07 250);
+    --stat-pelatih: oklch(0.93 0.04 165);
+    --stat-pelatih-foreground: oklch(0.32 0.07 165);
+    --stat-tenaga: oklch(0.94 0.04 75);
+    --stat-tenaga-foreground: oklch(0.38 0.08 75);
+    --success: oklch(0.94 0.04 145);
+    --success-foreground: oklch(0.32 0.08 145);
+}
+
+[data-theme='sport'] {
+    --background: oklch(0.95 0.02 155);
+    --foreground: oklch(0.26 0.04 155);
+    --card: oklch(0.98 0.012 155);
+    --card-foreground: oklch(0.26 0.04 155);
+    --popover: oklch(0.98 0.012 155);
+    --popover-foreground: oklch(0.26 0.04 155);
+    --primary: oklch(0.42 0.12 155);
+    --primary-foreground: oklch(0.99 0 0);
+    --secondary: oklch(0.92 0.022 155);
+    --secondary-foreground: oklch(0.3 0.06 155);
+    --muted: oklch(0.92 0.022 155);
+    --muted-foreground: oklch(0.48 0.04 155);
+    --accent: oklch(0.9 0.025 155);
+    --accent-foreground: oklch(0.28 0.05 155);
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.87 0.025 155);
+    --input: oklch(0.87 0.025 155);
+    --ring: oklch(0.48 0.1 155);
+    --chart-1: oklch(0.45 0.12 155);
+    --chart-2: oklch(0.55 0.1 200);
+    --chart-3: oklch(0.6 0.09 85);
+    --chart-4: oklch(0.58 0.1 300);
+    --chart-5: oklch(0.62 0.12 40);
+    --radius: 0.75rem;
+    --sidebar-background: oklch(0.26 0.06 155);
+    --sidebar-foreground: oklch(0.93 0.02 155);
+    --sidebar-primary: oklch(0.52 0.14 155);
+    --sidebar-primary-foreground: oklch(0.99 0 0);
+    --sidebar-accent: oklch(0.32 0.06 155);
+    --sidebar-accent-foreground: oklch(0.95 0.015 155);
+    --sidebar-border: oklch(0.34 0.06 155);
+    --sidebar-ring: oklch(0.52 0.12 155);
+    --sidebar: oklch(0.26 0.06 155);
+    --stat-atlet: oklch(0.94 0.035 250);
+    --stat-atlet-foreground: oklch(0.34 0.07 250);
+    --stat-pelatih: oklch(0.93 0.04 165);
+    --stat-pelatih-foreground: oklch(0.32 0.07 165);
+    --stat-tenaga: oklch(0.94 0.04 75);
+    --stat-tenaga-foreground: oklch(0.38 0.08 75);
+    --success: oklch(0.94 0.04 145);
+    --success-foreground: oklch(0.32 0.08 145);
+}
+
+[data-theme='dispora'] {
+    --brand-green: oklch(0.52 0.17 145);
+    --brand-orange: oklch(0.67 0.19 52);
+    --background: oklch(0.97 0.018 145);
+    --foreground: oklch(0.28 0.04 145);
+    --card: oklch(0.995 0.01 145);
+    --card-foreground: oklch(0.28 0.04 145);
+    --popover: oklch(0.995 0.01 145);
+    --popover-foreground: oklch(0.28 0.04 145);
+    --primary: oklch(0.52 0.17 145);
+    --primary-foreground: oklch(0.99 0 0);
+    --secondary: oklch(0.94 0.03 145);
+    --secondary-foreground: oklch(0.35 0.08 145);
+    --muted: oklch(0.94 0.025 145);
+    --muted-foreground: oklch(0.5 0.04 145);
+    --accent: oklch(0.95 0.04 52);
+    --accent-foreground: oklch(0.45 0.12 52);
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.88 0.03 145);
+    --input: oklch(0.88 0.03 145);
+    --ring: oklch(0.52 0.17 145);
+    --chart-1: oklch(0.52 0.17 145);
+    --chart-2: oklch(0.67 0.19 52);
+    --chart-3: oklch(0.55 0.1 200);
+    --chart-4: oklch(0.58 0.1 300);
+    --chart-5: oklch(0.62 0.12 85);
+    --radius: 0.75rem;
+    --sidebar-background: oklch(0.32 0.09 145);
+    --sidebar-foreground: oklch(0.93 0.02 145);
+    --sidebar-primary: oklch(0.67 0.19 52);
+    --sidebar-primary-foreground: oklch(0.99 0 0);
+    --sidebar-accent: oklch(0.38 0.08 145);
+    --sidebar-accent-foreground: oklch(0.95 0.015 145);
+    --sidebar-border: oklch(0.4 0.08 145);
+    --sidebar-ring: oklch(0.67 0.19 52);
+    --sidebar: oklch(0.32 0.09 145);
+    --stat-atlet: oklch(0.94 0.06 52);
+    --stat-atlet-foreground: oklch(0.42 0.14 52);
+    --stat-pelatih: oklch(0.93 0.05 145);
+    --stat-pelatih-foreground: oklch(0.35 0.1 145);
+    --stat-tenaga: oklch(0.94 0.05 85);
+    --stat-tenaga-foreground: oklch(0.38 0.1 85);
+    --success: oklch(0.93 0.05 145);
+    --success-foreground: oklch(0.32 0.1 145);
+}
+
+.dark,
+[data-theme='dark'] {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.205 0 0);
@@ -156,51 +481,63 @@
     --sidebar-border: oklch(0.269 0 0);
     --sidebar-ring: oklch(0.439 0 0);
     --sidebar: oklch(0.205 0 0);
+    --stat-atlet: oklch(0.28 0.05 250);
+    --stat-atlet-foreground: oklch(0.82 0.06 250);
+    --stat-pelatih: oklch(0.27 0.05 165);
+    --stat-pelatih-foreground: oklch(0.82 0.06 165);
+    --stat-tenaga: oklch(0.28 0.05 75);
+    --stat-tenaga-foreground: oklch(0.85 0.07 75);
+    --success: oklch(0.28 0.05 145);
+    --success-foreground: oklch(0.85 0.06 145);
 }
-
-@layer base {
-    * {
-        @apply border-border;
-    }
-
-    body {
-        @apply bg-background text-foreground;
-    }
-}
-
-/*
-  ---break---
-*/
 
 @layer base {
     * {
         @apply border-border outline-ring/50;
     }
+
     body {
-        @apply bg-background text-foreground;
+        @apply bg-background text-foreground font-sans antialiased;
+        font-family: 'Work Sans', ui-sans-serif, system-ui, sans-serif;
+        font-optical-sizing: auto;
+        font-style: normal;
+    }
+
+    [data-sidebar='content'] {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    [data-sidebar='content']::-webkit-scrollbar {
+        display: none;
     }
 }
 
-body {
-    font-family:
-        'Inter Variable',
-        'SF Pro Display',
-        -apple-system,
-        BlinkMacSystemFont,
-        'Segoe UI',
-        Roboto,
-        Oxygen,
-        Ubuntu,
-        Cantarell,
-        'Open Sans',
-        'Helvetica Neue',
-        sans-serif;
-    font-variation-settings: 'wght' 510;
+body:not(.dark) .apexcharts-menu {
+    background-color: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--foreground) !important;
+}
 
-    /* Light mode */
-    .apexcharts-menu {
-        background-color: #f3f4f6 !important; /* bg-gray-100 */
-        border: 1px solid #e5e7eb !important;
-        color: #111827 !important; /* text-gray-900 */
-    }
+.dark .apexcharts-menu {
+    background-color: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--foreground) !important;
+}
+
+.page-enter-active,
+.page-leave-active {
+    transition:
+        opacity 0.18s ease,
+        transform 0.18s ease;
+}
+
+.page-enter-from {
+    opacity: 0;
+    transform: translateY(6px);
+}
+
+.page-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
 }

@@ -24,7 +24,7 @@ defineProps<{
                 </div>
 
                 <!-- Form container with simple background -->
-                <div class="bg-card border-border rounded-xl border p-6 shadow-sm">
+                <div class="bg-card border-border/60 rounded-xl border p-6 shadow-sm">
                     <slot />
                 </div>
             </div>

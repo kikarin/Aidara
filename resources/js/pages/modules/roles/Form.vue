@@ -32,7 +32,7 @@ const formInputs = [
     },
     {
         name: 'init_page_login',
-        label: 'Default Page',
+        label: 'Halaman Default',
         type: 'select' as const,
         placeholder: 'Select default page',
         required: true,
@@ -40,7 +40,7 @@ const formInputs = [
     },
     {
         name: 'is_allow_login',
-        label: 'Can Login',
+        label: 'Bisa Login',
         type: 'radio' as const,
         required: true,
         options: [

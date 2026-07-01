@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { CardSkeleton, ChartSkeleton, TableSkeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast/useToast';
 import axios from 'axios';
-import { Award, Loader2, TrendingUp, X } from 'lucide-vue-next';
+import { Award, TrendingUp, X } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 
 const { toast } = useToast();
@@ -72,7 +73,7 @@ const getPredikatLabel = (predikat: string | null): string => {
 
 // Get predikat color
 const getPredikatColor = (predikat: string | null): string => {
-    if (!predikat) return 'bg-gray-300 text-gray-600';
+    if (!predikat) return 'badge-muted';
     const colors: Record<string, string> = {
         sangat_kurang: 'bg-red-500 text-white',
         kurang: 'bg-orange-500 text-white',
@@ -80,15 +81,15 @@ const getPredikatColor = (predikat: string | null): string => {
         mendekati_target: 'bg-green-400 text-white',
         target: 'bg-green-600 text-white',
     };
-    return colors[predikat] || 'bg-gray-500 text-white';
+    return colors[predikat] || 'bg-primary text-primary-foreground';
 };
 
 // Get rank badge color
 const getRankBadgeColor = (rank: number): string => {
     if (rank === 1) return 'bg-yellow-500 text-white';
-    if (rank === 2) return 'bg-gray-400 text-white';
+    if (rank === 2) return 'bg-muted-foreground text-primary-foreground';
     if (rank === 3) return 'bg-orange-500 text-white';
-    return 'bg-gray-300 text-gray-700';
+    return 'badge-muted';
 };
 
 // Get rank icon
@@ -460,8 +461,8 @@ onMounted(() => {
 <template>
     <div class="space-y-4">
         <Card v-if="loadingRanking">
-            <CardContent class="flex items-center justify-center py-8">
-                <Loader2 class="h-8 w-8 animate-spin" />
+            <CardContent class="py-6">
+                <TableSkeleton :rows="8" :columns="5" />
             </CardContent>
         </Card>
 
@@ -574,9 +575,7 @@ onMounted(() => {
                 <div v-if="modalVisualisasiData && modalAspekList.length > 0" class="space-y-4">
                     <ApexChart :options="modalRadarChartOptions" :series="modalRadarChartSeries" />
                 </div>
-                <div v-else class="flex items-center justify-center py-8">
-                    <Loader2 class="h-8 w-8 animate-spin" />
-                </div>
+                <ChartSkeleton v-else height="h-[280px]" />
             </DialogContent>
         </Dialog>
 
@@ -589,9 +588,7 @@ onMounted(() => {
                         Perbandingan 3 Tes Terakhir - {{ selectedPesertaForModal?.nama }}
                     </DialogTitle>
                 </DialogHeader>
-                <div v-if="loadingComparison" class="flex items-center justify-center py-8">
-                    <Loader2 class="h-8 w-8 animate-spin" />
-                </div>
+                <ChartSkeleton v-if="loadingComparison" height="h-[300px]" />
                 <div v-else-if="comparisonData.length > 0 && comparisonAspekList.length > 0" class="space-y-4">
                     <!-- Informasi Tes -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">

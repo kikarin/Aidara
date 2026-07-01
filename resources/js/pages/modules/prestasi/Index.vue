@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CardSkeleton, TableSkeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Tabs from '@/components/ui/tabs/Tabs.vue';
 import TabsContent from '@/components/ui/tabs/TabsContent.vue';
@@ -17,7 +18,7 @@ import { computed, onMounted, ref } from 'vue';
 const page = usePage();
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Dashboard',
+        title: 'Dasbor',
         href: '/dashboard',
     },
     {
@@ -288,7 +289,10 @@ onMounted(() => {
                         </TabsList>
 
                         <TabsContent value="all" class="mt-4">
-                            <div v-if="loading" class="text-center py-8">Memuat data...</div>
+                            <div v-if="loading" class="space-y-4">
+                                <CardSkeleton :lines="2" />
+                                <TableSkeleton :rows="5" :column-labels="columns.map((col) => col.label)" />
+                            </div>
                             <div v-else-if="prestasiData.length === 0" class="text-center py-8 text-muted-foreground">
                                 Tidak ada data prestasi
                             </div>
@@ -368,7 +372,10 @@ onMounted(() => {
                             :value="kategori.id"
                             class="mt-4"
                         >
-                            <div v-if="loading" class="text-center py-8">Memuat data...</div>
+                            <div v-if="loading" class="space-y-4">
+                                <CardSkeleton :lines="2" />
+                                <TableSkeleton :rows="5" :column-labels="columns.map((col) => col.label)" />
+                            </div>
                             <div v-else-if="!currentKategoriData" class="text-center py-8 text-muted-foreground">
                                 Tidak ada data untuk kategori ini
                             </div>

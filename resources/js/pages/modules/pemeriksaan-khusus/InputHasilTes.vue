@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast/useToast';
+import { CardSkeleton, TableSkeleton } from '@/components/ui/skeleton';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
@@ -156,7 +157,7 @@ const getPredikatColor = (predikat: string | null): string => {
         mendekati_target: 'bg-green-400 text-white',
         target: 'bg-green-600 text-white',
     };
-    return predikat ? colors[predikat] || 'bg-gray-500 text-white' : 'bg-gray-300 text-gray-600';
+    return predikat ? colors[predikat] || 'bg-primary text-primary-foreground' : 'badge-muted';
 };
 
 // Helper: Get jenis kelamin peserta
@@ -468,7 +469,7 @@ onMounted(() => {
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen w-full bg-gray-100 pt-4 dark:bg-neutral-950">
+        <div class="page-surface pt-4">
             <div class="mx-auto max-w-[95%] px-4">
                 <!-- Info Card -->
                 <Card class="mb-4">
@@ -508,14 +509,10 @@ onMounted(() => {
                     </Button>
                 </div>
 
-                <!-- Loading State -->
-                <div v-if="loadingData" class="flex items-center justify-center py-12">
-                    <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
-                    <span class="ml-2 text-muted-foreground">Memuat data...</span>
-                </div>
+                <TableSkeleton v-if="loadingData" :rows="8" :columns="6" />
 
                 <!-- Table -->
-                <div v-else-if="tableState.length > 0 && groupedItemTes.length > 0" class="overflow-x-auto rounded-xl bg-white shadow dark:bg-neutral-900">
+                <div v-else-if="tableState.length > 0 && groupedItemTes.length > 0" class="content-panel overflow-x-auto">
                     <table class="w-full min-w-max border-separate border-spacing-0 text-sm">
                         <thead>
                             <!-- Header Row 1: Aspek -->

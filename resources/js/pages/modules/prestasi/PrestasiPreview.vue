@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CardSkeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { onMounted, ref } from 'vue';
@@ -49,11 +50,9 @@ onMounted(() => {
 
 <template>
     <div class="space-y-4">
-        <div v-if="loading" class="text-center py-8 text-muted-foreground">
-            <div class="inline-flex items-center gap-2">
-                <div class="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-                <span>Memuat data...</span>
-            </div>
+        <div v-if="loading" class="space-y-6">
+            <CardSkeleton :lines="1" />
+            <CardSkeleton :lines="2" />
         </div>
         <div v-else class="space-y-6">
             <!-- Total Bonus -->

@@ -68,7 +68,7 @@ const passwordStrengthColor = computed(() => {
     if (score <= 1) return 'text-red-500';
     if (score === 2) return 'text-orange-500';
     if (score === 3) return 'text-yellow-500';
-    return 'text-green-500';
+    return 'text-[var(--success-foreground)]';
 });
 
 const isPasswordValid = computed(() => {
@@ -270,7 +270,7 @@ const resendOtp = () => {
                     <div v-if="form.password" class="space-y-2">
                         <div class="flex items-center gap-2">
                             <div class="flex-1">
-                                <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                                <div class="bg-muted h-2 w-full overflow-hidden rounded-full">
                                     <div
                                         :class="[passwordStrengthColor, 'h-full transition-all duration-300']"
                                         :style="{ width: `${(passwordStrength.score / 4) * 100}%` }"
@@ -283,7 +283,7 @@ const resendOtp = () => {
                         </div>
                         <div class="grid grid-cols-2 gap-2 text-xs">
                             <div class="flex items-center gap-2">
-                                <span :class="passwordStrength.checks.length ? 'text-green-500' : 'text-gray-400'">
+                                <span :class="passwordStrength.checks.length ? 'text-[var(--success-foreground)]' : 'text-muted-foreground'">
                                     {{ passwordStrength.checks.length ? '✓' : '○' }}
                                 </span>
                                 <span :class="passwordStrength.checks.length ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'">
@@ -291,7 +291,7 @@ const resendOtp = () => {
                                 </span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span :class="passwordStrength.checks.lowercase ? 'text-green-500' : 'text-gray-400'">
+                                <span :class="passwordStrength.checks.lowercase ? 'text-[var(--success-foreground)]' : 'text-muted-foreground'">
                                     {{ passwordStrength.checks.lowercase ? '✓' : '○' }}
                                 </span>
                                 <span :class="passwordStrength.checks.lowercase ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'">
@@ -299,7 +299,7 @@ const resendOtp = () => {
                                 </span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span :class="passwordStrength.checks.uppercase ? 'text-green-500' : 'text-gray-400'">
+                                <span :class="passwordStrength.checks.uppercase ? 'text-[var(--success-foreground)]' : 'text-muted-foreground'">
                                     {{ passwordStrength.checks.uppercase ? '✓' : '○' }}
                                 </span>
                                 <span :class="passwordStrength.checks.uppercase ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'">
@@ -307,7 +307,7 @@ const resendOtp = () => {
                                 </span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span :class="passwordStrength.checks.number ? 'text-green-500' : 'text-gray-400'">
+                                <span :class="passwordStrength.checks.number ? 'text-[var(--success-foreground)]' : 'text-muted-foreground'">
                                     {{ passwordStrength.checks.number ? '✓' : '○' }}
                                 </span>
                                 <span :class="passwordStrength.checks.number ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'">
@@ -346,7 +346,7 @@ const resendOtp = () => {
                     </div>
                     <InputError :message="form.errors.password_confirmation" />
                     <div v-if="form.password_confirmation && !passwordsMatch" class="text-xs text-red-500">Konfirmasi password tidak cocok</div>
-                    <div v-else-if="form.password_confirmation && passwordsMatch" class="text-xs text-green-500">✓ Password cocok</div>
+                    <div v-else-if="form.password_confirmation && passwordsMatch" class="text-xs text-[var(--success-foreground)]">✓ Password cocok</div>
                 </div>
 
                 <!-- reCAPTCHA v2 (dengan checkbox dan challenge default) -->

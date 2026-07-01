@@ -585,7 +585,7 @@ onBeforeUnmount(() => {
     closeCamera();
 });
 
-// Export PDF function
+// Ekspor PDF function
 const exportToPDF = () => {
     try {
         const doc = new jsPDF('p', 'mm', 'a4');
@@ -785,7 +785,7 @@ const exportToPDF = () => {
                         @click="exportToPDF"
                     >
                         <Download class="h-4 w-4 mr-2" />
-                        Export PDF
+                        Ekspor PDF
                     </Button>
                     <Button 
                         v-if="calendarData.some((item) => hasData(item))"

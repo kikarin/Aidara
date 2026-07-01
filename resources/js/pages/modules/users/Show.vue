@@ -54,31 +54,31 @@ const fields = computed(() => {
         { label: 'No. HP', value: user.value?.no_hp || '-' },
         { label: 'Role', value: user.value?.role?.name || '-' },
         {
-            label: 'All Roles',
+            label: 'Semua Peran',
             value:
                 allRoles && allRoles !== ''
                     ? `<div class='flex flex-wrap'>${allRoles
                           .split(', ')
                           .map(
                               (role: string) =>
-                                  `<span class='inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full mr-1 mb-1'>${role.trim()}</span>`,
+                                  `<span class='badge-role inline-flex items-center px-2 py-1 text-xs font-medium rounded-full mr-1 mb-1'>${role.trim()}</span>`,
                           )
                           .join('')}</div>`
                     : '-',
         },
         {
             label: 'Status',
-            value: user.value?.is_active ? 'Active' : 'Inactive',
+            value: user.value?.is_active ? 'Aktif' : 'Nonaktif',
             className: user.value?.is_active ? 'text-green-600' : 'text-red-600',
         },
     ];
 });
 
 const actionFields = [
-    { label: 'Created At', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Created By', value: props.item.created_by_user?.name || '-' },
-    { label: 'Updated At', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Updated By', value: props.item.updated_by_user?.name || '-' },
+    { label: 'Dibuat Pada', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Dibuat Oleh', value: props.item.created_by_user?.name || '-' },
+    { label: 'Diperbarui Pada', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Diperbarui Oleh', value: props.item.updated_by_user?.name || '-' },
 ];
 
 const handleEdit = () => {

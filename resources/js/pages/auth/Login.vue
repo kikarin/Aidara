@@ -67,11 +67,11 @@ const submit = () => {
 
 <template>
     <AuthBase title="Dispora" description="Dinas Pemuda dan Olahraga">
-        <Head title="Login" />
+        <Head title="Masuk" />
 
         <div
             v-if="status"
-            class="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-center text-sm font-medium text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400"
+            class="mb-6 alert-success"
         >
             {{ status }}
         </div>
@@ -101,7 +101,7 @@ const submit = () => {
 
             <!-- Password -->
             <div class="space-y-2">
-                <Label for="password" class="text-sm font-medium">Password</Label>
+                <Label for="password" class="text-sm font-medium">Kata Sandi</Label>
                 <div class="group relative">
                     <Lock
                         class="text-muted-foreground group-focus-within:text-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transition-colors"
@@ -113,7 +113,7 @@ const submit = () => {
                         :tabindex="2"
                         autocomplete="current-password"
                         v-model="form.password"
-                        placeholder="Masukkan password Anda"
+                        placeholder="Masukkan kata sandi Anda"
                         class="border-input bg-background focus:border-ring h-11 rounded-lg pr-10 pl-10 transition-colors"
                     />
                     <button

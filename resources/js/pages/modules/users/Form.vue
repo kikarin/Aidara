@@ -53,20 +53,20 @@ const formInputs = [
     },
     {
         name: 'password',
-        label: 'Password',
+        label: 'Kata Sandi',
         type: 'password' as const,
         placeholder: props.mode === 'create' ? 'Enter password' : 'Kosongkan jika tidak ingin mengubah password',
         required: props.mode === 'create',
-        help: 'Password harus minimal 8 karakter, mengandung huruf besar, huruf kecil, dan angka',
+        help: 'Kata sandi harus minimal 8 karakter, mengandung huruf besar, huruf kecil, dan angka',
         showPassword: showPassword,
     },
     {
         name: 'password_confirmation',
-        label: 'Konfirmasi Password',
+        label: 'Konfirmasi Kata Sandi',
         type: 'password' as const,
         placeholder: 'Konfirmasi password',
         required: props.mode === 'create',
-        help: 'Password harus sama dengan password di atas',
+        help: 'Kata sandi harus sama dengan password di atas',
         showPassword: showPasswordConfirmation,
     },
     {
@@ -92,8 +92,8 @@ const formInputs = [
         placeholder: 'Pilih status',
         required: true,
         options: [
-            { value: 1, label: 'Active' },
-            { value: 0, label: 'Inactive' },
+            { value: 1, label: 'Aktif' },
+            { value: 0, label: 'Nonaktif' },
         ],
     },
 ];

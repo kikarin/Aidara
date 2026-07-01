@@ -2,7 +2,7 @@
 
 ## Base URL
 - Dev: `http://localhost:8000/api`
-- Prod: `https://aidara.summitct.co.id/api`
+- Prod: `https://aidara.bogorkab.go.id/api`
 
 ## Flow Login
 1. Login → kalau belum verified, kirim OTP

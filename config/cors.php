@@ -9,8 +9,8 @@ return [
         // Development - React + Vite
         'http://localhost:5173',
         'http://localhost:5174',
-        // Production
-        'https://aidara-mobile.summitct.co.id',
+        // Production - Mobile PWA
+        'https://aidara-mobile.bogorkab.go.id',
     ],
 
     'allowed_origins_patterns' => [],

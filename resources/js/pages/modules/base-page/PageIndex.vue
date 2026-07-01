@@ -238,17 +238,17 @@ const localActions = (row: any) => {
         if (action.label === 'Detail') {
             return computedPermissions.value?.detail !== false;
         }
-        if (action.label === 'Edit') {
+        if (action.label === 'Ubah') {
             return computedPermissions.value?.edit !== false;
         }
-        if (action.label === 'Delete') {
+        if (action.label === 'Hapus') {
             return computedPermissions.value?.delete !== false;
         }
         
         // Default: tampilkan jika tidak ada permission check
         return true;
     }).map((action) => {
-        if (action.label === 'Delete') {
+        if (action.label === 'Hapus') {
             return {
                 ...action,
                 onClick: () => handleDeleteRow(row),
@@ -311,7 +311,7 @@ defineExpose({ fetchData, handleFilterFromParent, getCurrentParams, search, sort
 <template>
     <Head :title="title" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen w-full bg-gray-100 dark:bg-neutral-950">
+        <div class="page-surface">
             <div class="container mx-auto">
                 <div class="mx-auto px-4 py-4">
                     <slot name="header-extra"></slot>
@@ -345,7 +345,7 @@ defineExpose({ fetchData, handleFilterFromParent, getCurrentParams, search, sort
                         @export="$emit('export')"
                     />
                 </div>
-                <div class="mx-4 rounded-xl bg-white pt-4 shadow dark:bg-neutral-900">
+                <div class="content-panel mx-4 pt-4">
                     <DataTable
                         :columns="columns"
                         :rows="rowsWithCustom"

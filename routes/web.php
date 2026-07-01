@@ -608,6 +608,7 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::resource('/program-latihan', ProgramLatihanController::class)->names('program-latihan');
     Route::get('/api/program-latihan', [ProgramLatihanController::class, 'apiIndex']);
     Route::post('/program-latihan/destroy-selected', [ProgramLatihanController::class, 'destroy_selected'])->name('program-latihan.destroy_selected');
+
 });
 
 // =====================

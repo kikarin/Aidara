@@ -571,7 +571,7 @@ const isCaborIndexModule = computed(() => props.moduleType === 'cabor');
             </div>
 
             <DialogFooter>
-                <Button variant="outline" @click="resetFilters"> Reset </Button>
+                <Button variant="outline" @click="resetFilters"> Atur Ulang </Button>
                 <Button @click="handleFilter"> Terapkan Filter </Button>
             </DialogFooter>
         </DialogContent>

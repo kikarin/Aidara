@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/components/ui/toast/useToast';
 import axios from 'axios';
-import { Award, ChevronDown, ChevronUp, Loader2, TrendingUp } from 'lucide-vue-next';
+import { CardSkeleton, ChartSkeleton } from '@/components/ui/skeleton';
+import { Award, ChevronDown, ChevronUp, TrendingUp } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 
 const props = defineProps<{
@@ -82,7 +83,7 @@ const getPredikatLabel = (predikat: string | null): string => {
 };
 
 const getPredikatColor = (predikat: string | null): string => {
-    if (!predikat) return 'bg-gray-300 text-gray-600';
+    if (!predikat) return 'badge-muted';
     const colors: Record<string, string> = {
         sangat_kurang: 'bg-red-500 text-white',
         kurang: 'bg-orange-500 text-white',
@@ -90,7 +91,7 @@ const getPredikatColor = (predikat: string | null): string => {
         mendekati_target: 'bg-green-400 text-white',
         target: 'bg-green-600 text-white',
     };
-    return colors[predikat] || 'bg-gray-500 text-white';
+    return colors[predikat] || 'bg-primary text-primary-foreground';
 };
 
 // Open modal perbandingan 3 tes terakhir
@@ -270,9 +271,8 @@ onMounted(() => {
             </Button>
         </div>
 
-        <div v-if="loading" class="py-8 text-center">
-            <Loader2 class="h-8 w-8 animate-spin mx-auto" />
-            <p class="text-muted-foreground mt-2">Memuat data pemeriksaan khusus...</p>
+        <div v-if="loading" class="space-y-4">
+            <CardSkeleton v-for="n in 3" :key="n" />
         </div>
 
         <div v-else-if="pemeriksaanData.length === 0" class="py-8 text-center">
@@ -400,9 +400,7 @@ onMounted(() => {
                         Perbandingan 3 Tes Terakhir
                     </DialogTitle>
                 </DialogHeader>
-                <div v-if="loadingComparison" class="flex items-center justify-center py-8">
-                    <Loader2 class="h-8 w-8 animate-spin" />
-                </div>
+                <ChartSkeleton v-if="loadingComparison" height="h-[300px]" />
                 <div v-else-if="comparisonData.length > 0 && comparisonAspekList.length > 0" class="space-y-4">
                     <!-- Informasi Tes -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">

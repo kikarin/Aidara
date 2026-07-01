@@ -489,7 +489,7 @@ class AtletController extends Controller implements HasMiddleware
      */
     public function karakteristik()
     {
-        return Inertia::render('modules/atlet/Karakteristik');
+        return redirect()->route('dashboard', ['statistik' => 'atlet']);
     }
 
     /**

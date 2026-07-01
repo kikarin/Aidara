@@ -73,7 +73,7 @@ const columns = [
         label: 'Status',
         format: (row: CaborData) =>
             row.is_active
-                ? '<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Aktif</span>'
+                ? '<span class="badge-success">Aktif</span>'
                 : '<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Nonaktif</span>',
     },
 ];

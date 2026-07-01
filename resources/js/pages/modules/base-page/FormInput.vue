@@ -474,7 +474,7 @@ defineExpose({
         <!-- ALERT ERROR -->
         <Alert v-if="Object.keys(formErrors).length" variant="destructive" class="mb-4 shadow-none hover:shadow-none">
             <AlertCircle class="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
+            <AlertTitle>Kesalahan</AlertTitle>
             <AlertDescription>
                 <ul class="list-disc pl-5">
                     <li v-for="(msg, field) in formErrors" :key="field">{{ msg }}</li>
@@ -839,7 +839,7 @@ defineExpose({
                                 <a v-else :href="filePreview" target="_blank" class="flex items-center gap-2 text-blue-600 underline">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-gray-500"
+                                        class="h-5 w-5 text-muted-foreground"
                                         fill="none"
                                         viewBox="0 0 24 24"
                                         stroke="currentColor"
@@ -882,7 +882,7 @@ defineExpose({
             <div v-if="!hideButtons" class="grid grid-cols-1 items-center md:grid-cols-12">
                 <div class="hidden md:col-span-3 md:block"></div>
                 <div class="col-span-full md:col-span-9">
-                    <ButtonsForm :showSave="true" :showCancel="true" :saveText="saveText || 'Save'" @save="handleSubmit" @cancel="handleCancel" />
+                    <ButtonsForm :showSave="true" :showCancel="true" :saveText="saveText || 'Simpan'" @save="handleSubmit" @cancel="handleCancel" />
                 </div>
             </div>
         </form>

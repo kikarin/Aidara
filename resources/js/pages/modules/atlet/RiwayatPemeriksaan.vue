@@ -124,7 +124,7 @@ const deleteSelected = async () => {
                 :badges="[
                     {
                         value: row.jumlah_parameter || 0,
-                        colorClass: 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200',
+                        colorClass: 'stat-chip stat-chip-atlet hover:opacity-90',
                         onClick: () => showParameterDetail(row),
                     },
                 ]"

@@ -25,12 +25,12 @@ const actions = (row: any) => [
         permission: 'Mst Jenis Tenaga Pendukung Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/data-master/jenis-tenaga-pendukung/${row.id}/edit`),
         permission: 'Mst Jenis Tenaga Pendukung Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Mst Jenis Tenaga Pendukung Delete',
     },

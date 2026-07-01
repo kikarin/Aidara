@@ -102,12 +102,12 @@ const actions = (row: any) => [
         permission: 'Program Latihan Rekap Absen',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/program-latihan/${row.id}/edit`),
         permission: 'Program Latihan Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Program Latihan Delete',
     },

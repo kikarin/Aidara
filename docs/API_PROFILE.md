@@ -5,7 +5,7 @@ Dokumentasi API untuk Profile (Biodata, Sertifikat, Prestasi, Dokumen) untuk Mob
 ## Base URL
 
 - **Development**: `http://localhost:8000/api`
-- **Production**: `https://aidara.summitct.co.id/api`
+- **Production**: `https://aidara.bogorkab.go.id/api`
 
 ## Authentication
 
@@ -93,8 +93,11 @@ Jika ingin mengambil options secara terpisah:
 - `GET /api/options/kategori-peserta` - List kategori peserta
 - `GET /api/options/cabor` - List cabor (bisa filter dengan `?kategori_peserta_id=1`)
 - `GET /api/options/cabor-kategori/{caborId}` - List cabor kategori berdasarkan cabor ID
+- `GET /api/options/tenaga-pendukung` - List tenaga pendukung (untuk form Pemeriksaan)
+- `GET /api/options/parameter-pemeriksaan` - List parameter pemeriksaan (untuk form Pemeriksaan)
+- `GET /api/options/ref-status-pemeriksaan` - List status pemeriksaan peserta (untuk form Pemeriksaan)
 
-**Contoh Response:**
+**Contoh Response (umum):**
 ```json
 {
   "status": "success",
@@ -104,6 +107,68 @@ Jika ingin mengambil options secara terpisah:
   ]
 }
 ```
+
+#### Tenaga Pendukung
+
+**Endpoint:** `GET /api/options/tenaga-pendukung`
+
+**Query Parameters:**
+- `cabor_kategori_id` (integer, optional): Filter tenaga pendukung berdasarkan cabor kategori
+
+**Contoh:**
+```
+GET /api/options/tenaga-pendukung?cabor_kategori_id=5
+```
+
+**Response Success (200):**
+```json
+{
+  "status": "success",
+  "data": [
+    { "id": 1, "nama": "Dr. Budi" },
+    { "id": 2, "nama": "Dr. Siti" }
+  ]
+}
+```
+
+#### Parameter Pemeriksaan
+
+**Endpoint:** `GET /api/options/parameter-pemeriksaan`
+
+Mengembalikan list parameter pemeriksaan. Kategori `umum` di-exclude (kategori umum untuk atlet parameter umum, bukan pemeriksaan).
+
+**Response Success (200):**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": 1,
+      "nama": "Berat Badan",
+      "satuan": "kg",
+      "kategori": "fisik",
+      "label": "Berat Badan (kg)"
+    }
+  ]
+}
+```
+
+#### Ref Status Pemeriksaan
+
+**Endpoint:** `GET /api/options/ref-status-pemeriksaan`
+
+**Response Success (200):**
+```json
+{
+  "status": "success",
+  "data": [
+    { "id": 1, "nama": "Sehat" },
+    { "id": 2, "nama": "Tidak Sehat" }
+  ]
+}
+```
+
+**Catatan:** Tiga endpoint di atas (`tenaga-pendukung`, `parameter-pemeriksaan`, `ref-status-pemeriksaan`) tidak termasuk di `/api/options/all`. Ambil secara terpisah jika dibutuhkan untuk modul Pemeriksaan.
 
 ---
 
@@ -216,7 +281,9 @@ Accept: application/json
 
 Mengupdate biodata sesuai role user yang login. **Support partial update** - hanya kirim field yang ingin diupdate.
 
-**Endpoint:** `PUT /api/profile/biodata`
+**Endpoint:**
+- `PUT /api/profile/biodata` — untuk update JSON biasa
+- `POST /api/profile/biodata` — alternatif untuk upload foto (`multipart/form-data`); handler sama dengan PUT
 
 **Catatan Penting:**
 - ✅ **Partial Update**: Bisa update foto saja tanpa mengirim semua field
@@ -309,7 +376,7 @@ nama: "Nama Updated"
 ```
 
 **File Upload (Foto):**
-Untuk upload foto, gunakan `multipart/form-data`:
+Untuk upload foto, gunakan `POST /api/profile/biodata` (disarankan) atau `PUT /api/profile/biodata` dengan `multipart/form-data`:
 ```
 file: [binary file]
 nama: "Nama Atlet"
@@ -967,7 +1034,8 @@ Semua endpoint mengembalikan response dengan format:
    - Foto: `jpg, png, jpeg, webp`
    - Sertifikat/Dokumen: `jpg, png, jpeg, pdf, webp`
 8. **Return All**: Sertifikat, Prestasi, dan Dokumen return semua data (tidak ada pagination)
-9. **Options Endpoint**: Gunakan `/api/options/all` untuk mendapatkan semua dropdown options sekaligus
+9. **Options Endpoint**: Gunakan `/api/options/all` untuk dropdown form profile. Untuk modul Pemeriksaan, ambil `/api/options/tenaga-pendukung`, `/api/options/parameter-pemeriksaan`, dan `/api/options/ref-status-pemeriksaan` secara terpisah
+10. **Update Biodata dengan Foto**: Gunakan `POST /api/profile/biodata` saat upload foto via `multipart/form-data`
 
 ---
 

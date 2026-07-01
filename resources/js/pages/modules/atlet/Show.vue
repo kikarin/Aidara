@@ -292,29 +292,29 @@ const fields = computed(() => {
 });
 
 const actionFields = computed(() => [
-    { label: 'Created At', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Created By', value: props.item.created_by_user?.name || '-' },
-    { label: 'Updated At', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Updated By', value: props.item.updated_by_user?.name || '-' },
+    { label: 'Dibuat Pada', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Dibuat Oleh', value: props.item.created_by_user?.name || '-' },
+    { label: 'Diperbarui Pada', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Diperbarui Oleh', value: props.item.updated_by_user?.name || '-' },
 ]);
 
 const orangTuaActionFields = computed(() => {
     const o = props.item.atlet_orang_tua;
     return [
         {
-            label: 'Created At',
+            label: 'Dibuat Pada',
             value: o?.created_at ? new Date(o.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-',
         },
         {
-            label: 'Created By',
+            label: 'Dibuat Oleh',
             value: o?.created_by_user?.name || '-',
         },
         {
-            label: 'Updated At',
+            label: 'Diperbarui Pada',
             value: o?.updated_at ? new Date(o.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-',
         },
         {
-            label: 'Updated By',
+            label: 'Diperbarui Oleh',
             value: o?.updated_by_user?.name || '-',
         },
     ];
@@ -324,19 +324,19 @@ const kesehatanActionFields = computed(() => {
     const o = props.item.kesehatan;
     return [
         {
-            label: 'Created At',
+            label: 'Dibuat Pada',
             value: o?.created_at ? new Date(o.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-',
         },
         {
-            label: 'Created By',
+            label: 'Dibuat Oleh',
             value: o?.created_by_user?.name || '-',
         },
         {
-            label: 'Updated At',
+            label: 'Diperbarui Pada',
             value: o?.updated_at ? new Date(o.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-',
         },
         {
-            label: 'Updated By',
+            label: 'Diperbarui Oleh',
             value: o?.updated_by_user?.name || '-',
         },
     ];
@@ -503,10 +503,10 @@ function getLamaBergabung(tanggalBergabung: string) {
         :on-delete="currentOnDeleteHandler"
         :on-edit-label="
             (activeTab === 'orang-tua-data' && !props.item.atlet_orang_tua) || (activeTab === 'kesehatan-data' && !props.item.kesehatan)
-                ? 'Create'
+                ? 'Tambah'
                 : activeTab === 'pemeriksaan-khusus-data'
                   ? undefined
-                  : 'Edit'
+                  : 'Ubah'
         "
         :on-edit-icon="
             (activeTab === 'orang-tua-data' && !props.item.atlet_orang_tua) || (activeTab === 'kesehatan-data' && !props.item.kesehatan)

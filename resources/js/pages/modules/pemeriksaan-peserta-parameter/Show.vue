@@ -45,19 +45,19 @@ const fields = computed(() => [
 
 const actionFields = [
     {
-        label: 'Created At',
+        label: 'Dibuat Pada',
         value: item.value.created_at ? new Date(item.value.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-',
     },
     {
-        label: 'Created By',
+        label: 'Dibuat Oleh',
         value: typeof item.value.created_by_user === 'object' ? item.value.created_by_user?.name || '-' : item.value.created_by_user || '-',
     },
     {
-        label: 'Updated At',
+        label: 'Diperbarui Pada',
         value: item.value.updated_at ? new Date(item.value.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-',
     },
     {
-        label: 'Updated By',
+        label: 'Diperbarui Oleh',
         value: typeof item.value.updated_by_user === 'object' ? item.value.updated_by_user?.name || '-' : item.value.updated_by_user || '-',
     },
 ];

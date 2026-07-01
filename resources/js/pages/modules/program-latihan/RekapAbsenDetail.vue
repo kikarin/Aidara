@@ -100,7 +100,7 @@ const getJenisLatihanBadge = (value: string | null | undefined): string => {
         'latihan_mental': 'bg-yellow-500',
         'latihan_pemulihan': 'bg-orange-500',
     };
-    return value ? badges[value] || 'bg-gray-500' : 'bg-gray-500';
+    return value ? badges[value] || 'bg-muted-foreground' : 'bg-muted-foreground';
 };
 </script>
 

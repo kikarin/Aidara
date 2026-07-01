@@ -90,7 +90,7 @@ const canKelola = () => {
             <!-- Button Import -->
             <Button v-if="props.showImport && canImport()" variant="outline" size="sm" @click="$emit('import')">
                 <Import class="h-4 w-4" />
-                Import Excel
+                Impor Excel
             </Button>
 
             <!-- Button Export -->
@@ -103,17 +103,17 @@ const canKelola = () => {
                 :disabled="exportLoading"
             >
                 <Download class="h-4 w-4" />
-                {{ exportLoading ? 'Exporting...' : 'Export Excel' }}
+                {{ exportLoading ? 'Mengekspor...' : 'Ekspor Excel' }}
             </Button>
 
-            <!-- Button Tambah Multiple -->
+            <!-- Button Tambah Banyak -->
             <Link v-if="props.showMultipleButton && props.createMultipleUrl && canCreate()" :href="props.createMultipleUrl">
-                <Button variant="outline" size="sm">+ Tambah Multiple</Button>
+                <Button variant="outline" size="sm">+ Tambah Banyak</Button>
             </Link>
 
-            <!-- Button Create -->
+            <!-- Button Tambah -->
             <Link v-if="props.createUrl && canCreate()" :href="props.createUrl">
-                <Button variant="outline" size="sm">+ Create</Button>
+                <Button variant="outline" size="sm">+ Tambah</Button>
             </Link>
 
             <!-- Button Kelola -->
@@ -151,7 +151,7 @@ const canKelola = () => {
                 @click="onDeleteSelected"
             >
                 <Trash class="h-4 w-4" />
-                Delete Selected ({{ selected.length }})
+                Hapus Terpilih ({{ selected.length }})
             </Button>
         </div>
     </div>
