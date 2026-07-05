@@ -10,6 +10,7 @@ import debounce from 'lodash.debounce';
 import { computed, onMounted, ref, watch } from 'vue';
 import DataTable from '../components/DataTable.vue';
 import HeaderActions from './HeaderActions.vue';
+import permissionService from '@/services/permissionService';
 
 // Configure axios to send credentials (cookies) with requests
 axios.defaults.withCredentials = true;
@@ -103,20 +104,61 @@ const props = defineProps<{
         delete?: boolean;
         import?: boolean;
         kelola?: boolean;
+        detail?: boolean;
+        edit?: boolean;
     };
     showStatistik?: boolean;
     statistikUrl?: string;
     showFilter?: boolean;
     showBulkApprove?: boolean;
     showBulkReject?: boolean;
+    showExport?: boolean;
+    baseUrl?: string; // Base URL untuk detail/edit (optional, default: convert moduleName to URL format)
 }>();
 
-const emit = defineEmits(['search', 'update:selected', 'import', 'setKehadiran', 'filter', 'bulk-approve', 'bulk-reject']);
+const emit = defineEmits(['search', 'update:selected', 'import', 'setKehadiran', 'filter', 'bulk-approve', 'bulk-reject', 'export']);
+
+const exportLoading = ref(false);
 
 const localSelected = ref<number[]>([]);
 
 // Filter state
 const currentFilters = ref<any>({});
+
+// Convert moduleName to URL format (e.g., "Program Latihan" -> "program-latihan")
+const baseUrl = computed(() => {
+    if (props.baseUrl) {
+        return props.baseUrl;
+    }
+    // Convert moduleName to URL format: lowercase and replace spaces with dashes
+    return props.moduleName.toLowerCase().replace(/\s+/g, '-');
+});
+
+// Generate permissions otomatis dari moduleName jika tidak diberikan
+const computedPermissions = computed(() => {
+    if (props.permissions) {
+        return {
+            ...props.permissions,
+            // Tambahkan detail dan edit jika belum ada
+            detail: props.permissions.detail !== undefined ? props.permissions.detail : undefined,
+            edit: props.permissions.edit !== undefined ? props.permissions.edit : undefined,
+        };
+    }
+    
+    // Generate permissions otomatis berdasarkan moduleName
+    if (props.moduleName) {
+        return {
+            create: permissionService.canCreate(props.moduleName),
+            delete: permissionService.canDelete(props.moduleName),
+            import: permissionService.hasPermission(`${props.moduleName} Import`),
+            kelola: permissionService.hasPermission(`${props.moduleName} Kelola`),
+            detail: permissionService.canRead(props.moduleName),
+            edit: permissionService.canUpdate(props.moduleName),
+        };
+    }
+    
+    return undefined;
+});
 
 watch(
     () => props.selected,
@@ -184,8 +226,29 @@ const confirmDeleteRow = async () => {
 
 const localActions = (row: any) => {
     const base = props.actions ? props.actions(row) : [];
-    return base.map((action) => {
-        if (action.label === 'Delete') {
+    
+    // Filter actions berdasarkan permission
+    return base.filter((action) => {
+        // Jika action punya permission field, check permission tersebut
+        if (action.permission) {
+            return permissionService.hasPermission(action.permission);
+        }
+        
+        // Untuk default actions (Detail, Edit, Delete), check berdasarkan computedPermissions
+        if (action.label === 'Detail') {
+            return computedPermissions.value?.detail !== false;
+        }
+        if (action.label === 'Ubah') {
+            return computedPermissions.value?.edit !== false;
+        }
+        if (action.label === 'Hapus') {
+            return computedPermissions.value?.delete !== false;
+        }
+        
+        // Default: tampilkan jika tidak ada permission check
+        return true;
+    }).map((action) => {
+        if (action.label === 'Hapus') {
             return {
                 ...action,
                 onClick: () => handleDeleteRow(row),
@@ -231,14 +294,24 @@ const handleFilterFromParent = (filters: any) => {
     fetchData();
 };
 
+// Get current params for export
+const getCurrentParams = () => {
+    return {
+        search: search.value,
+        sort: sort.value.key,
+        order: sort.value.order,
+        filters: currentFilters.value,
+    };
+};
+
 // Expose filter handler
-defineExpose({ fetchData, handleFilterFromParent });
+defineExpose({ fetchData, handleFilterFromParent, getCurrentParams, search, sort, currentFilters, exportLoading });
 </script>
 
 <template>
     <Head :title="title" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen w-full bg-gray-100 dark:bg-neutral-950">
+        <div class="page-surface">
             <div class="container mx-auto">
                 <div class="mx-auto px-4 py-4">
                     <slot name="header-extra"></slot>
@@ -256,20 +329,23 @@ defineExpose({ fetchData, handleFilterFromParent });
                         :kelolaUrl="props.kelolaUrl"
                         :kelolaLabel="props.kelolaLabel"
                         :showDelete="props.showDelete"
-                        :permissions="permissions"
+                        :permissions="computedPermissions"
                         :showStatistik="props.showStatistik"
                         :statistikUrl="props.statistikUrl"
                         :showFilter="props.showFilter"
                         :showBulkApprove="props.showBulkApprove"
                         :showBulkReject="props.showBulkReject"
+                        :showExport="props.showExport"
+                        :exportLoading="exportLoading"
                         @import="$emit('import')"
                         @setKehadiran="(status: boolean) => $emit('setKehadiran', status)"
                         @filter="$emit('filter')"
                         @bulk-approve="$emit('bulk-approve')"
                         @bulk-reject="$emit('bulk-reject')"
+                        @export="$emit('export')"
                     />
                 </div>
-                <div class="mx-4 rounded-xl bg-white pt-4 shadow dark:bg-neutral-900">
+                <div class="content-panel mx-4 pt-4">
                     <DataTable
                         :columns="columns"
                         :rows="rowsWithCustom"
@@ -283,14 +359,14 @@ defineExpose({ fetchData, handleFilterFromParent });
                         :per-page="props.limit !== undefined ? props.limit : localLimit"
                         :base-url="''"
                         :module-name="moduleName"
-                        :permissions="permissions"
+                        :permissions="computedPermissions"
                         @update:search="handleSearchDebounced"
                         @update:sort="handleSort"
                         @update:page="handlePageChange"
                         @update:perPage="(val: any) => handleSearch({ limit: Number(val), page: 1 })"
                         @deleted="fetchData()"
-                        @detail="(id: string | number) => router.visit(`/${moduleName}/${id}`)"
-                        @edit="(id: string | number) => router.visit(`/${moduleName}/${id}/edit`)"
+                        @detail="(id: string | number) => router.visit(`/${baseUrl}/${id}`)"
+                        @edit="(id: string | number) => router.visit(`/${baseUrl}/${id}/edit`)"
                         @delete="(id: string | number) => handleDeleteRow({ id })"
                         :on-delete-row="handleDeleteRow"
                         :hide-pagination="props.hidePagination"

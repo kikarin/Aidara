@@ -1,30 +1,36 @@
 <script setup lang="ts">
 import { useAppearance } from '@/composables/useAppearance';
-import { Monitor, Moon, Sun } from 'lucide-vue-next';
+import type { Appearance } from '@/lib/theme';
+import { Award, Leaf, Monitor, Moon, Palette, Sparkles, Sun } from 'lucide-vue-next';
 
 const { appearance, updateAppearance } = useAppearance();
 
-const tabs = [
-    { value: 'light', Icon: Sun, label: 'Light' },
-    { value: 'dark', Icon: Moon, label: 'Dark' },
-    { value: 'system', Icon: Monitor, label: 'System' },
-] as const;
+const tabs: { value: Appearance; Icon: typeof Sun; label: string }[] = [
+    { value: 'dispora', Icon: Award, label: 'Dispora' },
+    { value: 'light', Icon: Sun, label: 'Terang' },
+    { value: 'slate', Icon: Sparkles, label: 'Slate' },
+    { value: 'warm', Icon: Palette, label: 'Hangat' },
+    { value: 'sport', Icon: Leaf, label: 'Olahraga' },
+    { value: 'dark', Icon: Moon, label: 'Gelap' },
+    { value: 'system', Icon: Monitor, label: 'Sistem' },
+];
 </script>
 
 <template>
-    <div class="inline-flex gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
+    <div class="grid max-w-3xl grid-cols-2 gap-1 rounded-lg bg-muted p-1 sm:grid-cols-4">
         <button
             v-for="{ value, Icon, label } in tabs"
             :key="value"
+            type="button"
             @click="updateAppearance(value)"
             :class="[
-                'flex items-center rounded-md px-3.5 py-1.5 transition-colors',
+                'flex items-center justify-center rounded-md px-2.5 py-2 transition-colors',
                 appearance === value
-                    ? 'bg-white shadow-xs dark:bg-neutral-700 dark:text-neutral-100'
-                    : 'text-neutral-500 hover:bg-neutral-200/60 hover:text-black dark:text-neutral-400 dark:hover:bg-neutral-700/60',
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
             ]"
         >
-            <component :is="Icon" class="-ml-1 h-4 w-4" />
+            <component :is="Icon" class="h-4 w-4 shrink-0" />
             <span class="ml-1.5 text-sm">{{ label }}</span>
         </button>
     </div>

@@ -26,7 +26,7 @@ const handleBack = () => {
 
 <template>
     <CardHeader class="flex items-center justify-between">
-        <CardTitle class="text-xl"> <span v-if="isEdit && showEditPrefix !== false">Edit </span>{{ title }} </CardTitle>
+        <CardTitle class="text-xl"> <span v-if="isEdit && showEditPrefix !== false">Ubah </span>{{ title }} </CardTitle>
         <Button variant="secondary" @click="handleBack"> ← Kembali </Button>
     </CardHeader>
 </template>

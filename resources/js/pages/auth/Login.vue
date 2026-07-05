@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
+import LoginConsentDialog from '@/components/auth/LoginConsentDialog.vue';
 import Recaptcha from '@/components/Recaptcha.vue';
+import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -23,6 +25,7 @@ const form = useForm({
 });
 
 const showPassword = ref(false);
+const consentOpen = ref(false);
 const recaptchaRef = ref<InstanceType<typeof Recaptcha> | null>(null);
 const recaptchaVerified = ref(false);
 
@@ -41,11 +44,15 @@ const handleRecaptchaError = () => {
     recaptchaVerified.value = false;
 };
 
+const openConsentDialog = () => {
+    consentOpen.value = true;
+};
+
 const submit = () => {
-    // Only require reCAPTCHA if site key is provided
     if (props.recaptchaSiteKey && props.recaptchaSiteKey.trim() !== '') {
         if (!recaptchaVerified.value || !form.recaptcha_token) {
             form.setError('recaptcha_token', 'Harap verifikasi bahwa Anda bukan robot');
+            consentOpen.value = false;
             return;
         }
     }
@@ -55,28 +62,34 @@ const submit = () => {
             form.reset('password', 'recaptcha_token');
             recaptchaVerified.value = false;
             recaptchaRef.value?.reset();
+            consentOpen.value = false;
         },
         onError: () => {
             recaptchaRef.value?.reset();
             recaptchaVerified.value = false;
             form.recaptcha_token = '';
+            consentOpen.value = false;
         },
     });
+};
+
+const handleConfirmLogin = () => {
+    submit();
 };
 </script>
 
 <template>
-    <AuthBase title="Dispora" description="Dinas Pemuda dan Olahraga">
-        <Head title="Login" />
+    <AuthBase title="Masuk ke AIDARA" description="Portal data olahraga Dispora Kabupaten Bogor">
+        <Head title="Masuk" />
 
         <div
             v-if="status"
-            class="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-center text-sm font-medium text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400"
+            class="mb-6 alert-success"
         >
             {{ status }}
         </div>
 
-        <form @submit.prevent="submit" class="space-y-6">
+        <form @submit.prevent="openConsentDialog" class="space-y-6">
             <!-- Email -->
             <div class="space-y-2">
                 <Label for="email" class="text-sm font-medium">Email</Label>
@@ -101,7 +114,7 @@ const submit = () => {
 
             <!-- Password -->
             <div class="space-y-2">
-                <Label for="password" class="text-sm font-medium">Password</Label>
+                <Label for="password" class="text-sm font-medium">Kata Sandi</Label>
                 <div class="group relative">
                     <Lock
                         class="text-muted-foreground group-focus-within:text-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transition-colors"
@@ -113,7 +126,7 @@ const submit = () => {
                         :tabindex="2"
                         autocomplete="current-password"
                         v-model="form.password"
-                        placeholder="Masukkan password Anda"
+                        placeholder="Masukkan kata sandi Anda"
                         class="border-input bg-background focus:border-ring h-11 rounded-lg pr-10 pl-10 transition-colors"
                     />
                     <button
@@ -157,9 +170,20 @@ const submit = () => {
                 :tabindex="4"
                 :disabled="form.processing || (recaptchaSiteKey && recaptchaSiteKey.trim() !== '' && !recaptchaVerified)"
             >
-                <LoaderCircle v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
-                {{ form.processing ? 'Memproses...' : 'Masuk ke Sistem' }}
+                <LoaderCircle v-if="form.processing && !consentOpen" class="mr-2 h-4 w-4 animate-spin" />
+                {{ form.processing && !consentOpen ? 'Memproses...' : 'Masuk ke Sistem' }}
             </Button>
         </form>
+
+        <p class="text-muted-foreground mt-6 text-center text-sm">
+            Belum punya akun?
+            <TextLink :href="route('register')" class="underline underline-offset-4">Daftar sebagai peserta</TextLink>
+        </p>
+
+        <LoginConsentDialog
+            v-model:open="consentOpen"
+            :loading="form.processing"
+            @confirm="handleConfirmLogin"
+        />
     </AuthBase>
 </template>

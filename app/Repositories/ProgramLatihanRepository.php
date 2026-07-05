@@ -20,12 +20,12 @@ class ProgramLatihanRepository
     public function __construct(ProgramLatihan $model)
     {
         $this->model = $model;
-        $this->with  = ['caborKategori', 'cabor', 'media', 'created_by_user', 'updated_by_user'];
+        $this->with  = ['caborKategori', 'cabor', 'pelatih', 'pelatihs', 'media', 'created_by_user', 'updated_by_user'];
     }
 
     public function customIndex($data)
     {
-        $query = $this->model->with(['caborKategori', 'cabor', 'media']);
+        $query = $this->model->with(['caborKategori', 'cabor', 'pelatih', 'media']);
 
         if (request('search')) {
             $search = request('search');
@@ -117,8 +117,11 @@ class ProgramLatihanRepository
                 'cabor_nama'                     => $item->cabor?->nama,
                 'nama_program'                   => $item->nama_program,
                 'cabor_kategori_id'              => $item->cabor_kategori_id,
-                'cabor_kategori_nama'            => $item->caborKategori?->nama,
-                'periode_mulai'                  => $item->periode_mulai,
+                    'cabor_kategori_nama'            => $item->caborKategori?->nama,
+                    'pelatih_id'                     => $item->pelatih_id,
+                    'pelatih_nama'                   => $item->pelatih?->nama,
+                    'wajib_absen_atlet'              => (bool) $item->wajib_absen_atlet,
+                    'periode_mulai'                  => $item->periode_mulai,
                 'periode_selesai'                => $item->periode_selesai,
                 'periode_hitung'                 => $item->periode_hitung,
                 'tahap'                          => $item->tahap,
@@ -182,23 +185,56 @@ class ProgramLatihanRepository
 
     public function create(array $data)
     {
-        unset($data['file']);
-        
+        $pelatihIds = $this->extractPelatihIds($data);
+        unset($data['pelatih_ids'], $data['file']);
+
+        $data['pelatih_id'] = $pelatihIds[0] ?? null;
         $data = $this->customDataCreateUpdate($data);
         $model = $this->model->create($data);
+        $this->syncPelatih($model, $pelatihIds);
 
-        return $model;
+        return $model->load('pelatihs');
     }
 
     public function update($id, array $data)
     {
         $record = $this->getById($id);
-        unset($data['file']);
-        
+        $pelatihIds = $this->extractPelatihIds($data);
+        unset($data['pelatih_ids'], $data['file']);
+
+        if (!empty($pelatihIds)) {
+            $data['pelatih_id'] = $pelatihIds[0];
+        }
+
         $processedData = $this->customDataCreateUpdate($data, $record);
         $record->update($processedData);
 
-        return $record;
+        if (!empty($pelatihIds)) {
+            $this->syncPelatih($record, $pelatihIds);
+        }
+
+        return $record->load('pelatihs');
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    protected function extractPelatihIds(array $data): array
+    {
+        if (!empty($data['pelatih_ids']) && is_array($data['pelatih_ids'])) {
+            return array_values(array_unique(array_map('intval', $data['pelatih_ids'])));
+        }
+
+        if (!empty($data['pelatih_id'])) {
+            return [(int) $data['pelatih_id']];
+        }
+
+        return [];
+    }
+
+    protected function syncPelatih(ProgramLatihan $model, array $pelatihIds): void
+    {
+        $model->pelatihs()->sync($pelatihIds);
     }
 
     public function validateRequest($request)
@@ -221,7 +257,7 @@ class ProgramLatihanRepository
      */
     public function getForMobile($request)
     {
-        $query = $this->model->with(['caborKategori', 'cabor', 'media']);
+        $query = $this->model->with(['caborKategori', 'cabor', 'pelatih', 'media']);
         $this->applyRoleBasedFiltering($query);
 
         // Search functionality

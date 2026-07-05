@@ -181,8 +181,9 @@ class CategoryPermissionSeeder extends Seeder
                 'permission' => 'CRUD',
             ],
             [
-                'name'       => 'Cabor',
-                'permission' => 'CRUD',
+                'name'              => 'Cabor',
+                'permission'        => 'CRUD',
+                'permission_common' => ['Cabor Tambah Peserta', 'Cabor Hapus Peserta'],
             ],
             [
                 'name'       => 'Cabor Kategori',
@@ -201,8 +202,9 @@ class CategoryPermissionSeeder extends Seeder
                 'permission' => ['Cabor Kategori Tenaga Pendukung Show', 'Cabor Kategori Tenaga Pendukung Add', 'Cabor Kategori Tenaga Pendukung Edit', 'Cabor Kategori Tenaga Pendukung Delete'],
             ],
             [
-                'name'       => 'Program Latihan',
-                'permission' => 'CRUD',
+                'name'              => 'Program Latihan',
+                'permission'        => 'CRUD',
+                'permission_common' => ['Program Latihan Rekap Absen'],
             ],
             [
                 'name'       => 'Pemeriksaan',
@@ -224,11 +226,15 @@ class CategoryPermissionSeeder extends Seeder
             [
                 'name'              => 'Pemeriksaan Khusus',
                 'permission'        => 'CRUD',
-                'permission_common' => ['Pemeriksaan Khusus Setup', 'Pemeriksaan Khusus Input Hasil Tes'],
+                'permission_common' => ['Pemeriksaan Khusus Setup', 'Pemeriksaan Khusus Input Hasil Tes', 'Pemeriksaan Khusus Tambah Peserta', 'Pemeriksaan Khusus Hapus Peserta'],
             ],
             [
                 'name'      => 'Turnamen',
                 'permission'=> 'CRUD',
+            ],
+            [
+                'name'       => 'Pengaturan World Cup',
+                'permission' => ['Pengaturan World Cup Edit'],
             ],
         ];
 

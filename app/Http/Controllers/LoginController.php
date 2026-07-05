@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\OtpMailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -36,7 +37,11 @@ class LoginController extends Controller
         if (Auth::attempt($credentials, $remember)) {
             $user = Auth::user();
             
-            if ($user->is_active == 0) {
+            // Izinkan login jika user masih dalam proses registrasi (belum punya peserta_id atau registration_status = 'pending')
+            $isInRegistrationProcess = !$user->peserta_id || !$user->peserta_type || $user->registration_status === 'pending';
+            
+            // Jika user tidak aktif, cek apakah masih dalam proses registrasi
+            if ($user->is_active == 0 && !$isInRegistrationProcess) {
                 Auth::logout();
 
                 return redirect('login')->withError('Your account is not active!');
@@ -47,25 +52,27 @@ class LoginController extends Controller
             if (!$user->email_verified_at) {
                 activity()->event('Login')->performedOn(User::find($user->id))->log('Auth');
                 User::where('id', $user->id)->update(['last_login' => now()]);
-                
-                // Jika belum ada OTP, kirim OTP baru
-                if (!$user->email_otp || !$user->email_otp_expires_at) {
-                    $otpCode = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
-                    
-                    $user->update([
-                        'email_otp' => bcrypt($otpCode),
-                        'email_otp_expires_at' => now()->addMinutes(10),
-                    ]);
 
-                    // Kirim email OTP
-                    $user->notify(new \App\Notifications\EmailOtpNotification($otpCode));
-                    
-                    // Simpan waktu terakhir OTP dikirim untuk cooldown
-                    $request->session()->put('otp_last_sent', now());
-                }
-                
+                $otpCode = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+
+                $user->update([
+                    'email_otp' => bcrypt($otpCode),
+                    'email_otp_expires_at' => now()->addMinutes(10),
+                ]);
+
+                app(OtpMailService::class)->send($user->email, $otpCode, 'legacy-web-login');
+
+                $request->session()->put('otp_last_sent', now());
+
                 return redirect()->route('email.otp.verify')
                     ->with('warning', 'Email Anda belum diverifikasi. Silakan masukkan kode OTP yang telah dikirim ke email Anda.');
+            }
+            
+            // Jika user sudah verified tapi masih dalam proses registrasi, redirect ke registration steps
+            $isInRegistrationProcess = !$user->peserta_id || !$user->peserta_type || $user->registration_status === 'pending';
+            if ($isInRegistrationProcess) {
+                return redirect()->route('registration.steps', ['step' => 1])
+                    ->with('info', 'Silakan lengkapi data registrasi Anda.');
             }
             
             if ($user->verification_token != null) {

@@ -9,6 +9,8 @@ use App\Traits\BaseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class CaborKategoriController extends Controller implements HasMiddleware
 {
@@ -155,11 +157,45 @@ class CaborKategoriController extends Controller implements HasMiddleware
 
     public function listByCabor($cabor_id)
     {
-        $data = CaborKategori::where('cabor_id', $cabor_id)
+        $query = CaborKategori::where('cabor_id', $cabor_id)
             ->select('id', 'nama')
-            ->orderBy('nama')
-            ->get();
-
+            ->orderBy('nama');
+        
+        // Filter berdasarkan cabor yang dimiliki pelatih/tenaga pendukung
+        $auth = Auth::user();
+        if ($auth && (int) $auth->current_role_id === 36) {
+            // Pelatih hanya melihat kategori dari cabor yang mereka miliki
+            if ($auth->pelatih && $auth->pelatih->id) {
+                $caborIds = DB::table('cabor_kategori_pelatih')
+                    ->where('pelatih_id', $auth->pelatih->id)
+                    ->whereNull('deleted_at')
+                    ->pluck('cabor_id')
+                    ->unique()
+                    ->toArray();
+                
+                if (!empty($caborIds) && !in_array($cabor_id, $caborIds)) {
+                    // Jika cabor_id tidak ada di list cabor yang dimiliki pelatih, return empty
+                    return response()->json([]);
+                }
+            }
+        } elseif ($auth && (int) $auth->current_role_id === 37) {
+            // Tenaga Pendukung hanya melihat kategori dari cabor yang mereka miliki
+            if ($auth->tenagaPendukung && $auth->tenagaPendukung->id) {
+                $caborIds = DB::table('cabor_kategori_tenaga_pendukung')
+                    ->where('tenaga_pendukung_id', $auth->tenagaPendukung->id)
+                    ->whereNull('deleted_at')
+                    ->pluck('cabor_id')
+                    ->unique()
+                    ->toArray();
+                
+                if (!empty($caborIds) && !in_array($cabor_id, $caborIds)) {
+                    // Jika cabor_id tidak ada di list cabor yang dimiliki tenaga pendukung, return empty
+                    return response()->json([]);
+                }
+            }
+        }
+        
+        $data = $query->get();
         return response()->json($data);
     }
 }

@@ -86,7 +86,7 @@ const handleClose = () => {
         <div class="absolute inset-0 bg-black/50" @click="handleClose"></div>
 
         <!-- Modal -->
-        <div class="relative mx-4 flex max-h-[90vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl dark:bg-neutral-900">
+        <div class="relative mx-4 flex max-h-[90vh] w-full max-w-4xl flex-col rounded-lg border border-border/60 bg-card shadow-xl">
             <!-- Header -->
             <CardHeader class="flex flex-shrink-0 flex-row items-center justify-between space-y-0 pb-4">
                 <div class="flex items-center gap-2">
@@ -141,7 +141,7 @@ const handleClose = () => {
                                         <tr
                                             v-for="(item, index) in chartData"
                                             :key="index"
-                                            class="border-b hover:bg-gray-50 dark:hover:bg-neutral-800"
+                                            class="border-b hover:bg-muted/50"
                                         >
                                             <td class="p-3">{{ item.tanggal }}</td>
                                             <td class="p-3">{{ item.pemeriksaan }}</td>

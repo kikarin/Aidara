@@ -84,7 +84,7 @@ watch(
                 <li v-if="item.children">
                     <button
                         @click="toggleGroup(item.title)"
-                        class="hover:bg-muted flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition"
+                        class="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition"
                     >
                         <span class="flex items-center gap-2">
                             <component :is="item.icon" class="h-4 w-4" />
@@ -98,7 +98,7 @@ watch(
                             <li v-if="child.children">
                                 <button
                                     @click="toggleGroup(child.title)"
-                                    class="hover:bg-muted flex w-full justify-between rounded px-3 py-1 text-sm"
+                                    class="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full justify-between rounded px-3 py-1 text-sm"
                                 >
                                     {{ child.title }}
                                     <ChevronDown class="h-4 w-4 transition-transform" :class="{ 'rotate-180': openGroups.includes(child.title) }" />
@@ -107,8 +107,9 @@ watch(
                                     <li v-for="sub in child.children" :key="sub.title">
                                         <Link
                                             :href="sub.href"
-                                            class="hover:bg-muted block rounded px-3 py-1 text-xs"
-                                            :class="{ 'bg-muted font-semibold': isActive(sub.href) }"
+                                            prefetch="hover"
+                                            class="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground block rounded px-3 py-1 text-xs"
+                                            :class="{ 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold': isActive(sub.href) }"
                                         >
                                             {{ sub.title }}
                                         </Link>
@@ -119,8 +120,9 @@ watch(
                             <li v-else>
                                 <Link
                                     :href="child.href"
-                                    class="hover:bg-muted block rounded px-3 py-1 text-sm"
-                                    :class="{ 'bg-muted font-semibold': isActive(child.href) }"
+                                    prefetch="hover"
+                                    class="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground block rounded px-3 py-1 text-sm"
+                                    :class="{ 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold': isActive(child.href) }"
                                 >
                                     {{ child.title }}
                                 </Link>
@@ -133,8 +135,9 @@ watch(
                 <li v-else>
                     <Link
                         :href="item.href"
-                        class="hover:bg-muted flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition"
-                        :class="{ 'bg-muted font-semibold': isActive(item.href) }"
+                        prefetch="hover"
+                        class="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition"
+                        :class="{ 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold': isActive(item.href) }"
                     >
                         <component :is="item.icon" class="h-4 w-4" />
                         {{ item.title }}

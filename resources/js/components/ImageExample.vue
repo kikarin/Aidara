@@ -63,7 +63,7 @@ const closeManualModal = () => {
             <h2 class="text-xl font-semibold">Manual Modal Example</h2>
 
             <div class="space-y-2">
-                <p class="text-sm text-gray-600">Anda juga bisa menggunakan ImageModal secara manual untuk kontrol yang lebih fleksibel.</p>
+                <p class="text-muted-foreground text-sm">Anda juga bisa menggunakan ImageModal secara manual untuk kontrol yang lebih fleksibel.</p>
 
                 <button @click="openManualModal" class="rounded bg-blue-500 px-4 py-2 text-white transition-colors hover:bg-blue-600">
                     Buka Modal Manual
@@ -77,7 +77,7 @@ const closeManualModal = () => {
         <section class="space-y-4">
             <h2 class="text-xl font-semibold">Cara Penggunaan</h2>
 
-            <div class="rounded-lg bg-gray-50 p-4">
+            <div class="bg-muted rounded-lg p-4">
                 <h3 class="mb-2 font-medium">Import Komponen:</h3>
                 <pre class="rounded border bg-white p-2 text-sm"><code>import { ImagePreview, ImageModal } from '@/components';
 // atau

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import axios from 'axios';
 import { onMounted, ref, watch } from 'vue';
@@ -21,7 +22,7 @@ const items = ref<any[]>([]);
 const loading = ref(false);
 const searchQuery = ref('');
 const currentPage = ref(1);
-const perPage = ref(10);
+const perPage = ref(100); // Default lebih besar untuk menampilkan lebih banyak item
 const total = ref(0);
 const localSelected = ref<number[]>(props.selectedIds ? [...props.selectedIds] : []);
 
@@ -93,13 +94,15 @@ const isSelected = (id: number) => localSelected.value.includes(id);
         </div>
         <div class="mb-2 flex flex-col flex-wrap items-center justify-center gap-4 text-center sm:flex-row sm:justify-between">
             <div class="w-full sm:w-64">
-                <Input v-model="searchQuery" placeholder="Search..." class="w-full" />
+                <Input v-model="searchQuery" placeholder="Cari..." class="w-full" />
             </div>
         </div>
-        <div v-if="loading" class="flex items-center justify-center py-8">
-            <div class="border-primary h-8 w-8 animate-spin rounded-full border-b-2"></div>
-            <span class="text-muted-foreground ml-2 text-sm">Memuat data...</span>
-        </div>
+        <TableSkeleton
+            v-if="loading"
+            :rows="8"
+            :column-labels="props.columns.map((col) => col.label)"
+            show-checkbox
+        />
         <div v-else-if="items.length === 0" class="py-8 text-center">
             <p class="text-muted-foreground">Tidak ada data tersedia</p>
         </div>
@@ -110,14 +113,12 @@ const isSelected = (id: number) => localSelected.value.includes(id);
                         <TableRow>
                             <TableHead class="w-12 text-center">No</TableHead>
                             <TableHead class="w-10 text-center">
-                                <label
-                                    class="bg-background relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-gray-500"
-                                >
+                                <label class="table-checkbox">
                                     <input
                                         type="checkbox"
                                         class="peer sr-only"
                                         :checked="localSelected.length > 0 && localSelected.length === items.length"
-                                        @change="(e) => toggleSelectAll((e.target as HTMLInputElement).checked)"
+                                        @change="(e: Event) => toggleSelectAll((e.target as HTMLInputElement).checked)"
                                     />
                                     <div class="bg-primary h-3 w-3 scale-0 transform rounded-sm transition-all peer-checked:scale-100"></div>
                                 </label>
@@ -133,9 +134,7 @@ const isSelected = (id: number) => localSelected.value.includes(id);
                                 {{ (currentPage - 1) * perPage + index + 1 }}
                             </TableCell>
                             <TableCell class="px-2 text-center text-xs break-words whitespace-normal sm:px-4 sm:text-sm">
-                                <label
-                                    class="bg-background relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-gray-500"
-                                >
+                                <label class="table-checkbox">
                                     <input
                                         type="checkbox"
                                         class="peer sr-only"

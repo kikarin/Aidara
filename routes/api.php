@@ -1,25 +1,15 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\SettingsController;
-use App\Http\Controllers\Api\CsrfController;
-use App\Http\Controllers\Api\ProgramLatihanController;
-use App\Http\Controllers\Api\PemeriksaanController;
-use App\Http\Controllers\Api\PemeriksaanParameterController as ApiPemeriksaanParameterController;
-use App\Http\Controllers\Api\TurnamenController;
-use App\Http\Controllers\Api\TurnamenCrudController;
-use App\Http\Controllers\Api\TurnamenFormController;
-use App\Http\Controllers\Api\TurnamenPesertaController;
-use App\Http\Controllers\Api\PemeriksaanPesertaController as ApiPemeriksaanPesertaController;
-use App\Http\Controllers\Api\PemeriksaanPesertaParameterController;
+use App\Http\Controllers\Api\CaborController;
+use App\Http\Controllers\Api\OptionsController;
 use App\Http\Controllers\Api\ProfileController;
-use App\Http\Controllers\Api\ParticipantProfileController;
-use App\Http\Controllers\RefStatusPemeriksaanController;
-use App\Http\Controllers\Api\HomeController;
-use App\Http\Controllers\UsersController;
-use App\Http\Controllers\MstParameterController;
-use App\Http\Controllers\UsersMenuController;
-use Illuminate\Http\Request;
+use App\Http\Controllers\Api\ProgramLatihanAbsenAtletController;
+use App\Http\Controllers\Api\ProgramLatihanController;
+use App\Http\Controllers\Api\RekapAbsenController;
+use App\Http\Controllers\Api\PemeriksaanController;
+use App\Http\Controllers\Api\PemeriksaanKhususController;
+use App\Http\Controllers\Api\PrestasiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -33,11 +23,10 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// CSRF Cookie route (harus di atas semua routes)
-Route::get('/sanctum/csrf-cookie', [CsrfController::class, 'getCsrfCookie']);
-
 // Public routes (tidak perlu authentication)
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp']);
+Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp']);
 
 // Protected routes (perlu authentication)
 Route::middleware('auth:sanctum')->group(function () {
@@ -45,127 +34,132 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/profile', [AuthController::class, 'profile']);
     Route::post('/auth/refresh', [AuthController::class, 'refresh']);
+    
+    // Options/Dropdown routes (public untuk authenticated user)
+    Route::prefix('options')->group(function () {
+        Route::get('/kecamatan', [OptionsController::class, 'getKecamatan']);
+        Route::get('/kelurahan/{kecamatanId}', [OptionsController::class, 'getKelurahanByKecamatan']);
+        Route::get('/tingkat', [OptionsController::class, 'getTingkat']);
+        Route::get('/kategori-prestasi-pelatih', [OptionsController::class, 'getKategoriPrestasiPelatih']);
+        Route::get('/kategori-atlet', [OptionsController::class, 'getKategoriAtlet']);
+        Route::get('/jenis-dokumen', [OptionsController::class, 'getJenisDokumen']);
+        Route::get('/posisi-atlet', [OptionsController::class, 'getPosisiAtlet']);
+        Route::get('/kategori-peserta', [OptionsController::class, 'getKategoriPeserta']);
+        Route::get('/cabor', [OptionsController::class, 'getCabor']);
+        Route::get('/cabor-kategori/{caborId}', [OptionsController::class, 'getCaborKategoriByCabor']);
+        Route::get('/tenaga-pendukung', [OptionsController::class, 'getTenagaPendukung']);
+        Route::get('/parameter-pemeriksaan', [OptionsController::class, 'getParameterPemeriksaan']);
+        Route::get('/ref-status-pemeriksaan', [OptionsController::class, 'getRefStatusPemeriksaan']);
+        Route::get('/all', [OptionsController::class, 'getAllOptions']); // Get all options sekaligus
+    });
+    
+    // Profile routes (auto-detect role: atlet/pelatih/tenaga_pendukung)
+    Route::prefix('profile')->group(function () {
+        // Biodata
+        Route::get('/biodata', [ProfileController::class, 'getBiodata']);
+        Route::put('/biodata', [ProfileController::class, 'updateBiodata']);
+        Route::post('/biodata', [ProfileController::class, 'updateBiodata']); // POST untuk file upload (dengan _method=PUT atau langsung POST)
+        
+        // Sertifikat
+        Route::get('/sertifikat', [ProfileController::class, 'getSertifikat']);
+        Route::post('/sertifikat', [ProfileController::class, 'storeSertifikat']);
+        Route::get('/sertifikat/{id}/file', [ProfileController::class, 'downloadSertifikat']);
+        Route::delete('/sertifikat/{id}', [ProfileController::class, 'deleteSertifikat']);
+        
+        // Prestasi
+        Route::get('/prestasi', [ProfileController::class, 'getPrestasi']);
+        Route::post('/prestasi', [ProfileController::class, 'storePrestasi']);
+        Route::delete('/prestasi/{id}', [ProfileController::class, 'deletePrestasi']);
+        
+        // Dokumen
+        Route::get('/dokumen', [ProfileController::class, 'getDokumen']);
+        Route::post('/dokumen', [ProfileController::class, 'storeDokumen']);
+        Route::get('/dokumen/{id}/file', [ProfileController::class, 'downloadDokumen']);
+        Route::delete('/dokumen/{id}', [ProfileController::class, 'deleteDokumen']);
+    });
+    
+    // Program Latihan routes (mobile API)
+    Route::prefix('v1/program-latihan')->group(function () {
+        Route::get('/', [ProgramLatihanController::class, 'index']);
+        Route::post('/', [ProgramLatihanController::class, 'store']);
+        Route::put('/{id}', [ProgramLatihanController::class, 'update']);
+        Route::delete('/{id}', [ProgramLatihanController::class, 'destroy']);
+        
+        // Filter endpoints (bisa digunakan untuk filter dan form dropdown)
+        Route::get('/filter/cabor', [ProgramLatihanController::class, 'getCaborList']);
+        Route::get('/filter/kategori/{caborId}', [ProgramLatihanController::class, 'getKategoriByCabor']);
+        Route::get('/filter/pelatih/{caborKategoriId}', [ProgramLatihanController::class, 'getPelatihByKategori']);
+        
+        // Rekap Absen routes
+        Route::prefix('{programId}/rekap-absen')->group(function () {
+            Route::get('/', [RekapAbsenController::class, 'index']);
+            Route::get('/today', [RekapAbsenController::class, 'getToday']);
+            Route::post('/', [RekapAbsenController::class, 'store']);
+            Route::post('/{rekapId}', [RekapAbsenController::class, 'update']); // POST untuk update (PUT tidak reliable untuk file upload)
+            Route::delete('/{rekapId}/media/{mediaId}', [RekapAbsenController::class, 'deleteMedia']);
+        });
 
-    // Settings routes
-    Route::get('/settings', [SettingsController::class, 'getSettings']);
-    Route::put('/settings/profile', [SettingsController::class, 'updateProfile']);
-    Route::put('/settings/password', [SettingsController::class, 'changePassword']);
-    Route::post('/settings/reset-password', [SettingsController::class, 'resetPassword']);
-    Route::delete('/settings/account', [SettingsController::class, 'deleteAccount']);
+        // Absen Atlet routes
+        Route::prefix('{programId}/absen-atlet')->group(function () {
+            Route::get('/', [ProgramLatihanAbsenAtletController::class, 'index']);
+            Route::get('/today', [ProgramLatihanAbsenAtletController::class, 'getToday']);
+            Route::post('/', [ProgramLatihanAbsenAtletController::class, 'store']);
+        });
 
-    // Program Latihan (Mobile)
-    Route::get('/program-latihan/mobile', [ProgramLatihanController::class, 'index']);
-    Route::get('/program-latihan/{id}', [ProgramLatihanController::class, 'show']);
-    Route::get('/program-latihan/cabor/list', [ProgramLatihanController::class, 'getCaborList']);
-    Route::get('/program-latihan/cabor/list-for-create', [ProgramLatihanController::class, 'getCaborListForCreate']);
-    Route::get('/program-latihan/cabor/{caborId}/kategori', [ProgramLatihanController::class, 'getCaborKategoriByCabor']);
-
-    // Program Latihan CRUD (Restricted to Superadmin and Pelatih)
-    Route::middleware('program.latihan.permission')->group(function () {
-        Route::post('/program-latihan', [ProgramLatihanController::class, 'store']);
-        Route::put('/program-latihan/{id}', [ProgramLatihanController::class, 'update']);
-        Route::delete('/program-latihan/{id}', [ProgramLatihanController::class, 'destroy']);
+        Route::get('/{programId}/kehadiran', [ProgramLatihanAbsenAtletController::class, 'kehadiran']);
+        Route::get('/{programId}/kehadiran/atlet/{atletId}', [ProgramLatihanAbsenAtletController::class, 'riwayatAtlet']);
+    });
+    
+    // Pemeriksaan routes (mobile API)
+    Route::prefix('v1/pemeriksaan')->group(function () {
+        Route::get('/', [PemeriksaanController::class, 'index']);
+        Route::get('/statistik/parameter/{parameterId}', [PemeriksaanController::class, 'getStatistikParameter']);
+        Route::get('/{id}', [PemeriksaanController::class, 'show']);
+        Route::post('/', [PemeriksaanController::class, 'store']);
+        Route::put('/{id}', [PemeriksaanController::class, 'update']);
+        Route::delete('/{id}', [PemeriksaanController::class, 'destroy']);
+        
+        // Peserta dengan parameter
+        Route::get('/{id}/peserta', [PemeriksaanController::class, 'getPesertaWithParameter']);
+        Route::post('/{id}/peserta-parameter/bulk-update', [PemeriksaanController::class, 'bulkUpdatePesertaParameter']);
+    });
+    
+    // Cabor routes (mobile API)
+    Route::prefix('v1/cabor')->group(function () {
+        Route::get('/', [CaborController::class, 'index']);
+        Route::get('/{id}/peserta/{pesertaId}/last-three-pemeriksaan', [CaborController::class, 'getLastThreePemeriksaan']);
+        Route::get('/{id}/peserta', [CaborController::class, 'getPeserta']);
+        Route::get('/{id}/perbandingan', [CaborController::class, 'getPerbandingan']);
+        Route::get('/{id}/ranking', [CaborController::class, 'getRanking']);
     });
 
-    // Pemeriksaan (Mobile)
-    Route::get('/pemeriksaan/mobile', [PemeriksaanController::class, 'index']);
-    Route::get('/pemeriksaan/{id}', [PemeriksaanController::class, 'show']);
-    Route::get('/pemeriksaan/cabor/list', [PemeriksaanController::class, 'getCaborList']);
-    Route::get('/pemeriksaan/cabor/list-for-create', [PemeriksaanController::class, 'getCaborListForCreate']);
-    Route::get('/pemeriksaan/cabor/{caborId}/kategori', [PemeriksaanController::class, 'getCaborKategoriByCabor']);
-    Route::get('/pemeriksaan/cabor-kategori/{caborKategoriId}/tenaga-pendukung', [PemeriksaanController::class, 'getTenagaPendukungByCaborKategori']);
-    Route::get('/pemeriksaan/{pemeriksaanId}/peserta', [PemeriksaanController::class, 'peserta']);
-    Route::get('/pemeriksaan/{pemeriksaanId}/parameter', [PemeriksaanController::class, 'parameter']);
-    Route::get('/pemeriksaan/{pemeriksaanId}/parameter/{parameterId}', [PemeriksaanController::class, 'parameterDetail'])
-        ->whereNumber('pemeriksaanId')
-        ->whereNumber('parameterId');
-    // Ref Status Pemeriksaan (read-only)
-    Route::get('/pemeriksaan/ref-status/list', [RefStatusPemeriksaanController::class, 'index']);
-
-    // Pemeriksaan Parameter CRUD (Restricted to Superadmin, Admin, Tenaga Pendukung)
-    Route::middleware('pemeriksaan.permission')->group(function () {
-        Route::post('/pemeriksaan/{pemeriksaanId}/parameter', [ApiPemeriksaanParameterController::class, 'store']);
-        Route::put('/pemeriksaan/{pemeriksaanId}/parameter/{id}', [ApiPemeriksaanParameterController::class, 'update']);
-        Route::delete('/pemeriksaan/{pemeriksaanId}/parameter/{id}', [ApiPemeriksaanParameterController::class, 'destroy']);
+    // Pemeriksaan Khusus routes (mobile API)
+    Route::prefix('v1/pemeriksaan-khusus')->group(function () {
+        Route::get('/', [PemeriksaanKhususController::class, 'index']);
+        Route::post('/', [PemeriksaanKhususController::class, 'store']);
+        
+        // Template routes (harus sebelum route dengan {id} untuk menghindari konflik)
+        Route::get('/template/{caborId}', [PemeriksaanKhususController::class, 'getTemplate']);
+        Route::post('/template', [PemeriksaanKhususController::class, 'saveTemplate']);
+        Route::post('/clone-template', [PemeriksaanKhususController::class, 'cloneFromTemplate']);
+        Route::post('/setup', [PemeriksaanKhususController::class, 'saveSetup']);
+        Route::post('/hasil-tes', [PemeriksaanKhususController::class, 'saveHasilTes']);
+        
+        // Routes dengan {id} - urutkan dari yang paling spesifik ke yang paling umum
+        Route::get('/{id}/peserta-visualisasi', [PemeriksaanKhususController::class, 'getPesertaVisualisasi']);
+        Route::get('/{id}/visualisasi/{pesertaId}', [PemeriksaanKhususController::class, 'getVisualisasiPeserta']);
+        Route::get('/{id}/peserta-hasil-tes', [PemeriksaanKhususController::class, 'getPesertaForInputHasilTes']);
+        Route::get('/{id}/setup/{pesertaId}', [PemeriksaanKhususController::class, 'getSetupForPeserta']);
+        Route::get('/{id}/hasil-tes', [PemeriksaanKhususController::class, 'getHasilTes']);
+        Route::get('/{id}/setup', [PemeriksaanKhususController::class, 'getSetup']);
+        Route::put('/{id}', [PemeriksaanKhususController::class, 'update']);
+        Route::delete('/{id}', [PemeriksaanKhususController::class, 'destroy']);
     });
-    Route::get('/pemeriksaan/{pemeriksaanId}/peserta/{pesertaId}/parameter', [PemeriksaanController::class, 'pesertaParameterList']);
-    Route::get('/pemeriksaan/{pemeriksaanId}/peserta/{pesertaId}/parameter/{parameterId}/grafik', [PemeriksaanController::class, 'pesertaParameterChart']);
-
-    // Pemeriksaan CRUD (Restricted to Superadmin, Admin, and Tenaga Pendukung)
-    Route::middleware('pemeriksaan.permission')->group(function () {
-        Route::post('/pemeriksaan', [PemeriksaanController::class, 'store']);
-        Route::put('/pemeriksaan/{id}', [PemeriksaanController::class, 'update']);
-        Route::delete('/pemeriksaan/{id}', [PemeriksaanController::class, 'destroy']);
-
-        // Pemeriksaan Peserta CRUD (Superadmin, Admin, Tenaga Pendukung)
-        Route::post('/pemeriksaan/{pemeriksaanId}/peserta', [ApiPemeriksaanPesertaController::class, 'store']);
-        Route::put('/pemeriksaan/{pemeriksaanId}/peserta/{id}', [ApiPemeriksaanPesertaController::class, 'update']);
-        Route::delete('/pemeriksaan/{pemeriksaanId}/peserta/{id}', [ApiPemeriksaanPesertaController::class, 'destroy']);
+    
+    // Prestasi routes (mobile API)
+    Route::prefix('v1/prestasi')->group(function () {
+        Route::get('/', [PrestasiController::class, 'index']);
     });
-
-    // Pemeriksaan Peserta - Form Support (Mobile)
-    Route::get('/pemeriksaan/{pemeriksaanId}/peserta/list', [ApiPemeriksaanPesertaController::class, 'index']);
-    Route::get('/pemeriksaan/{pemeriksaanId}/kandidat/atlet', [ApiPemeriksaanPesertaController::class, 'availableAtlet']);
-    Route::get('/pemeriksaan/{pemeriksaanId}/kandidat/pelatih', [ApiPemeriksaanPesertaController::class, 'availablePelatih']);
-    Route::get('/pemeriksaan/{pemeriksaanId}/kandidat/tenaga-pendukung', [ApiPemeriksaanPesertaController::class, 'availableTenagaPendukung']);
-
-    // Turnamen (Mobile)
-    Route::get('/turnamen/mobile', [TurnamenController::class, 'index']);
-    Route::get('/turnamen/{id}/mobile', [TurnamenController::class, 'show']);
-    Route::get('/turnamen/cabor/list', [TurnamenController::class, 'getCaborList']);
-    Route::get('/turnamen/{turnamenId}/peserta', [TurnamenController::class, 'peserta']);
-    // Profil peserta by-id dari listing
-    Route::get('/pemeriksaan/{pemeriksaanId}/peserta/{jenis}/profil/{pesertaId}', [ParticipantProfileController::class, 'pemeriksaanProfil']);
-    Route::get('/turnamen/{turnamenId}/peserta/{jenis}/profil/{pesertaId}', [ParticipantProfileController::class, 'turnamenProfil']);
-
-    // Turnamen CRUD (Restricted to Superadmin, Admin, and Pelatih)
-    Route::middleware('turnamen.permission')->group(function () {
-        Route::get('/turnamen/crud', [TurnamenCrudController::class, 'index']);
-        Route::get('/turnamen/crud/{id}', [TurnamenCrudController::class, 'show']);
-        Route::post('/turnamen/crud', [TurnamenCrudController::class, 'store']);
-        Route::put('/turnamen/crud/{id}', [TurnamenCrudController::class, 'update']);
-        Route::delete('/turnamen/crud/{id}', [TurnamenCrudController::class, 'destroy']);
-    });
-
-    // Turnamen Form Support (Mobile)
-    Route::get('/turnamen/form/cabor-kategori', [TurnamenFormController::class, 'getCaborKategoriList']);
-    Route::get('/turnamen/form/cabor-kategori/{caborKategoriId}/atlet', [TurnamenFormController::class, 'getAtletByCaborKategori']);
-    Route::get('/turnamen/form/cabor-kategori/{caborKategoriId}/pelatih', [TurnamenFormController::class, 'getPelatihByCaborKategori']);
-    Route::get('/turnamen/form/cabor-kategori/{caborKategoriId}/tenaga-pendukung', [TurnamenFormController::class, 'getTenagaPendukungByCaborKategori']);
-    Route::get('/turnamen/form/tingkat', [TurnamenFormController::class, 'getTingkatList']);
-    Route::get('/turnamen/form/juara', [TurnamenFormController::class, 'getJuaraList']);
-
-    // Turnamen Peserta Management (Mobile)
-    Route::middleware('turnamen.permission')->group(function () {
-        Route::get('/turnamen/{turnamenId}/peserta/kelola', [TurnamenPesertaController::class, 'index']);
-        Route::post('/turnamen/{turnamenId}/peserta/kelola', [TurnamenPesertaController::class, 'store']);
-        Route::delete('/turnamen/{turnamenId}/peserta/kelola/{pesertaId}', [TurnamenPesertaController::class, 'destroy']);
-        Route::get('/turnamen/{turnamenId}/peserta/kelola/available', [TurnamenPesertaController::class, 'availablePeserta']);
-    });
-
-    // Home (Mobile)
-    Route::get('/home', [HomeController::class, 'index']);
-
-    // User routes
-    Route::get('/user', function (Request $request) {
-        return $request->user();
-    });
-
-    Route::get('/users-menu', [UsersMenuController::class, 'getMenus']);
-    Route::get('/users', [UsersController::class, 'apiIndex']);
-
-    // Master Parameter (Reference list for dropdown)
-    Route::get('/mst-parameter', [MstParameterController::class, 'apiIndex']);
-
-    // Pemeriksaan Peserta Parameter (Mobile)
-    Route::get('/pemeriksaan/{pemeriksaanId}/parameter/pemetaan', [PemeriksaanPesertaParameterController::class, 'getParameterPemeriksaan']);
-    Route::get('/pemeriksaan/{pemeriksaanId}/peserta/{jenisPeserta}/parameter/pemetaan', [PemeriksaanPesertaParameterController::class, 'getPesertaWithParameters']);
-    Route::post('/pemeriksaan/{pemeriksaanId}/peserta-parameter/bulk-update', [PemeriksaanPesertaParameterController::class, 'bulkUpdateParameterPeserta']);
-    Route::get('/pemeriksaan/{pemeriksaanId}/peserta/{pesertaId}/parameter/pemetaan', [PemeriksaanPesertaParameterController::class, 'getPesertaParameter']);
-
-    // Profil Peserta (tanpa permission khusus, hanya auth)
-    Route::get('/profil/me', [ProfileController::class, 'me']);
-    Route::get('/profil/atlet', [ProfileController::class, 'myAtlet']);
-    Route::get('/profil/pelatih', [ProfileController::class, 'myPelatih']);
-    Route::get('/profil/tenaga-pendukung', [ProfileController::class, 'myTenagaPendukung']);
+    
+    // Tambahkan API module lain di sini nanti
 });

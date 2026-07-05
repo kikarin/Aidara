@@ -36,7 +36,7 @@ const columns = computed(() => {
           <img src='${row.foto}' alt='Foto ${row.nama}' class='w-12 h-12 object-cover rounded-full border hover:shadow-md transition-shadow' />
         </div>`;
                 }
-                return '<div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-xs">No</div>';
+                return '<div class="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground">No</div>';
             },
         },
         {
@@ -193,7 +193,7 @@ const handleAddPeserta = async () => {
 
 const actions = (row: any) => [
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         variant: 'destructive',
         permission: `Turnamen Delete`,

@@ -64,12 +64,12 @@ const statusLabel = computed(() => {
 
 const statusColor = computed(() => {
     const colors: Record<string, string> = {
-        draft: 'bg-gray-100 text-gray-800',
-        submitted: 'bg-yellow-100 text-yellow-800',
-        approved: 'bg-green-100 text-green-800',
-        rejected: 'bg-red-100 text-red-800',
+        draft: 'badge-muted',
+        submitted: 'badge-warning',
+        approved: 'badge-success',
+        rejected: 'bg-destructive text-destructive-foreground',
     };
-    return colors[props.registration.status] || 'bg-gray-100 text-gray-800';
+    return colors[props.registration.status] || 'badge-muted';
 });
 
 const activeTab = ref('data-diri');

@@ -35,7 +35,7 @@ const columns = [
                     <img src="${row.foto}" alt="Foto ${row.nama}" class="w-12 h-12 object-cover rounded-full border hover:shadow-md transition-shadow" />
                 </div>`;
             }
-            return '<div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-xs">No</div>';
+            return '<div class="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground">No</div>';
         },
     },
     { key: 'tenaga_pendukung_nama', label: 'Nama' },
@@ -67,7 +67,7 @@ const columns = [
         label: 'Status',
         format: (row: any) => {
             return row.is_active
-                ? '<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Aktif</span>'
+                ? '<span class="badge-success">Aktif</span>'
                 : '<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Nonaktif</span>';
         },
     },
@@ -104,12 +104,12 @@ const actions = (row: any) => [
         permission: 'Tenaga Pendukung Detail',
     },
     {
-        label: 'Edit Jenis Tenaga Pendukung',
+        label: 'Ubah',
         onClick: () => router.visit(`/cabor-kategori-tenaga-pendukung/${row.id}/edit`),
         permission: 'Cabor Kategori Tenaga Pendukung Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => {
             rowToDelete.value = row;
             showConfirmDelete.value = true;

@@ -13,6 +13,7 @@ class MstKategoriPesertaSeeder extends Seeder
             ['nama' => 'PPOPM', ],
             ['nama' => 'KONI', ],
             ['nama' => 'NPCI', ],
+            ['nama' => 'SOIna', ],
         ];
         foreach ($data as $item) {
             MstKategoriPeserta::firstOrCreate(['nama' => $item['nama']], $item);

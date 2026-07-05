@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use App\Models\Role;
-
+use App\Services\UserPesertaLinkService;
 
 class PelatihRepository
 {
@@ -78,6 +78,7 @@ class PelatihRepository
                         ->where('pelatih_kategori_peserta.mst_kategori_peserta_id', $caborKategori->kategori_peserta_id);
                 });
             }
+            
         }
 
         // Apply filters
@@ -294,24 +295,34 @@ class PelatihRepository
         // Tambahkan relasi untuk nanti kecamatan/kelurahan
         // Load kategori peserta yang sudah ada (multiple)
         if ($item && isset($item->id)) {
-            $item->load(['kategoriPesertas', 'caborKategoriPelatih.cabor']);
+            $item->load(['kategoriPesertas', 'caborKategoriPelatih.cabor', 'caborKategoriPelatih.caborKategori']);
             $kategoriPesertasIds = $item->kategoriPesertas->pluck('id')->toArray();
             $data['kategori_pesertas'] = $kategoriPesertasIds;
             
-            // Load cabor data dari pivot (ambil yang pertama jika ada)
-            $caborKategoriPelatih = $item->caborKategoriPelatih->first();
+            // Load semua cabor data dari pivot (yang langsung ke cabor, tanpa kategori)
+            $caborKategoriPelatihList = $item->caborKategoriPelatih->where('cabor_kategori_id', null);
             
             // Convert item ke array dan tambahkan kategori_pesertas
             $itemArray = $item->toArray();
             $itemArray['kategori_pesertas'] = $kategoriPesertasIds;
             
-            // Tambahkan cabor data
-            if ($caborKategoriPelatih) {
-                $itemArray['cabor_id'] = $caborKategoriPelatih->cabor_id;
-                $itemArray['jenis_pelatih'] = $caborKategoriPelatih->jenis_pelatih;
+            // Tambahkan cabor_kategori_pelatih untuk form bisa akses
+            $itemArray['cabor_kategori_pelatih'] = $item->caborKategoriPelatih->toArray();
+            
+            // Ambil semua cabor_id yang unik (yang langsung ke cabor, tanpa kategori)
+            $caborIds = $caborKategoriPelatihList->pluck('cabor_id')->unique()->values()->toArray();
+            $itemArray['cabor_ids'] = $caborIds;
+            
+            // Tambahkan cabor data (untuk backward compatibility)
+            $firstCaborKategoriPelatih = $caborKategoriPelatihList->first();
+            if ($firstCaborKategoriPelatih) {
+                $itemArray['cabor_id'] = $firstCaborKategoriPelatih->cabor_id;
+                $itemArray['jenis_pelatih'] = $firstCaborKategoriPelatih->jenis_pelatih;
+                $itemArray['posisi_atlet'] = $firstCaborKategoriPelatih->posisi_atlet;
             } else {
                 $itemArray['cabor_id'] = null;
                 $itemArray['jenis_pelatih'] = null;
+                $itemArray['posisi_atlet'] = null;
             }
             
             $data['item'] = $itemArray;
@@ -360,13 +371,39 @@ class PelatihRepository
             $this->kategoriPesertasForCallback = null;
         }
 
-        // Simpan cabor_id dan jenis_pelatih untuk digunakan di callbackAfterStoreOrUpdate
+        // Simpan cabor_ids (array), jenis_pelatih, dan posisi_atlet untuk digunakan di callbackAfterStoreOrUpdate
+        // Support backward compatibility dengan cabor_id (single)
+        // Cek dari $data terlebih dahulu, lalu dari request sebagai fallback
+        $caborIds = [];
+        if (isset($data['cabor_ids']) && is_array($data['cabor_ids'])) {
+            $caborIds = array_filter($data['cabor_ids']); // Remove null/empty values
+        } elseif (request()->has('cabor_ids') && is_array(request()->input('cabor_ids'))) {
+            // Fallback: ambil dari request langsung
+            $caborIds = array_filter(request()->input('cabor_ids', []));
+        } elseif (isset($data['cabor_id']) && $data['cabor_id']) {
+            // Backward compatibility: jika masih pakai cabor_id (single)
+            $caborIds = [$data['cabor_id']];
+        } elseif (request()->has('cabor_id') && request()->input('cabor_id')) {
+            // Fallback: ambil dari request langsung
+            $caborIds = [request()->input('cabor_id')];
+        }
+        
+        Log::info('PelatihRepository: customDataCreateUpdate - cabor_ids', [
+            'cabor_ids_from_data' => $data['cabor_ids'] ?? 'not set',
+            'cabor_ids_from_request' => request()->input('cabor_ids', 'not set'),
+            'cabor_ids_final' => $caborIds,
+            'method' => is_null($record) ? 'create' : 'update',
+        ]);
+        
         $this->caborDataForCallback = [
-            'cabor_id' => $data['cabor_id'] ?? null,
-            'jenis_pelatih' => $data['jenis_pelatih'] ?? null,
+            'cabor_ids' => $caborIds,
+            'jenis_pelatih' => $data['jenis_pelatih'] ?? request()->input('jenis_pelatih'),
+            'posisi_atlet' => $data['posisi_atlet'] ?? request()->input('posisi_atlet'),
         ];
         unset($data['cabor_id']);
+        unset($data['cabor_ids']);
         unset($data['jenis_pelatih']);
+        unset($data['posisi_atlet']);
 
         Log::info('PelatihRepository: customDataCreateUpdate', [
             'data'   => $data,
@@ -467,30 +504,70 @@ class PelatihRepository
             }
 
             // Handle Cabor Assignment (langsung ke cabor tanpa kategori)
+            // Support multiple cabor_ids (array) dengan backward compatibility untuk cabor_id (single)
             $caborData = $this->caborDataForCallback ?? [
-                'cabor_id' => request()->input('cabor_id'),
+                'cabor_ids' => request()->input('cabor_ids', []),
+                'cabor_id' => request()->input('cabor_id'), // Backward compatibility
                 'jenis_pelatih' => request()->input('jenis_pelatih'),
+                'posisi_atlet' => request()->input('posisi_atlet'),
             ];
             
-            if (!empty($caborData['cabor_id'])) {
-                $caborId = $caborData['cabor_id'];
+            // Get cabor_ids array (support backward compatibility)
+            $caborIds = [];
+            if (!empty($caborData['cabor_ids']) && is_array($caborData['cabor_ids'])) {
+                $caborIds = array_filter($caborData['cabor_ids']); // Remove null/empty values
+            } elseif (!empty($caborData['cabor_id'])) {
+                // Backward compatibility: jika masih pakai cabor_id (single)
+                $caborIds = [$caborData['cabor_id']];
+            }
+            
+            // Selalu hapus relasi cabor yang tidak ada di array baru (soft delete)
+            // Ini penting untuk handle kasus ketika cabor_ids kosong atau berubah
+            $existingCaborIds = \App\Models\CaborKategoriPelatih::where('pelatih_id', $model->id)
+                ->whereNull('cabor_kategori_id') // Hanya yang langsung ke cabor (tanpa kategori)
+                ->pluck('cabor_id')
+                ->toArray();
+            
+            $caborIdsToDelete = array_diff($existingCaborIds, $caborIds);
+            if (!empty($caborIdsToDelete)) {
+                \App\Models\CaborKategoriPelatih::where('pelatih_id', $model->id)
+                    ->whereNull('cabor_kategori_id')
+                    ->whereIn('cabor_id', $caborIdsToDelete)
+                    ->delete();
+                Log::info('PelatihRepository: Deleted cabor assignments', [
+                    'pelatih_id' => $model->id,
+                    'deleted_cabor_ids' => $caborIdsToDelete,
+                ]);
+            }
+            
+            // Jika ada cabor_ids, create atau update relasi
+            if (!empty($caborIds)) {
                 $jenisPelatih = $caborData['jenis_pelatih'] ?? null;
+                $posisiAtlet = $caborData['posisi_atlet'] ?? null;
+                
+                // Create atau update relasi untuk setiap cabor_id
+                foreach ($caborIds as $caborId) {
+                    if (empty($caborId)) continue;
                 
                 // Cek apakah sudah ada relasi ke cabor ini
                 $existingRelation = \App\Models\CaborKategoriPelatih::where('cabor_id', $caborId)
                     ->where('pelatih_id', $model->id)
+                        ->whereNull('cabor_kategori_id') // Hanya yang langsung ke cabor
                     ->first();
                 
                 if ($existingRelation) {
-                    // Update jenis jika sudah ada
+                    // Update jenis dan posisi jika sudah ada
                     $existingRelation->update([
                         'jenis_pelatih' => $jenisPelatih,
+                        'posisi_atlet' => $posisiAtlet,
+                            'is_active' => 1,
                         'updated_by' => Auth::id(),
                     ]);
                     Log::info('PelatihRepository: Updated cabor assignment', [
                         'pelatih_id' => $model->id,
                         'cabor_id' => $caborId,
                         'jenis_pelatih' => $jenisPelatih,
+                        'posisi_atlet' => $posisiAtlet,
                     ]);
                 } else {
                     // Buat relasi baru tanpa kategori (cabor_kategori_id = null)
@@ -499,6 +576,7 @@ class PelatihRepository
                         'cabor_kategori_id' => null, // Langsung ke cabor tanpa kategori
                         'pelatih_id' => $model->id,
                         'jenis_pelatih' => $jenisPelatih,
+                        'posisi_atlet' => $posisiAtlet,
                         'is_active' => 1,
                         'created_by' => Auth::id(),
                         'updated_by' => Auth::id(),
@@ -507,7 +585,9 @@ class PelatihRepository
                         'pelatih_id' => $model->id,
                         'cabor_id' => $caborId,
                         'jenis_pelatih' => $jenisPelatih,
+                        'posisi_atlet' => $posisiAtlet,
                     ]);
+                    }
                 }
             }
 
@@ -558,19 +638,18 @@ class PelatihRepository
             'updated_by'      => $userId,
         ];
 
-        // Jika ada password, hash password
         if (isset($data['akun_password']) && $data['akun_password']) {
             $userData['password'] = bcrypt($data['akun_password']);
         }
 
-        // Jika sudah ada users_id, update user
+        $user = null;
+
         if (isset($data['users_id']) && $data['users_id']) {
             $user = User::find($data['users_id']);
             if ($user) {
                 $user->update($userData);
 
-                // Ensure role is assigned using Spatie Permission
-                $role = Role::find(36); // Role Pelatih
+                $role = Role::find(36);
                 if ($role && !$user->hasRole($role)) {
                     $user->assignRole($role);
                 }
@@ -581,16 +660,13 @@ class PelatihRepository
                 ]);
             }
         } else {
-            // Create new user
             $user = User::create($userData);
 
-            // Assign role Pelatih using Spatie Permission
-            $role = Role::find(36); // Role Pelatih
+            $role = Role::find(36);
             if ($role) {
                 $user->assignRole($role);
             }
 
-            // Also create users_role record for compatibility
             $user->users_role()->create([
                 'users_id'   => $user->id,
                 'role_id'    => 36,
@@ -598,12 +674,14 @@ class PelatihRepository
                 'updated_by' => $userId,
             ]);
 
-            $pelatih->update(['users_id' => $user->id]);
-
             Log::info('PelatihRepository: Created new user for pelatih', [
                 'pelatih_id' => $pelatih->id,
                 'user_id'    => $user->id,
             ]);
+        }
+
+        if ($user) {
+            app(UserPesertaLinkService::class)->link($user, 'pelatih', $pelatih->id);
         }
     }
 

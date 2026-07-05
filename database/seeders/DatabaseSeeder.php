@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
         $this->call(IdentitySeeder::class);
         $this->call(CategoryPermissionSeeder::class);
         $this->call(UsersMenuSeeder::class);
+        $this->call(WorldCupSeeder::class);
         $this->call(RoleSeeder::class);
         $this->call(UsersSeeder::class);
         $this->call(SetRolePermissionSeeder::class);

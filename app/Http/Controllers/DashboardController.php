@@ -426,51 +426,41 @@ class DashboardController extends Controller implements HasMiddleware
 
 
     /**
-     * ✅ OPTIMASI: Rekap data dengan GROUP BY
-     * Sebelum: 450 query (3 count query x 150 kategori)
-     * Sesudah: 4 query total (1 untuk kategori + 3 GROUP BY)
+     * Rekap data peserta per cabor dengan GROUP BY
      */
     private function getRekapData()
     {
-        // ✅ Query 1: Ambil semua cabor kategori dengan relasi cabor
-        $caborKategoris = CaborKategori::with('cabor')
-            ->orderBy('cabor_id')
-            ->orderBy('nama')
-            ->get();
+        $cabors = Cabor::with('kategoriPeserta')->orderBy('nama')->get();
 
-        // ✅ Query 2: Hitung semua atlet per kategori sekaligus
-        $atletCounts = CaborKategoriAtlet::select('cabor_kategori_id', DB::raw('COUNT(*) as total'))
+        $atletCounts = CaborKategoriAtlet::select('cabor_id', DB::raw('COUNT(DISTINCT atlet_id) as total'))
             ->where('is_active', 1)
-            ->groupBy('cabor_kategori_id')
-            ->pluck('total', 'cabor_kategori_id')
+            ->groupBy('cabor_id')
+            ->pluck('total', 'cabor_id')
             ->toArray();
 
-        // ✅ Query 3: Hitung semua pelatih per kategori sekaligus
-        $pelatihCounts = CaborKategoriPelatih::select('cabor_kategori_id', DB::raw('COUNT(*) as total'))
+        $pelatihCounts = CaborKategoriPelatih::select('cabor_id', DB::raw('COUNT(DISTINCT pelatih_id) as total'))
             ->where('is_active', 1)
-            ->groupBy('cabor_kategori_id')
-            ->pluck('total', 'cabor_kategori_id')
+            ->groupBy('cabor_id')
+            ->pluck('total', 'cabor_id')
             ->toArray();
 
-        // ✅ Query 4: Hitung semua tenaga pendukung per kategori sekaligus
-        $tenagaCounts = CaborKategoriTenagaPendukung::select('cabor_kategori_id', DB::raw('COUNT(*) as total'))
+        $tenagaCounts = CaborKategoriTenagaPendukung::select('cabor_id', DB::raw('COUNT(DISTINCT tenaga_pendukung_id) as total'))
             ->where('is_active', 1)
-            ->groupBy('cabor_kategori_id')
-            ->pluck('total', 'cabor_kategori_id')
+            ->groupBy('cabor_id')
+            ->pluck('total', 'cabor_id')
             ->toArray();
 
-        // Bentuk data dari hasil lookup (tanpa query tambahan)
         $rekapData = [];
 
-        foreach ($caborKategoris as $caborKategori) {
-            $jumlahAtlet           = $atletCounts[$caborKategori->id]   ?? 0;
-            $jumlahPelatih         = $pelatihCounts[$caborKategori->id] ?? 0;
-            $jumlahTenagaPendukung = $tenagaCounts[$caborKategori->id]  ?? 0;
+        foreach ($cabors as $cabor) {
+            $jumlahAtlet           = $atletCounts[$cabor->id]   ?? 0;
+            $jumlahPelatih         = $pelatihCounts[$cabor->id] ?? 0;
+            $jumlahTenagaPendukung = $tenagaCounts[$cabor->id]  ?? 0;
 
             $rekapData[] = [
-                'id'                      => $caborKategori->id,
-                'cabor_nama'              => $caborKategori->cabor->nama ?? '-',
-                'nama'                    => $caborKategori->nama,
+                'id'                      => $cabor->id,
+                'cabor_nama'              => $cabor->nama,
+                'cabor_jenis'             => $cabor->kategoriPeserta?->nama,
                 'jumlah_atlet'            => $jumlahAtlet,
                 'jumlah_pelatih'          => $jumlahPelatih,
                 'jumlah_tenaga_pendukung' => $jumlahTenagaPendukung,

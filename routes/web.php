@@ -16,7 +16,10 @@ use App\Http\Controllers\CaborKategoriTenagaPendukungController;
 use App\Http\Controllers\CategoryPermissionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DesaController;
-use App\Http\Controllers\KecamatanController;
+use App\Http\Controllers\LegalController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\Settings\WorldCupSettingController;
+use App\Http\Controllers\WorldCupController;
 use App\Http\Controllers\MstJenisDokumenController;
 use App\Http\Controllers\MstJenisPelatihController;
 use App\Http\Controllers\MstJenisTenagaPendukungController;
@@ -27,6 +30,7 @@ use App\Http\Controllers\MstKategoriPesertaController;
 use App\Http\Controllers\MstKategoriPrestasiPelatihController;
 use App\Http\Controllers\MstJuaraController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\PublicEventController;
 use App\Http\Controllers\PelatihController;
 use App\Http\Controllers\PelatihDokumenController;
 use App\Http\Controllers\PelatihKesehatanController;
@@ -38,7 +42,9 @@ use App\Http\Controllers\PemeriksaanParameterController;
 use App\Http\Controllers\PemeriksaanPesertaController;
 use App\Http\Controllers\PemeriksaanPesertaParameterController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\PrestasiController;
 use App\Http\Controllers\ProgramLatihanController;
+use App\Http\Controllers\Api\ProgramLatihanAbsenAtletController;
 use App\Http\Controllers\RekapAbsenProgramLatihanController;
 use App\Http\Controllers\RefStatusPemeriksaanController;
 use App\Http\Controllers\RoleController;
@@ -48,6 +54,7 @@ use App\Http\Controllers\TenagaPendukungKesehatanController;
 use App\Http\Controllers\TenagaPendukungPrestasiController;
 use App\Http\Controllers\TenagaPendukungSertifikatController;
 use App\Http\Controllers\UsersController;
+use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\UsersMenuController;
 use App\Http\Controllers\MstJenisUnitPendukungController;
 use App\Http\Controllers\MstParameterController;
@@ -72,15 +79,54 @@ use App\Models\MstParameter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Mail;
 
 // =====================
 // ROUTE UTAMA
 // =====================
-Route::get('/', function () {
-    return Inertia::render('Welcome');
-})->name('home');
+Route::get('/', HomeController::class)->name('home');
+
+Route::get('/legal/{slug}', [LegalController::class, 'show'])
+    ->whereIn('slug', ['terms', 'privacy', 'pdp'])
+    ->name('legal.show');
+
+Route::get('/piala-dunia', [WorldCupController::class, 'index'])->name('worldcup.index');
+Route::get('/event-publik', [PublicEventController::class, 'index'])->name('event.public.index');
+Route::get('/event-publik/{id}', [PublicEventController::class, 'show'])->whereNumber('id')->name('event.public.show');
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/api/worldcup/preview', [WorldCupController::class, 'preview'])->name('worldcup.preview');
+    Route::get('/api/worldcup/live', [WorldCupController::class, 'live'])->name('worldcup.live');
+    Route::get('/api/worldcup/schedule', [WorldCupController::class, 'schedule'])->name('worldcup.schedule');
+    Route::get('/api/worldcup/groups', [WorldCupController::class, 'groups'])->name('worldcup.groups');
+});
+
+Route::middleware(['auth', 'verified'])->prefix('dashboard/settings')->group(function () {
+    Route::get('/worldcup', [WorldCupSettingController::class, 'edit'])->name('settings.worldcup.edit');
+    Route::put('/worldcup', [WorldCupSettingController::class, 'update'])->name('settings.worldcup.update');
+});
 
 Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'ensure.email.verified', 'check.registration.status'])->name('dashboard');
+
+// Chatbot bantuan Aplikasi (Gemini)
+Route::middleware(['auth', 'verified', 'check.registration.status', 'throttle:gemini-chat'])->group(function () {
+    Route::post('/api/chatbot/message', [ChatbotController::class, 'message'])->name('chatbot.message');
+});
+
+// Prestasi
+Route::middleware(['auth', 'verified', 'check.registration.status'])->group(function () {
+    Route::get('/prestasi', [PrestasiController::class, 'index'])->name('prestasi.index');
+    Route::get('/api/prestasi', [PrestasiController::class, 'apiIndex'])->name('prestasi.apiIndex');
+    Route::get('/api/prestasi/summary', [PrestasiController::class, 'apiSummary'])->name('prestasi.apiSummary');
+});
 
 // =====================
 // REGISTRATION (Multi-step)
@@ -119,25 +165,67 @@ Route::get('/api/parameter', [MstParameterController::class, 'apiIndex']);
 
 // select
 Route::get('/api/tingkat-list', function () {
-    return MstTingkat::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstTingkat::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/tingkat-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kategori-atlet-list', function () {
-    return MstKategoriPeserta::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstKategoriPeserta::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kategori-atlet-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kategori-peserta-list', function () {
-    return MstKategoriPeserta::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstKategoriPeserta::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kategori-peserta-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kategori-prestasi-pelatih-list', function () {
-    return MstKategoriPrestasiPelatih::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstKategoriPrestasiPelatih::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kategori-prestasi-pelatih-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/jenis-dokumen-list', function () {
-    return MstJenisDokumen::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstJenisDokumen::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/jenis-dokumen-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kecamatan-list', function () {
-    return MstKecamatan::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstKecamatan::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kecamatan-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kelurahan-by-kecamatan/{id_kecamatan}', function ($id_kecamatan) {
-    return MstDesa::where('id_kecamatan', $id_kecamatan)->select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstDesa::where('id_kecamatan', $id_kecamatan)->select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kelurahan-by-kecamatan: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/posisi-atlet-list', function () {
     return MstPosisiAtlet::select('id', 'nama')->orderBy('nama')->get();
@@ -182,6 +270,7 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::get('/users/{id}/login-as', [UsersController::class, 'login_as'])->name('users.login-as');
     Route::post('/users/switch-role', [UsersController::class, 'switchRole'])->name('users.switch-role');
     Route::get('/api/users', [UsersController::class, 'apiIndex']);
+    Route::get('/api/users/peserta-options', [UsersController::class, 'pesertaOptions'])->name('api.users.peserta-options');
     Route::post('/users/destroy-selected', [UsersController::class, 'destroy_selected'])->name('users.destroy_selected');
 
     Route::resource('/menu-permissions/menus', UsersMenuController::class)->names('menus');
@@ -222,10 +311,11 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::get('/atlet/karakteristik', [AtletController::class, 'karakteristik'])->name('atlet.karakteristik');
     Route::post('/atlet/api-karakteristik', [AtletController::class, 'apiKarakteristik'])->name('atlet.api-karakteristik');
 
-    Route::resource('/atlet', AtletController::class)->names('atlet');
     Route::get('/api/atlet', [AtletController::class, 'apiIndex']);
-    Route::post('/atlet/destroy-selected', [AtletController::class, 'destroy_selected'])->name('atlet.destroy_selected');
+    Route::get('/atlet/export', [AtletController::class, 'export'])->name('atlet.export');
     Route::post('/atlet/import', [AtletController::class, 'import'])->name('atlet.import');
+    Route::post('/atlet/destroy-selected', [AtletController::class, 'destroy_selected'])->name('atlet.destroy_selected');
+    Route::resource('/atlet', AtletController::class)->names('atlet');
     Route::prefix('atlet/{atlet_id}')->group(function () {
         Route::get('orang-tua', [AtletOrangTuaController::class, 'getByAtletId'])->name('atlet.orang-tua.show');
         Route::post('orang-tua', [AtletOrangTuaController::class, 'store'])->name('atlet.orang-tua.store');
@@ -377,9 +467,11 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::get('/cabor/{id}/peserta/{tipe}', [CaborController::class, 'getPeserta'])->name('cabor.peserta');
     Route::get('/cabor/{id}/peserta/{tipe}/create', [CaborController::class, 'createMultiplePeserta'])->name('cabor.peserta.create');
     Route::post('/cabor/{id}/peserta/{tipe}/store', [CaborController::class, 'storeMultiplePeserta'])->name('cabor.peserta.store');
+    Route::delete('/cabor/{id}/peserta/{tipe}/{pesertaId}', [CaborController::class, 'destroyPeserta'])->name('cabor.peserta.destroy');
     Route::get('/api/cabor', [CaborController::class, 'apiIndex']);
     Route::get('/api/cabor/{cabor_id}/perbandingan-multi-tes', [CaborController::class, 'apiPerbandinganMultiTes'])->name('api.cabor.perbandingan-multi-tes');
     Route::get('/api/cabor/{cabor_id}/ranking', [CaborController::class, 'apiRanking'])->name('api.cabor.ranking');
+    Route::get('/api/cabor/{cabor_id}/atlet/{atlet_id}/last-three-pemeriksaan', [CaborController::class, 'apiGetLastThreePemeriksaan'])->name('api.cabor.atlet.last-three-pemeriksaan');
     Route::post('/cabor/destroy-selected', [CaborController::class, 'destroy_selected'])->name('cabor.destroy_selected');
     // KATEGORI (CaborKategori)
     Route::resource('/cabor-kategori', CaborKategoriController::class)->names('cabor-kategori');
@@ -387,7 +479,75 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::post('/cabor-kategori/destroy-selected', [CaborKategoriController::class, 'destroy_selected'])->name('cabor-kategori.destroy_selected');
     // API select option
     Route::get('/api/cabor-list', function () {
-        return Cabor::select('id', 'nama')->orderBy('nama')->get();
+        try {
+            $query = Cabor::select('id', 'nama', 'kategori_peserta_id')
+                ->orderBy('nama');
+            
+            // Filter berdasarkan kategori_peserta_id jika ada (untuk filtering saat tambah peserta ke cabor)
+            $kategoriPesertaId = request('kategori_peserta_id');
+            if ($kategoriPesertaId && $kategoriPesertaId !== 'all') {
+                $query->where('kategori_peserta_id', $kategoriPesertaId);
+            }
+            
+            // Filter berdasarkan cabor yang dimiliki pelatih/tenaga pendukung
+            // Kecuali jika dipanggil dari form pelatih/tenaga pendukung (parameter for_peserta_form)
+            $forPesertaForm = request('for_peserta_form', false);
+            if (!$forPesertaForm) {
+                $auth = Auth::user();
+                if ($auth && (int) $auth->current_role_id === 36) {
+                    // Pelatih hanya melihat cabor yang mereka miliki
+                    if ($auth->pelatih && $auth->pelatih->id) {
+                        $caborIds = DB::table('cabor_kategori_pelatih')
+                            ->where('pelatih_id', $auth->pelatih->id)
+                            ->whereNull('deleted_at')
+                            ->pluck('cabor_id')
+                            ->unique()
+                            ->toArray();
+                        
+                        if (!empty($caborIds)) {
+                            $query->whereIn('id', $caborIds);
+                        } else {
+                            // Jika pelatih tidak punya cabor, return empty
+                            return response()->json([]);
+                        }
+                    }
+                } elseif ($auth && (int) $auth->current_role_id === 37) {
+                    // Tenaga Pendukung hanya melihat cabor yang mereka miliki
+                    if ($auth->tenagaPendukung && $auth->tenagaPendukung->id) {
+                        $caborIds = DB::table('cabor_kategori_tenaga_pendukung')
+                            ->where('tenaga_pendukung_id', $auth->tenagaPendukung->id)
+                            ->whereNull('deleted_at')
+                            ->pluck('cabor_id')
+                            ->unique()
+                            ->toArray();
+                        
+                        if (!empty($caborIds)) {
+                            $query->whereIn('id', $caborIds);
+                        } else {
+                            // Jika tenaga pendukung tidak punya cabor, return empty
+                            return response()->json([]);
+                        }
+                    }
+                }
+            }
+            
+            $data = $query->get();
+            // Pastikan selalu return array dengan kategori_peserta_id
+            return response()->json($data->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama' => $item->nama,
+                    'kategori_peserta_id' => $item->kategori_peserta_id,
+                ];
+            })->toArray());
+        } catch (\Exception $e) {
+            \Log::error('Error in /api/cabor-list: ' . $e->getMessage());
+            return response()->json([]);
+        }
+    });
+    Route::get('/api/cabor/{id}', function ($id) {
+        $cabor = Cabor::select('id', 'nama', 'kategori_peserta_id')->find($id);
+        return response()->json($cabor);
     });
     Route::get('/api/cabor-kategori-list', [CaborKategoriController::class, 'list']);
     Route::get('/api/cabor-kategori-by-cabor/{cabor_id}', [CaborKategoriController::class, 'listByCabor']);
@@ -430,11 +590,17 @@ Route::get('/api/atlet/{atlet_id}/dokumen', [AtletDokumenController::class, 'api
 Route::get('/api/atlet/{atlet_id}/riwayat-pemeriksaan', [AtletController::class, 'apiRiwayatPemeriksaan']);
 Route::get('/api/atlet/{id}/parameter-umum', [AtletController::class, 'apiParameterUmum']);
 Route::get('/api/atlet/{id}/rekap-parameter-khusus', [AtletController::class, 'apiRekapParameterKhusus']);
+Route::get('/api/atlet/{id}/pemeriksaan-khusus', [AtletController::class, 'apiPemeriksaanKhusus'])->name('api.atlet.pemeriksaan-khusus');
+Route::get('/api/atlet/{id}/last-three-pemeriksaan-khusus', [AtletController::class, 'apiLastThreePemeriksaanKhusus'])->name('api.atlet.last-three-pemeriksaan-khusus');
+Route::get('/api/atlet/{id}/cabor', [AtletController::class, 'apiGetCabor'])->name('api.atlet.cabor');
+Route::get('/api/atlet/{id}/beregu/available', [AtletController::class, 'apiGetBereguAvailable'])->name('api.atlet.beregu.available');
 Route::post('/api/atlet/{id}/parameter-umum', [AtletController::class, 'apiUpdateParameterUmum']);
 Route::get('/api/pelatih/{pelatih_id}/sertifikat', [PelatihSertifikatController::class, 'apiIndex']);
 Route::get('/api/pelatih/{pelatih_id}/prestasi', [PelatihPrestasiController::class, 'apiIndex']);
 Route::get('/api/pelatih/{pelatih_id}/dokumen', [PelatihDokumenController::class, 'apiIndex']);
 Route::get('/api/pelatih/{pelatih_id}/riwayat-pemeriksaan', [PelatihController::class, 'apiRiwayatPemeriksaan']);
+Route::get('/api/pelatih/{id}/cabor', [PelatihController::class, 'apiGetCabor'])->name('api.pelatih.cabor');
+Route::get('/api/pelatih/{id}/beregu/available', [PelatihController::class, 'apiGetBereguAvailable'])->name('api.pelatih.beregu.available');
 
 // API endpoint untuk sertifikat tenaga pendukung
 Route::get('/api/tenaga-pendukung/{tenaga_pendukung_id}/sertifikat', [TenagaPendukungSertifikatController::class, 'apiIndex']);
@@ -453,6 +619,7 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     // Rekap Absen Program Latihan (harus SEBELUM resource route)
     Route::prefix('program-latihan/{program_id}/rekap-absen')->group(function () {
         Route::get('/', [RekapAbsenProgramLatihanController::class, 'index'])->name('program-latihan.rekap-absen.index');
+        Route::get('/detail', [RekapAbsenProgramLatihanController::class, 'show'])->name('program-latihan.rekap-absen.show');
         Route::post('/', [RekapAbsenProgramLatihanController::class, 'store'])->name('program-latihan.rekap-absen.store');
         Route::put('/{rekap_id}', [RekapAbsenProgramLatihanController::class, 'update'])->name('program-latihan.rekap-absen.update');
     });
@@ -462,8 +629,12 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
         ->name('program-latihan.rekap-absen.delete-media');
     
     Route::resource('/program-latihan', ProgramLatihanController::class)->names('program-latihan');
+    Route::get('/api/program-latihan/pelatih-by-kategori/{cabor_kategori_id}', [ProgramLatihanController::class, 'apiPelatihByKategori']);
     Route::get('/api/program-latihan', [ProgramLatihanController::class, 'apiIndex']);
+    Route::get('/api/program-latihan/{program_id}/absen-atlet', [ProgramLatihanAbsenAtletController::class, 'index']);
+    Route::get('/api/program-latihan/{program_id}/kehadiran/atlet/{atlet_id}', [ProgramLatihanAbsenAtletController::class, 'riwayatAtlet']);
     Route::post('/program-latihan/destroy-selected', [ProgramLatihanController::class, 'destroy_selected'])->name('program-latihan.destroy_selected');
+
 });
 
 // =====================
@@ -536,7 +707,6 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::prefix('pemeriksaan-parameter')->group(function () {
         Route::get('AllParameter', [AllParameterController::class, 'index'])->name('all.parameter.index');
         Route::get('AllParameter/{parameter_id}/statistik', [AllParameterController::class, 'show'])->name('all.parameter.statistik');
-        Route::get('AllParameter/{parameter_id}/chart', [AllParameterController::class, 'chart'])->name('all.parameter.chart');
     });
 
     // Nested Pemeriksaan Peserta - Web Routes
@@ -624,6 +794,9 @@ Route::post('/api/pemeriksaan-khusus/clone-from-template', [PemeriksaanKhususCon
 Route::post('/api/pemeriksaan-khusus/save-aspek-item-tes', [PemeriksaanKhususController::class, 'apiSaveAspekItemTes'])->name('api.pemeriksaan-khusus.save-aspek-item-tes');
 Route::post('/api/pemeriksaan-khusus/save-as-template', [PemeriksaanKhususController::class, 'apiSaveAsTemplate'])->name('api.pemeriksaan-khusus.save-as-template');
 Route::get('/api/pemeriksaan-khusus/{id}/peserta', [PemeriksaanKhususController::class, 'apiGetPeserta'])->name('api.pemeriksaan-khusus.get-peserta');
+Route::get('/api/pemeriksaan-khusus/{id}/peserta/available', [PemeriksaanKhususController::class, 'apiAvailablePeserta'])->name('api.pemeriksaan-khusus.peserta.available');
+Route::post('/pemeriksaan-khusus/{id}/peserta', [PemeriksaanKhususController::class, 'storePeserta'])->name('pemeriksaan-khusus.peserta.store');
+Route::delete('/pemeriksaan-khusus/{id}/peserta/{pesertaId}', [PemeriksaanKhususController::class, 'destroyPeserta'])->name('pemeriksaan-khusus.peserta.destroy');
 Route::get('/api/pemeriksaan-khusus/{id}/hasil-tes', [PemeriksaanKhususController::class, 'apiGetHasilTes'])->name('api.pemeriksaan-khusus.get-hasil-tes');
 Route::post('/api/pemeriksaan-khusus/save-hasil-tes', [PemeriksaanKhususController::class, 'apiSaveHasilTes'])->name('api.pemeriksaan-khusus.save-hasil-tes');
 Route::get('/api/pemeriksaan-khusus/{id}/visualisasi', [PemeriksaanKhususController::class, 'apiGetVisualisasi'])->name('api.pemeriksaan-khusus.get-visualisasi');

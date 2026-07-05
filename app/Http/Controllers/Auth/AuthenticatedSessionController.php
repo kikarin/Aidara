@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\OtpMailService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -40,6 +41,32 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $request->session()->regenerate();
+
+        $user = Auth::user();
+
+        // Jika user belum verified, kirim OTP baru lalu redirect ke halaman verifikasi
+        if (!$user->email_verified_at) {
+            $otpCode = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+
+            $user->update([
+                'email_otp' => bcrypt($otpCode),
+                'email_otp_expires_at' => now()->addMinutes(10),
+            ]);
+
+            app(OtpMailService::class)->send($user->email, $otpCode, 'web-login');
+
+            $request->session()->put('otp_last_sent', now());
+
+            return redirect()->route('email.otp.verify')
+                ->with('warning', 'Email Anda belum diverifikasi. Silakan masukkan kode OTP yang telah dikirim ke email Anda.');
+        }
+
+        // Jika user sudah verified tapi masih dalam proses registrasi, redirect ke registration steps
+        $isInRegistrationProcess = !$user->peserta_id || !$user->peserta_type || $user->registration_status === 'pending';
+        if ($isInRegistrationProcess) {
+            return redirect()->route('registration.steps', ['step' => 1])
+                ->with('info', 'Silakan lengkapi data registrasi Anda.');
+        }
 
         return redirect()->intended(route('dashboard', absolute: false));
     }

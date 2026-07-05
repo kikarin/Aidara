@@ -13,13 +13,13 @@ defineProps<{
     <div class="flex flex-wrap items-start gap-2">
         <div>
             <Link :href="createUrl">
-                <Button variant="default">+ Create</Button>
+                <Button variant="default">+ Tambah</Button>
             </Link>
         </div>
 
         <div>
             <Button variant="destructive" size="sm" :disabled="selected.length === 0" @click="onDeleteSelected">
-                Delete Selected ({{ selected.length }})
+                Hapus Terpilih ({{ selected.length }})
             </Button>
         </div>
     </div>

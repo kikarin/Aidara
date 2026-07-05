@@ -32,6 +32,17 @@ const props = defineProps<{
             name: string;
         } | null;
         all_roles: string;
+        peserta_info?: {
+            peserta_type?: string;
+            peserta_type_label?: string;
+            peserta_id?: number;
+            peserta_nama?: string;
+            peserta_nik?: string;
+            peserta_is_active?: boolean | null;
+            edit_url?: string | null;
+            registration_status?: string | null;
+            is_orphan?: boolean;
+        } | null;
     };
 }>();
 
@@ -54,31 +65,68 @@ const fields = computed(() => {
         { label: 'No. HP', value: user.value?.no_hp || '-' },
         { label: 'Role', value: user.value?.role?.name || '-' },
         {
-            label: 'All Roles',
+            label: 'Semua Peran',
             value:
                 allRoles && allRoles !== ''
                     ? `<div class='flex flex-wrap'>${allRoles
                           .split(', ')
                           .map(
                               (role: string) =>
-                                  `<span class='inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full mr-1 mb-1'>${role.trim()}</span>`,
+                                  `<span class='badge-role inline-flex items-center px-2 py-1 text-xs font-medium rounded-full mr-1 mb-1'>${role.trim()}</span>`,
                           )
                           .join('')}</div>`
                     : '-',
         },
         {
             label: 'Status',
-            value: user.value?.is_active ? 'Active' : 'Inactive',
+            value: user.value?.is_active ? 'Aktif' : 'Nonaktif',
             className: user.value?.is_active ? 'text-green-600' : 'text-red-600',
+        },
+        {
+            label: 'Jenis Peserta',
+            value: user.value?.peserta_info?.peserta_type_label || '-',
+        },
+        {
+            label: 'ID Peserta',
+            value: user.value?.peserta_info?.peserta_id
+                ? `#${user.value.peserta_info.peserta_id}`
+                : '-',
+        },
+        {
+            label: 'Nama Peserta',
+            value: user.value?.peserta_info?.peserta_nama || '-',
+        },
+        {
+            label: 'NIK Peserta',
+            value: user.value?.peserta_info?.peserta_nik || '-',
+        },
+        {
+            label: 'Status Peserta',
+            value:
+                user.value?.peserta_info?.peserta_is_active === true
+                    ? 'Aktif'
+                    : user.value?.peserta_info?.peserta_is_active === false
+                      ? 'Nonaktif'
+                      : '-',
+        },
+        {
+            label: 'Status Registrasi',
+            value: user.value?.peserta_info?.registration_status || '-',
+        },
+        {
+            label: 'Detail Peserta',
+            value: user.value?.peserta_info?.edit_url
+                ? `<a href="${user.value.peserta_info.edit_url}" class="text-primary underline-offset-2 hover:underline">Buka profil peserta</a>`
+                : '-',
         },
     ];
 });
 
 const actionFields = [
-    { label: 'Created At', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Created By', value: props.item.created_by_user?.name || '-' },
-    { label: 'Updated At', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Updated By', value: props.item.updated_by_user?.name || '-' },
+    { label: 'Dibuat Pada', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Dibuat Oleh', value: props.item.created_by_user?.name || '-' },
+    { label: 'Diperbarui Pada', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Diperbarui Oleh', value: props.item.updated_by_user?.name || '-' },
 ];
 
 const handleEdit = () => {
