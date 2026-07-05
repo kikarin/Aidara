@@ -27,7 +27,7 @@ const props = defineProps<{
 const { toast } = useToast();
 
 const breadcrumbs = [
-    { title: 'Pemeriksaan Khusus Kondisi Fisik/Kebugaran', href: '/pemeriksaan-khusus' },
+    { title: 'Pemeriksaan Fisik', href: '/pemeriksaan-khusus' },
     { title: 'Input Hasil Tes', href: `/pemeriksaan-khusus/${props.item.id}/input-hasil-tes` },
 ];
 
@@ -474,7 +474,7 @@ onMounted(() => {
                 <!-- Info Card -->
                 <Card class="mb-4">
                     <CardHeader>
-                        <CardTitle>Informasi Pemeriksaan Khusus</CardTitle>
+                        <CardTitle>Informasi Pemeriksaan Fisik</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">

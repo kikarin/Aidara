@@ -27,27 +27,49 @@ const formatTahap = (tahap: string) => {
     return mapping[tahap] || tahap;
 };
 
-const fields = computed(() => [
-    { label: 'Nama Program', value: dataItem.value?.nama_program || '-' },
-    { label: 'Cabor', value: dataItem.value?.cabor?.nama || '-' },
-    { label: 'Kategori', value: dataItem.value?.cabor_kategori?.nama || '-' },
-    {
-        label: 'Periode',
-        value:
-            dataItem.value?.periode_mulai && dataItem.value?.periode_selesai
-                ? `${dataItem.value.periode_mulai} s/d ${dataItem.value.periode_selesai}`
-                : '-',
-    },
-    {
-        label: 'Durasi',
-        value: dataItem.value?.periode_hitung || '-',
-    },
-    {
-        label: 'Tahap',
-        value: formatTahap(dataItem.value?.tahap),
-    },
-    { label: 'Keterangan', value: dataItem.value?.keterangan || '-' },
-]);
+const fields = computed(() => {
+    const pelatihNames =
+        dataItem.value?.pelatihs?.length > 0
+            ? dataItem.value.pelatihs.map((p: any) => p.nama).join(', ')
+            : dataItem.value?.pelatih?.nama || '-';
+
+    const jamAbsen =
+        dataItem.value?.absen_jam_mulai && dataItem.value?.absen_jam_selesai
+            ? `${String(dataItem.value.absen_jam_mulai).slice(0, 5)} – ${String(dataItem.value.absen_jam_selesai).slice(0, 5)} WIB`
+            : 'Bebas (tidak dibatasi jam)';
+
+    return [
+        { label: 'Nama Program', value: dataItem.value?.nama_program || '-' },
+        { label: 'Cabor', value: dataItem.value?.cabor?.nama || '-' },
+        { label: 'Kategori', value: dataItem.value?.cabor_kategori?.nama || '-' },
+        {
+            label: 'Mode Pelatih',
+            value: dataItem.value?.mode_pelatih === 'multiple' ? 'Lebih dari satu pelatih' : 'Satu pelatih',
+        },
+        { label: 'Pelatih', value: pelatihNames },
+        {
+            label: 'Absen Atlet',
+            value: dataItem.value?.wajib_absen_atlet ? 'Wajib absen' : 'Tidak wajib',
+        },
+        { label: 'Jam Absen', value: jamAbsen },
+        {
+            label: 'Periode',
+            value:
+                dataItem.value?.periode_mulai && dataItem.value?.periode_selesai
+                    ? `${dataItem.value.periode_mulai} s/d ${dataItem.value.periode_selesai}`
+                    : '-',
+        },
+        {
+            label: 'Durasi',
+            value: dataItem.value?.periode_hitung || '-',
+        },
+        {
+            label: 'Tahap',
+            value: formatTahap(dataItem.value?.tahap),
+        },
+        { label: 'Keterangan', value: dataItem.value?.keterangan || '-' },
+    ];
+});
 
 const actionFields = [
     { label: 'Dibuat Pada', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },

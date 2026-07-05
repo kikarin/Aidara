@@ -263,6 +263,7 @@ const formInputs = computed(() => [
         name: 'jenis_kelamin',
         label: 'Jenis Kelamin',
         type: 'select' as const,
+        placeholder: 'Pilih jenis kelamin',
         required: true,
         options: [
             { value: 'L', label: 'Laki-laki' },

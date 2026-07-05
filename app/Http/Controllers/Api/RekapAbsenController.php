@@ -196,6 +196,8 @@ class RekapAbsenController extends Controller
                     'message' => 'Tanggal harus dalam periode program latihan.',
                 ], 422);
             }
+
+            app(\App\Services\ProgramLatihanAbsenWindowService::class)->assertWithinWindow($programLatihan);
             
             // Cari atau buat rekap absen
             $rekapAbsen = RekapAbsenProgramLatihan::firstOrCreate(

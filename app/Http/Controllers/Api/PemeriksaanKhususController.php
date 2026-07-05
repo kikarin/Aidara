@@ -1152,6 +1152,8 @@ class PemeriksaanKhususController extends Controller
                     'nama' => $peserta->peserta->nama ?? '-',
                     'jenis_kelamin' => $peserta->peserta->jenis_kelamin ?? null,
                     'tanggal_lahir' => $peserta->peserta->tanggal_lahir ?? null,
+                    'foto' => $peserta->peserta->foto ?? null,
+                    'foto_thumbnail' => $peserta->peserta->foto_thumbnail ?? null,
                 ];
                 
                 // Hitung usia jika ada tanggal_lahir
@@ -1482,6 +1484,8 @@ class PemeriksaanKhususController extends Controller
                         'posisi' => $posisi,
                         'umur' => $umur,
                         'cabor' => $caborNama,
+                        'foto' => $peserta->peserta->foto ?? null,
+                        'foto_thumbnail' => $peserta->peserta->foto_thumbnail ?? null,
                     ],
                     'nilai_keseluruhan' => $nilaiKeseluruhan,
                     'predikat_keseluruhan' => $predikatKeseluruhan,
@@ -1652,6 +1656,8 @@ class PemeriksaanKhususController extends Controller
                     'posisi' => $posisi,
                     'umur' => $umur,
                     'cabor' => $caborNama,
+                    'foto' => $peserta->peserta->foto ?? null,
+                    'foto_thumbnail' => $peserta->peserta->foto_thumbnail ?? null,
                 ],
                 'aspek' => [],
                 'item_tes' => [],

@@ -181,6 +181,11 @@ class Atlet extends Model implements HasMedia
         return $this->kategoriPesertas();
     }
 
+    public function absenProgramLatihan()
+    {
+        return $this->hasMany(ProgramLatihanAbsenAtlet::class, 'atlet_id');
+    }
+
     /**
      * Scope filter untuk tanggal
      */

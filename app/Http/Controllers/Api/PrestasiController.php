@@ -77,6 +77,8 @@ class PrestasiController extends Controller
                         'peserta_type' => 'atlet',
                         'peserta_id' => $atlet->id,
                         'nama' => $atlet->nama ?? '-',
+                        'foto' => $atlet->foto,
+                        'foto_thumbnail' => $atlet->foto_thumbnail,
                         'cabor' => $cabor?->nama ?? '-',
                         'nomor_posisi' => $caborKategoriAtlet?->posisi_atlet ?? '-',
                         'juara' => $prestasi->juara ?? '-',
@@ -132,6 +134,8 @@ class PrestasiController extends Controller
                         'peserta_type' => 'pelatih',
                         'peserta_id' => $pelatih->id,
                         'nama' => $pelatih->nama ?? '-',
+                        'foto' => $pelatih->foto,
+                        'foto_thumbnail' => $pelatih->foto_thumbnail,
                         'cabor' => $cabor?->nama ?? '-',
                         'nomor_posisi' => $caborKategoriPelatih?->posisi_atlet ?? '-',
                         'juara' => $prestasi->juara ?? '-',
@@ -152,6 +156,7 @@ class PrestasiController extends Controller
                         $q->where('is_active', 1)->whereNull('deleted_at')->with('cabor');
                     }]);
                 },
+                'tingkat',
             ])
                 ->whereNull('deleted_at')
                 ->get()
@@ -166,22 +171,31 @@ class PrestasiController extends Controller
                     
                     $caborKategoriTenagaPendukung = $tenagaPendukung->caborKategoriTenagaPendukung->first();
                     $cabor = $caborKategoriTenagaPendukung?->cabor;
-                    $kategoriPeserta = $tenagaPendukung->kategoriPesertas ? $tenagaPendukung->kategoriPesertas->pluck('nama')->toArray() : [];
+                    $kategoriPesertaItems = $tenagaPendukung->kategoriPesertas ?? collect();
+                    $kategoriPesertaNama = $kategoriPesertaItems->isNotEmpty()
+                        ? $kategoriPesertaItems->pluck('nama')->implode(', ')
+                        : '-';
+                    $kategoriPesertaId = $kategoriPesertaItems->first()?->id;
                     
                     return [
                         'id' => $prestasi->id,
+                        'prestasi_group_id' => null,
+                        'jenis_prestasi' => 'individu',
                         'peserta_type' => 'tenaga_pendukung',
                         'peserta_id' => $tenagaPendukung->id,
                         'nama' => $tenagaPendukung->nama ?? '-',
+                        'foto' => $tenagaPendukung->foto,
+                        'foto_thumbnail' => $tenagaPendukung->foto_thumbnail,
                         'cabor' => $cabor?->nama ?? '-',
                         'nomor_posisi' => $caborKategoriTenagaPendukung?->posisi_atlet ?? '-',
                         'juara' => '-',
                         'medali' => '-',
-                        'kategori_peserta' => !empty($kategoriPeserta) ? implode(', ', $kategoriPeserta) : '-',
+                        'kategori_peserta' => $kategoriPesertaNama,
+                        'kategori_peserta_id' => $kategoriPesertaId,
                         'bonus' => $prestasi->bonus ?? 0,
                         'nama_event' => $prestasi->nama_event ?: 'Event Tanpa Nama',
                         'tanggal' => $prestasi->tanggal,
-                        'tingkat' => '-',
+                        'tingkat' => $prestasi->tingkat?->nama ?? '-',
                     ];
                 })
                 ->filter();
@@ -233,6 +247,8 @@ class PrestasiController extends Controller
                     'peserta_type' => $prestasiUtama['peserta_type'],
                     'peserta_id' => $prestasiUtama['peserta_id'],
                     'nama' => $prestasiUtama['nama'],
+                    'foto' => $prestasiUtama['foto'] ?? null,
+                    'foto_thumbnail' => $prestasiUtama['foto_thumbnail'] ?? null,
                     'cabor' => $prestasiUtama['cabor'],
                     'nomor_posisi' => '-',
                     'juara' => $prestasiUtama['juara'],
@@ -256,11 +272,14 @@ class PrestasiController extends Controller
             
             // Process prestasi individu
             foreach ($allPrestasiCollection as $prestasi) {
-                if ($prestasi['prestasi_group_id'] && in_array($prestasi['prestasi_group_id'], $processedGroupIds)) {
+                $prestasiGroupId = $prestasi['prestasi_group_id'] ?? null;
+                $prestasiId = $prestasi['id'] ?? null;
+
+                if ($prestasiGroupId && in_array($prestasiGroupId, $processedGroupIds)) {
                     continue;
                 }
                 
-                if ($prestasi['prestasi_group_id'] && $prestasi['id'] != $prestasi['prestasi_group_id']) {
+                if ($prestasiGroupId && $prestasiId != $prestasiGroupId) {
                     continue;
                 }
                 
@@ -270,7 +289,9 @@ class PrestasiController extends Controller
             }
 
             // Group by kategori peserta
-            $groupedByKategori = collect($processedPrestasi)->groupBy('kategori_peserta_id')->map(function ($prestasiGroup, $kategoriId) {
+            $groupedByKategori = collect($processedPrestasi)->groupBy(function ($prestasi) {
+                return $prestasi['kategori_peserta_id'] ?? 'unknown';
+            })->map(function ($prestasiGroup, $kategoriId) {
                 $totalMedali = [
                     'Emas' => 0,
                     'Perak' => 0,
@@ -287,7 +308,7 @@ class PrestasiController extends Controller
                 }
                 
                 return [
-                    'kategori_peserta_id' => $kategoriId,
+                    'kategori_peserta_id' => is_numeric($kategoriId) ? (int) $kategoriId : null,
                     'kategori_peserta_nama' => $prestasiGroup->first()['kategori_peserta'] ?? '-',
                     'count' => $prestasiGroup->count(),
                     'total_bonus' => $prestasiGroup->sum('bonus'),

@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Registration;
 use App\Http\Controllers\Controller;
 use App\Http\Helpers\RecaptchaHelper;
 use App\Models\User;
-use App\Notifications\EmailOtpNotification;
 use App\Repositories\RegistrationRepository;
+use App\Services\OtpMailService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\Rule;
@@ -161,8 +161,7 @@ class RegistrationController extends Controller
                 'email_otp_expires_at' => now()->addMinutes(10),
             ]);
 
-            // Kirim email OTP
-            $user->notify(new EmailOtpNotification($otpCode));
+            app(OtpMailService::class)->send($user->email, $otpCode, 'registration');
 
             // Simpan waktu terakhir OTP dikirim untuk cooldown
             $request->session()->put('otp_last_sent', now());

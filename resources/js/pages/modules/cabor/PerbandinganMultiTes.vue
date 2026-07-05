@@ -232,7 +232,7 @@ onMounted(async () => {
 
                     <!-- Filter Pemeriksaan (multi-select) -->
                     <div class="space-y-2">
-                        <Label>Pemeriksaan Khusus (Min. 2)</Label>
+                        <Label>Pemeriksaan Fisik (Min. 2)</Label>
                         <div class="border rounded-md p-2 min-h-[40px] max-h-32 overflow-auto">
                             <div v-if="loadingPemeriksaan" class="flex items-center justify-center py-2">
                                 <Loader2 class="h-4 w-4 animate-spin" />

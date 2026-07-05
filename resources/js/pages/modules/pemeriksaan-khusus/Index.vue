@@ -9,7 +9,7 @@ import BadgeGroup from '../components/BadgeGroup.vue';
 import PesertaModal from './components/PesertaModal.vue';
 
 const { toast } = useToast();
-const breadcrumbs = [{ title: 'Pemeriksaan Kondisi Fisik/Kebugaran', href: '/pemeriksaan-khusus' }];
+const breadcrumbs = [{ title: 'Pemeriksaan Fisik', href: '/pemeriksaan-khusus' }];
 
 const columns = [
     { key: 'peserta', label: 'Peserta', orderable: false },
@@ -148,8 +148,8 @@ const closePesertaModal = () => {
 
 <template>
     <PageIndex
-        title="Pemeriksaan Khusus"
-        module-name="Pemeriksaan Khusus"
+        title="Pemeriksaan Fisik"
+        module-name="Pemeriksaan Fisik"
         :breadcrumbs="breadcrumbs"
         :columns="columns"
         :create-url="'/pemeriksaan-khusus/create'"

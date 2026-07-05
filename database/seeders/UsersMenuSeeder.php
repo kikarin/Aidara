@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Permission;
 use App\Models\UsersMenu;
+use App\Repositories\UsersMenuRepository;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -106,7 +107,7 @@ class UsersMenuSeeder extends Seeder
                 'permission_id' => 'Pemeriksaan Show',
             ],
             [
-                'nama'          => 'Pemeriksaan Khusus',
+                'nama'          => 'Pemeriksaan Fisik',
                 'kode'          => 'PEMERIKSAAN-KHUSUS',
                 'url'           => '/pemeriksaan-khusus',
                 'icon'          => 'Activity',
@@ -275,9 +276,20 @@ class UsersMenuSeeder extends Seeder
                     ],
                 ],
             ],
+            [
+                'nama'          => 'Live Score Piala Dunia',
+                'kode'          => 'SETTINGS-WORLDCUP',
+                'url'           => '/dashboard/settings/worldcup',
+                'icon'          => 'Trophy',
+                'rel'           => 0,
+                'urutan'        => 104,
+                'permission_id' => 'Pengaturan World Cup Edit',
+            ],
         ];
 
         $this->insertMenus($usersMenus);
+
+        app(UsersMenuRepository::class)->invalidateMenusCache();
     }
 
     private function insertMenus(array $menus, $parentId = 0)

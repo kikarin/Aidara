@@ -32,6 +32,17 @@ const props = defineProps<{
             name: string;
         } | null;
         all_roles: string;
+        peserta_info?: {
+            peserta_type?: string;
+            peserta_type_label?: string;
+            peserta_id?: number;
+            peserta_nama?: string;
+            peserta_nik?: string;
+            peserta_is_active?: boolean | null;
+            edit_url?: string | null;
+            registration_status?: string | null;
+            is_orphan?: boolean;
+        } | null;
     };
 }>();
 
@@ -70,6 +81,43 @@ const fields = computed(() => {
             label: 'Status',
             value: user.value?.is_active ? 'Aktif' : 'Nonaktif',
             className: user.value?.is_active ? 'text-green-600' : 'text-red-600',
+        },
+        {
+            label: 'Jenis Peserta',
+            value: user.value?.peserta_info?.peserta_type_label || '-',
+        },
+        {
+            label: 'ID Peserta',
+            value: user.value?.peserta_info?.peserta_id
+                ? `#${user.value.peserta_info.peserta_id}`
+                : '-',
+        },
+        {
+            label: 'Nama Peserta',
+            value: user.value?.peserta_info?.peserta_nama || '-',
+        },
+        {
+            label: 'NIK Peserta',
+            value: user.value?.peserta_info?.peserta_nik || '-',
+        },
+        {
+            label: 'Status Peserta',
+            value:
+                user.value?.peserta_info?.peserta_is_active === true
+                    ? 'Aktif'
+                    : user.value?.peserta_info?.peserta_is_active === false
+                      ? 'Nonaktif'
+                      : '-',
+        },
+        {
+            label: 'Status Registrasi',
+            value: user.value?.peserta_info?.registration_status || '-',
+        },
+        {
+            label: 'Detail Peserta',
+            value: user.value?.peserta_info?.edit_url
+                ? `<a href="${user.value.peserta_info.edit_url}" class="text-primary underline-offset-2 hover:underline">Buka profil peserta</a>`
+                : '-',
         },
     ];
 });

@@ -78,7 +78,13 @@ class ProgramLatihanController extends Controller
                 },
                 'caborKategori' => function($q) {
                     $q->whereNull('cabor_kategori.deleted_at');
-                }
+                },
+                'pelatih' => function($q) {
+                    $q->whereNull('pelatihs.deleted_at');
+                },
+                'pelatihs' => function($q) {
+                    $q->whereNull('pelatihs.deleted_at');
+                },
             ]);
 
             // Filter by cabor_id
@@ -130,27 +136,7 @@ class ProgramLatihanController extends Controller
             $itemsArray = $items instanceof \Illuminate\Pagination\LengthAwarePaginator ? $items->items() : $items->all();
             
             $formattedData = collect($itemsArray)
-                ->map(function ($item) {
-                    return [
-                        'id' => $item->id,
-                        'cabor' => $item->cabor ? [
-                            'id' => $item->cabor->id,
-                            'nama' => $item->cabor->nama,
-                        ] : null,
-                        'nama_program' => $item->nama_program,
-                        'cabor_kategori' => $item->caborKategori ? [
-                            'id' => $item->caborKategori->id,
-                            'nama' => $item->caborKategori->nama,
-                        ] : null,
-                        'periode_mulai' => $item->periode_mulai,
-                        'periode_selesai' => $item->periode_selesai,
-                        'periode_hitung' => $item->periode_hitung,
-                        'tahap' => $item->tahap,
-                        'keterangan' => $item->keterangan,
-                        'created_at' => $item->created_at,
-                        'updated_at' => $item->updated_at,
-                    ];
-                });
+                ->map(fn ($item) => $this->formatProgramLatihanItem($item));
 
             $response = [
                 'status' => 'success',
@@ -208,12 +194,18 @@ class ProgramLatihanController extends Controller
             }
 
             $data = $request->validated();
+            $pelatihIds = array_values(array_unique(array_map('intval', $data['pelatih_ids'] ?? [])));
 
             // Create program latihan
             $programLatihan = ProgramLatihan::create([
                 'cabor_id' => $data['cabor_id'],
                 'nama_program' => $data['nama_program'],
                 'cabor_kategori_id' => $data['cabor_kategori_id'],
+                'mode_pelatih' => $data['mode_pelatih'],
+                'pelatih_id' => $pelatihIds[0] ?? null,
+                'wajib_absen_atlet' => $data['wajib_absen_atlet'] ?? false,
+                'absen_jam_mulai' => $data['absen_jam_mulai'] ?? null,
+                'absen_jam_selesai' => $data['absen_jam_selesai'] ?? null,
                 'periode_mulai' => $data['periode_mulai'],
                 'periode_selesai' => $data['periode_selesai'],
                 'tahap' => $data['tahap'] ?? null,
@@ -222,30 +214,16 @@ class ProgramLatihanController extends Controller
                 'updated_by' => $user->id,
             ]);
 
+            $programLatihan->pelatihs()->sync($pelatihIds);
+
             // Reload with relations
-            $programLatihan->load(['cabor', 'caborKategori']);
+            $programLatihan->load(['cabor', 'caborKategori', 'pelatih', 'pelatihs']);
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Program latihan berhasil ditambahkan.',
                 'data' => [
-                    'program_latihan' => [
-                        'id' => $programLatihan->id,
-                        'cabor' => $programLatihan->cabor ? [
-                            'id' => $programLatihan->cabor->id,
-                            'nama' => $programLatihan->cabor->nama,
-                        ] : null,
-                        'nama_program' => $programLatihan->nama_program,
-                        'cabor_kategori' => $programLatihan->caborKategori ? [
-                            'id' => $programLatihan->caborKategori->id,
-                            'nama' => $programLatihan->caborKategori->nama,
-                        ] : null,
-                        'periode_mulai' => $programLatihan->periode_mulai,
-                        'periode_selesai' => $programLatihan->periode_selesai,
-                        'periode_hitung' => $programLatihan->periode_hitung,
-                        'tahap' => $programLatihan->tahap,
-                        'keterangan' => $programLatihan->keterangan,
-                    ],
+                    'program_latihan' => $this->formatProgramLatihanItem($programLatihan),
                     'permissions' => $permissions,
                 ],
             ], 201);
@@ -303,6 +281,24 @@ class ProgramLatihanController extends Controller
             if (isset($data['cabor_kategori_id'])) {
                 $updateData['cabor_kategori_id'] = $data['cabor_kategori_id'];
             }
+            if (isset($data['mode_pelatih'])) {
+                $updateData['mode_pelatih'] = $data['mode_pelatih'];
+            }
+            if (isset($data['pelatih_ids'])) {
+                $pelatihIds = array_values(array_unique(array_map('intval', $data['pelatih_ids'])));
+                $updateData['pelatih_id'] = $pelatihIds[0] ?? null;
+            } elseif (isset($data['pelatih_id'])) {
+                $updateData['pelatih_id'] = $data['pelatih_id'];
+            }
+            if (array_key_exists('wajib_absen_atlet', $data)) {
+                $updateData['wajib_absen_atlet'] = $data['wajib_absen_atlet'] ?? false;
+            }
+            if (array_key_exists('absen_jam_mulai', $data)) {
+                $updateData['absen_jam_mulai'] = $data['absen_jam_mulai'];
+            }
+            if (array_key_exists('absen_jam_selesai', $data)) {
+                $updateData['absen_jam_selesai'] = $data['absen_jam_selesai'];
+            }
             if (isset($data['periode_mulai'])) {
                 $updateData['periode_mulai'] = $data['periode_mulai'];
             }
@@ -319,31 +315,21 @@ class ProgramLatihanController extends Controller
 
             $programLatihan->update($updateData);
 
+            if (isset($data['pelatih_ids'])) {
+                $programLatihan->pelatihs()->sync(
+                    array_values(array_unique(array_map('intval', $data['pelatih_ids'])))
+                );
+            }
+
             // Reload with relations
             $programLatihan->refresh();
-            $programLatihan->load(['cabor', 'caborKategori']);
+            $programLatihan->load(['cabor', 'caborKategori', 'pelatih', 'pelatihs']);
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Program latihan berhasil diperbarui.',
                 'data' => [
-                    'program_latihan' => [
-                        'id' => $programLatihan->id,
-                        'cabor' => $programLatihan->cabor ? [
-                            'id' => $programLatihan->cabor->id,
-                            'nama' => $programLatihan->cabor->nama,
-                        ] : null,
-                        'nama_program' => $programLatihan->nama_program,
-                        'cabor_kategori' => $programLatihan->caborKategori ? [
-                            'id' => $programLatihan->caborKategori->id,
-                            'nama' => $programLatihan->caborKategori->nama,
-                        ] : null,
-                        'periode_mulai' => $programLatihan->periode_mulai,
-                        'periode_selesai' => $programLatihan->periode_selesai,
-                        'periode_hitung' => $programLatihan->periode_hitung,
-                        'tahap' => $programLatihan->tahap,
-                        'keterangan' => $programLatihan->keterangan,
-                    ],
+                    'program_latihan' => $this->formatProgramLatihanItem($programLatihan),
                     'permissions' => $permissions,
                 ],
             ]);
@@ -660,6 +646,84 @@ class ProgramLatihanController extends Controller
                 'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
+    }
+
+    public function getPelatihByKategori(Request $request, $caborKategoriId): JsonResponse
+    {
+        try {
+            $caborId = $request->query('cabor_id');
+
+            $query = \App\Models\CaborKategoriPelatih::query()
+                ->with('pelatih')
+                ->where('cabor_kategori_id', $caborKategoriId)
+                ->whereNull('deleted_at')
+                ->where('is_active', 1);
+
+            if ($caborId) {
+                $query->where('cabor_id', $caborId);
+            }
+
+            $pelatih = $query->get()->map(fn ($row) => [
+                'id' => $row->pelatih_id,
+                'nama' => $row->pelatih?->nama ?? '-',
+                'jenis_pelatih' => $row->jenis_pelatih,
+            ])->values();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $pelatih,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get Pelatih By Kategori error: ' . $e->getMessage(), [
+                'cabor_kategori_id' => $caborKategoriId,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil daftar pelatih.',
+            ], 500);
+        }
+    }
+
+    private function formatProgramLatihanItem(ProgramLatihan $item): array
+    {
+        $windowService = app(\App\Services\ProgramLatihanAbsenWindowService::class);
+
+        return [
+            'id' => $item->id,
+            'cabor' => $item->cabor ? [
+                'id' => $item->cabor->id,
+                'nama' => $item->cabor->nama,
+            ] : null,
+            'nama_program' => $item->nama_program,
+            'cabor_kategori' => $item->caborKategori ? [
+                'id' => $item->caborKategori->id,
+                'nama' => $item->caborKategori->nama,
+            ] : null,
+            'mode_pelatih' => $item->mode_pelatih ?? 'single',
+            'pelatih' => $item->pelatih ? [
+                'id' => $item->pelatih->id,
+                'nama' => $item->pelatih->nama,
+            ] : null,
+            'pelatihs' => $item->relationLoaded('pelatihs')
+                ? $item->pelatihs->map(fn ($p) => ['id' => $p->id, 'nama' => $p->nama])->values()->all()
+                : [],
+            'pelatih_id' => $item->pelatih_id,
+            'pelatih_ids' => $item->relationLoaded('pelatihs')
+                ? $item->pelatihs->pluck('id')->all()
+                : ($item->pelatih_id ? [$item->pelatih_id] : []),
+            'wajib_absen_atlet' => (bool) $item->wajib_absen_atlet,
+            'absen_jam_mulai' => $item->absen_jam_mulai ? substr((string) $item->absen_jam_mulai, 0, 5) : null,
+            'absen_jam_selesai' => $item->absen_jam_selesai ? substr((string) $item->absen_jam_selesai, 0, 5) : null,
+            'absen_window_label' => $windowService->windowLabel($item),
+            'periode_mulai' => $item->periode_mulai,
+            'periode_selesai' => $item->periode_selesai,
+            'periode_hitung' => $item->periode_hitung,
+            'tahap' => $item->tahap,
+            'keterangan' => $item->keterangan,
+            'created_at' => $item->created_at,
+            'updated_at' => $item->updated_at,
+        ];
     }
 
 }

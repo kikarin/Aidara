@@ -1129,6 +1129,117 @@ class CaborController extends Controller
     }
 
     /**
+     * Get 3 pemeriksaan khusus terakhir untuk peserta tertentu (radar chart perbandingan)
+     */
+    public function getLastThreePemeriksaan(Request $request, $id, $pesertaId): JsonResponse
+    {
+        try {
+            $user = $request->user()->fresh();
+
+            if (!Gate::allows('Cabor Show')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk melihat data pemeriksaan.',
+                ], 403);
+            }
+
+            Cabor::findOrFail($id);
+
+            $pesertaType = $request->query('peserta_type', 'App\\Models\\Atlet');
+
+            $pemeriksaanList = PemeriksaanKhusus::where('cabor_id', $id)
+                ->whereHas('pemeriksaanKhususPeserta', function ($q) use ($pesertaId, $pesertaType) {
+                    $q->where('peserta_id', $pesertaId)
+                        ->where('peserta_type', $pesertaType);
+                })
+                ->with(['caborKategori'])
+                ->orderBy('tanggal_pemeriksaan', 'desc')
+                ->limit(3)
+                ->get();
+
+            if ($pemeriksaanList->isEmpty()) {
+                return response()->json([
+                    'status' => 'success',
+                    'data' => [],
+                ]);
+            }
+
+            $result = [];
+            foreach ($pemeriksaanList as $pemeriksaan) {
+                $aspekList = PemeriksaanKhususAspek::where('pemeriksaan_khusus_id', $pemeriksaan->id)
+                    ->whereNull('deleted_at')
+                    ->orderBy('urutan')
+                    ->get();
+
+                $peserta = PemeriksaanKhususPeserta::with([
+                    'hasilAspek.aspek',
+                    'hasilKeseluruhan',
+                ])
+                    ->where('pemeriksaan_khusus_id', $pemeriksaan->id)
+                    ->where('peserta_id', $pesertaId)
+                    ->where('peserta_type', $pesertaType)
+                    ->first();
+
+                if (!$peserta) {
+                    continue;
+                }
+
+                $aspekData = [];
+                foreach ($aspekList as $aspek) {
+                    $hasilAspek = $peserta->hasilAspek->firstWhere('pemeriksaan_khusus_aspek_id', $aspek->id);
+                    $aspekData[] = [
+                        'aspek_id' => $aspek->id,
+                        'nama' => $aspek->nama,
+                        'nilai_performa' => $hasilAspek ? (float) $hasilAspek->nilai_performa : null,
+                        'predikat' => $hasilAspek->predikat ?? null,
+                    ];
+                }
+
+                $result[] = [
+                    'pemeriksaan_id' => $pemeriksaan->id,
+                    'nama_pemeriksaan' => $pemeriksaan->nama_pemeriksaan,
+                    'tanggal_pemeriksaan' => $pemeriksaan->tanggal_pemeriksaan,
+                    'cabor_kategori' => $pemeriksaan->caborKategori->nama ?? '-',
+                    'aspek_list' => $aspekList->map(fn ($a) => [
+                        'id' => $a->id,
+                        'nama' => $a->nama,
+                        'urutan' => $a->urutan,
+                    ])->toArray(),
+                    'aspek' => $aspekData,
+                    'nilai_keseluruhan' => $peserta->hasilKeseluruhan
+                        ? (float) $peserta->hasilKeseluruhan->nilai_keseluruhan
+                        : null,
+                    'predikat_keseluruhan' => $peserta->hasilKeseluruhan->predikat ?? null,
+                ];
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $result,
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Cabor tidak ditemukan.',
+            ], 404);
+        } catch (\Exception $e) {
+            Log::error('Get Last Three Pemeriksaan error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+                'cabor_id' => $id,
+                'peserta_id' => $pesertaId,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil data pemeriksaan.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /**
      * Helper function untuk menghitung umur
      */
     private function calculateAge($tanggalLahir)

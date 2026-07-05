@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Models\ProgramLatihanAbsenAtlet;
 use App\Models\RekapAbsenProgramLatihan;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -128,6 +129,43 @@ trait ManagesRekapAbsenFoto
         }
 
         $this->uploadFileNilaiBatch($rekapAbsen, $request->file('file_nilai'), $tanggal);
+    }
+
+    protected function attachFotoAbsenAtletWithMetadata(
+        ProgramLatihanAbsenAtlet $absenAtlet,
+        UploadedFile $foto,
+        string $tanggal,
+        ?array $metadata = null
+    ): void {
+        $absenAtlet->clearMediaCollection('foto_absen_atlet');
+
+        $mediaAdder = $absenAtlet->addMedia($foto)
+            ->usingName('Foto Absen Atlet ' . $tanggal);
+
+        if ($metadata) {
+            $mediaAdder->withCustomProperties($metadata);
+        }
+
+        $mediaAdder->toMediaCollection('foto_absen_atlet');
+    }
+
+    protected function uploadFotoAbsenAtletFromRequest(
+        ProgramLatihanAbsenAtlet $absenAtlet,
+        Request $request,
+        string $tanggal
+    ): void {
+        if (!$request->hasFile('foto_absen')) {
+            return;
+        }
+
+        $foto = $request->file('foto_absen');
+        if (!$foto instanceof UploadedFile) {
+            return;
+        }
+
+        $metadata = $this->parseFotoMetadata($request->input('foto_lokasi'));
+
+        $this->attachFotoAbsenAtletWithMetadata($absenAtlet, $foto, $tanggal, $metadata);
     }
 
     protected function uploadFileNilaiBatch(

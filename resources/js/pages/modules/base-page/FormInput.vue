@@ -237,6 +237,12 @@ const toggleMultiSelect = (fieldName: string) => {
     multiSelectOpen.value[fieldName] = !multiSelectOpen.value[fieldName];
 };
 
+const emitFieldUpdate = (fieldName: string) => {
+    const value = form[fieldName];
+    emit('field-updated', { field: fieldName, value });
+    emit('update:modelValue', form.data());
+};
+
 const selectMultiOption = (fieldName: string, value: string | number) => {
     const currentValues = form[fieldName] || [];
     if (currentValues.includes(value)) {
@@ -244,11 +250,13 @@ const selectMultiOption = (fieldName: string, value: string | number) => {
     } else {
         form[fieldName] = [...currentValues, value];
     }
+    emitFieldUpdate(fieldName);
 };
 
 const removeMultiOption = (fieldName: string, value: string | number) => {
     const currentValues = form[fieldName] || [];
     form[fieldName] = currentValues.filter((v: any) => v !== value);
+    emitFieldUpdate(fieldName);
 };
 
 const getSelectedLabels = (fieldName: string, options: { value: string | number; label: string }[]) => {
@@ -601,6 +609,7 @@ defineExpose({
                                                 } else {
                                                     form[input.name] = selected.filter((v: any) => v !== option.value);
                                                 }
+                                                emitFieldUpdate(input.name);
                                             }
                                         "
                                     />

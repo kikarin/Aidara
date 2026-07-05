@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
+import RegisterConsentDialog from '@/components/auth/RegisterConsentDialog.vue';
 import Recaptcha from '@/components/Recaptcha.vue';
 import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ const showPassword = ref(false);
 const showPasswordConfirmation = ref(false);
 const recaptchaRef = ref<InstanceType<typeof Recaptcha> | null>(null);
 const recaptchaVerified = ref(false);
+const consentOpen = ref(false);
 
 // Password strength validation
 const passwordStrength = computed(() => {
@@ -121,6 +123,11 @@ const submitRegister = () => {
         }
     }
 
+    // Minta persetujuan Syarat & Ketentuan / Privasi / PDP sebelum registrasi awal dikirim
+    consentOpen.value = true;
+};
+
+const performRegister = () => {
     // Submit registrasi awal (email & password)
     form.post(route('register'), {
         onSuccess: (page) => {
@@ -135,6 +142,7 @@ const submitRegister = () => {
             recaptchaRef.value?.reset();
             showPassword.value = false;
             showPasswordConfirmation.value = false;
+            consentOpen.value = false;
         },
         onFinish: () => {
             if (!showOtpField.value) {
@@ -149,8 +157,13 @@ const submitRegister = () => {
             recaptchaRef.value?.reset();
             recaptchaVerified.value = false;
             form.recaptcha_token = '';
+            consentOpen.value = false;
         },
     });
+};
+
+const handleConfirmRegister = () => {
+    performRegister();
 };
 
 const verifyOtp = () => {
@@ -368,12 +381,12 @@ const resendOtp = () => {
                     class="mt-2 w-full"
                     tabindex="4"
                     :disabled="
-                        form.processing ||
+                        (form.processing && !consentOpen) ||
                         (!showOtpField && (!isPasswordValid || !passwordsMatch || (recaptchaSiteKey && recaptchaSiteKey.trim() !== '' && !recaptchaVerified))) ||
                         (showOtpField && form.otp.length !== 6)
                     "
                 >
-                    <LoaderCircle v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
+                    <LoaderCircle v-if="form.processing && !consentOpen" class="mr-2 h-4 w-4 animate-spin" />
                     {{ showOtpField ? 'Verifikasi OTP' : 'Daftar' }}
                 </Button>
             </div>
@@ -383,5 +396,11 @@ const resendOtp = () => {
                 <TextLink :href="route('login')" class="underline underline-offset-4" :tabindex="5">Masuk</TextLink>
             </div>
         </form>
+
+        <RegisterConsentDialog
+            v-model:open="consentOpen"
+            :loading="form.processing"
+            @confirm="handleConfirmRegister"
+        />
     </AuthBase>
 </template>

@@ -16,7 +16,10 @@ use App\Http\Controllers\CaborKategoriTenagaPendukungController;
 use App\Http\Controllers\CategoryPermissionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DesaController;
-use App\Http\Controllers\KecamatanController;
+use App\Http\Controllers\LegalController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\Settings\WorldCupSettingController;
+use App\Http\Controllers\WorldCupController;
 use App\Http\Controllers\MstJenisDokumenController;
 use App\Http\Controllers\MstJenisPelatihController;
 use App\Http\Controllers\MstJenisTenagaPendukungController;
@@ -27,6 +30,7 @@ use App\Http\Controllers\MstKategoriPesertaController;
 use App\Http\Controllers\MstKategoriPrestasiPelatihController;
 use App\Http\Controllers\MstJuaraController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\PublicEventController;
 use App\Http\Controllers\PelatihController;
 use App\Http\Controllers\PelatihDokumenController;
 use App\Http\Controllers\PelatihKesehatanController;
@@ -40,6 +44,7 @@ use App\Http\Controllers\PemeriksaanPesertaParameterController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PrestasiController;
 use App\Http\Controllers\ProgramLatihanController;
+use App\Http\Controllers\Api\ProgramLatihanAbsenAtletController;
 use App\Http\Controllers\RekapAbsenProgramLatihanController;
 use App\Http\Controllers\RefStatusPemeriksaanController;
 use App\Http\Controllers\RoleController;
@@ -88,9 +93,26 @@ use Illuminate\Support\Facades\Mail;
 // =====================
 // ROUTE UTAMA
 // =====================
-Route::get('/', function () {
-    return Inertia::render('Welcome');
-})->name('home');
+Route::get('/', HomeController::class)->name('home');
+
+Route::get('/legal/{slug}', [LegalController::class, 'show'])
+    ->whereIn('slug', ['terms', 'privacy', 'pdp'])
+    ->name('legal.show');
+
+Route::get('/piala-dunia', [WorldCupController::class, 'index'])->name('worldcup.index');
+Route::get('/event-publik', [PublicEventController::class, 'index'])->name('event.public.index');
+Route::get('/event-publik/{id}', [PublicEventController::class, 'show'])->whereNumber('id')->name('event.public.show');
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/api/worldcup/preview', [WorldCupController::class, 'preview'])->name('worldcup.preview');
+    Route::get('/api/worldcup/live', [WorldCupController::class, 'live'])->name('worldcup.live');
+    Route::get('/api/worldcup/schedule', [WorldCupController::class, 'schedule'])->name('worldcup.schedule');
+    Route::get('/api/worldcup/groups', [WorldCupController::class, 'groups'])->name('worldcup.groups');
+});
+
+Route::middleware(['auth', 'verified'])->prefix('dashboard/settings')->group(function () {
+    Route::get('/worldcup', [WorldCupSettingController::class, 'edit'])->name('settings.worldcup.edit');
+    Route::put('/worldcup', [WorldCupSettingController::class, 'update'])->name('settings.worldcup.update');
+});
 
 Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'ensure.email.verified', 'check.registration.status'])->name('dashboard');
 
@@ -248,6 +270,7 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::get('/users/{id}/login-as', [UsersController::class, 'login_as'])->name('users.login-as');
     Route::post('/users/switch-role', [UsersController::class, 'switchRole'])->name('users.switch-role');
     Route::get('/api/users', [UsersController::class, 'apiIndex']);
+    Route::get('/api/users/peserta-options', [UsersController::class, 'pesertaOptions'])->name('api.users.peserta-options');
     Route::post('/users/destroy-selected', [UsersController::class, 'destroy_selected'])->name('users.destroy_selected');
 
     Route::resource('/menu-permissions/menus', UsersMenuController::class)->names('menus');
@@ -606,7 +629,10 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
         ->name('program-latihan.rekap-absen.delete-media');
     
     Route::resource('/program-latihan', ProgramLatihanController::class)->names('program-latihan');
+    Route::get('/api/program-latihan/pelatih-by-kategori/{cabor_kategori_id}', [ProgramLatihanController::class, 'apiPelatihByKategori']);
     Route::get('/api/program-latihan', [ProgramLatihanController::class, 'apiIndex']);
+    Route::get('/api/program-latihan/{program_id}/absen-atlet', [ProgramLatihanAbsenAtletController::class, 'index']);
+    Route::get('/api/program-latihan/{program_id}/kehadiran/atlet/{atlet_id}', [ProgramLatihanAbsenAtletController::class, 'riwayatAtlet']);
     Route::post('/program-latihan/destroy-selected', [ProgramLatihanController::class, 'destroy_selected'])->name('program-latihan.destroy_selected');
 
 });

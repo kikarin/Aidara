@@ -19,6 +19,7 @@ use App\Models\TenagaPendukung;
 use App\Models\TenagaPendukungDokumen;
 use App\Models\TenagaPendukungPrestasi;
 use App\Models\TenagaPendukungSertifikat;
+use App\Services\UserPesertaLinkService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -408,6 +409,60 @@ class ProfileController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Terjadi kesalahan saat menghapus sertifikat.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Download / preview file sertifikat (authenticated)
+     */
+    public function downloadSertifikat(Request $request, $id)
+    {
+        try {
+            $user = $request->user()->fresh();
+            $roleName = $this->getRoleName($user);
+
+            if (! Gate::allows("{$roleName} Sertifikat Show")) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk melihat sertifikat.',
+                ], 403);
+            }
+
+            $peserta = $this->getPesertaData($user);
+            if (! $peserta) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            $sertifikat = $this->getSertifikatById($id, $user->peserta_type);
+            if (! $sertifikat) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Sertifikat tidak ditemukan.',
+                ], 404);
+            }
+
+            if (! $this->checkSertifikatOwnership($sertifikat, $peserta, $user->peserta_type)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk mengakses file ini.',
+                ], 403);
+            }
+
+            return $this->streamMediaFile($sertifikat, 'sertifikat_file');
+        } catch (\Exception $e) {
+            Log::error('Download Sertifikat error: '.$e->getMessage(), [
+                'exception' => $e,
+                'user_id'   => $request->user()->id ?? null,
+                'id'        => $id,
+            ]);
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Terjadi kesalahan saat mengunduh file sertifikat.',
             ], 500);
         }
     }
@@ -925,6 +980,60 @@ class ProfileController extends Controller
         }
     }
 
+    /**
+     * Download / preview file dokumen (authenticated)
+     */
+    public function downloadDokumen(Request $request, $id)
+    {
+        try {
+            $user = $request->user()->fresh();
+            $roleName = $this->getRoleName($user);
+
+            if (! Gate::allows("{$roleName} Dokumen Show")) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk melihat dokumen.',
+                ], 403);
+            }
+
+            $peserta = $this->getPesertaData($user);
+            if (! $peserta) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Data peserta tidak ditemukan.',
+                ], 404);
+            }
+
+            $dokumen = $this->getDokumenById($id, $user->peserta_type);
+            if (! $dokumen) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Dokumen tidak ditemukan.',
+                ], 404);
+            }
+
+            if (! $this->checkDokumenOwnership($dokumen, $peserta, $user->peserta_type)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk mengakses file ini.',
+                ], 403);
+            }
+
+            return $this->streamMediaFile($dokumen, 'dokumen_file');
+        } catch (\Exception $e) {
+            Log::error('Download Dokumen error: '.$e->getMessage(), [
+                'exception' => $e,
+                'user_id'   => $request->user()->id ?? null,
+                'id'        => $id,
+            ]);
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Terjadi kesalahan saat mengunduh file dokumen.',
+            ], 500);
+        }
+    }
+
     // ==================== Helper Methods ====================
 
     /**
@@ -932,13 +1041,17 @@ class ProfileController extends Controller
      */
     private function getRoleName($user): string
     {
+        $linkService = app(UserPesertaLinkService::class);
+        $pesertaType = $user->peserta_type
+            ?: $linkService->pesertaTypeFromRole((int) $user->current_role_id);
+
         $roleMap = [
-            'atlet' => 'Atlet',
-            'pelatih' => 'Pelatih',
+            'atlet'            => 'Atlet',
+            'pelatih'          => 'Pelatih',
             'tenaga_pendukung' => 'Tenaga Pendukung',
         ];
 
-        return $roleMap[$user->peserta_type] ?? 'Atlet';
+        return $roleMap[$pesertaType] ?? 'Atlet';
     }
 
     /**
@@ -946,15 +1059,26 @@ class ProfileController extends Controller
      */
     private function getPesertaData($user)
     {
-        switch ($user->peserta_type) {
+        $linkService = app(UserPesertaLinkService::class);
+        $peserta     = $linkService->resolvePeserta($user);
+
+        if (!$peserta) {
+            return null;
+        }
+
+        $user->refresh();
+        $pesertaType = $user->peserta_type
+            ?: $linkService->pesertaTypeFromRole((int) $user->current_role_id);
+
+        switch ($pesertaType) {
             case 'atlet':
-                return Atlet::where('users_id', $user->id)
+                return Atlet::where('id', $peserta->id)
                     ->with([
-                        'kecamatan', 
-                        'kelurahan', 
-                        'kategoriAtlet', 
+                        'kecamatan',
+                        'kelurahan',
+                        'kategoriAtlet',
                         'posisiAtlet',
-                        'caborKategoriAtlet' => function($query) {
+                        'caborKategoriAtlet' => function ($query) {
                             $query->whereNull('deleted_at')
                                 ->with(['cabor', 'caborKategori']);
                         },
@@ -962,12 +1086,12 @@ class ProfileController extends Controller
                     ])
                     ->first();
             case 'pelatih':
-                return Pelatih::where('users_id', $user->id)
+                return Pelatih::where('id', $peserta->id)
                     ->with([
-                        'kecamatan', 
-                        'kelurahan', 
+                        'kecamatan',
+                        'kelurahan',
                         'jenisPelatih',
-                        'caborKategoriPelatih' => function($query) {
+                        'caborKategoriPelatih' => function ($query) {
                             $query->whereNull('deleted_at')
                                 ->with(['cabor', 'caborKategori']);
                         },
@@ -975,11 +1099,11 @@ class ProfileController extends Controller
                     ])
                     ->first();
             case 'tenaga_pendukung':
-                return TenagaPendukung::where('users_id', $user->id)
+                return TenagaPendukung::where('id', $peserta->id)
                     ->with([
-                        'kecamatan', 
+                        'kecamatan',
                         'kelurahan',
-                        'caborKategoriTenagaPendukung' => function($query) {
+                        'caborKategoriTenagaPendukung' => function ($query) {
                             $query->whereNull('deleted_at')
                                 ->with(['cabor', 'caborKategori']);
                         },
@@ -1468,6 +1592,35 @@ class ProfileController extends Controller
             default:
                 return false;
         }
+    }
+
+    /**
+     * Stream media file inline for authenticated profile downloads.
+     */
+    private function streamMediaFile($model, string $collection)
+    {
+        $media = $model->getFirstMedia($collection);
+
+        if (! $media) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'File tidak ditemukan.',
+            ], 404);
+        }
+
+        $path = $media->getPath();
+
+        if (! is_file($path)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'File tidak ditemukan di server.',
+            ], 404);
+        }
+
+        return response()->file($path, [
+            'Content-Type'        => $media->mime_type ?? 'application/octet-stream',
+            'Content-Disposition' => 'inline; filename="'.addslashes($media->file_name).'"',
+        ]);
     }
 }
 

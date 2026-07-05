@@ -11,7 +11,7 @@ const props = defineProps<{
 }>();
 
 const breadcrumbs = [
-    { title: 'Pemeriksaan Khusus', href: '/pemeriksaan-khusus' },
+    { title: 'Pemeriksaan Fisik', href: '/pemeriksaan-khusus' },
     { title: 'Setup Aspek & Item Tes', href: `/pemeriksaan-khusus/${props.item.id}/setup` },
 ];
 

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
+import LoginConsentDialog from '@/components/auth/LoginConsentDialog.vue';
 import Recaptcha from '@/components/Recaptcha.vue';
+import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -23,6 +25,7 @@ const form = useForm({
 });
 
 const showPassword = ref(false);
+const consentOpen = ref(false);
 const recaptchaRef = ref<InstanceType<typeof Recaptcha> | null>(null);
 const recaptchaVerified = ref(false);
 
@@ -41,11 +44,15 @@ const handleRecaptchaError = () => {
     recaptchaVerified.value = false;
 };
 
+const openConsentDialog = () => {
+    consentOpen.value = true;
+};
+
 const submit = () => {
-    // Only require reCAPTCHA if site key is provided
     if (props.recaptchaSiteKey && props.recaptchaSiteKey.trim() !== '') {
         if (!recaptchaVerified.value || !form.recaptcha_token) {
             form.setError('recaptcha_token', 'Harap verifikasi bahwa Anda bukan robot');
+            consentOpen.value = false;
             return;
         }
     }
@@ -55,18 +62,24 @@ const submit = () => {
             form.reset('password', 'recaptcha_token');
             recaptchaVerified.value = false;
             recaptchaRef.value?.reset();
+            consentOpen.value = false;
         },
         onError: () => {
             recaptchaRef.value?.reset();
             recaptchaVerified.value = false;
             form.recaptcha_token = '';
+            consentOpen.value = false;
         },
     });
+};
+
+const handleConfirmLogin = () => {
+    submit();
 };
 </script>
 
 <template>
-    <AuthBase title="Dispora" description="Dinas Pemuda dan Olahraga">
+    <AuthBase title="Masuk ke AIDARA" description="Portal data olahraga Dispora Kabupaten Bogor">
         <Head title="Masuk" />
 
         <div
@@ -76,7 +89,7 @@ const submit = () => {
             {{ status }}
         </div>
 
-        <form @submit.prevent="submit" class="space-y-6">
+        <form @submit.prevent="openConsentDialog" class="space-y-6">
             <!-- Email -->
             <div class="space-y-2">
                 <Label for="email" class="text-sm font-medium">Email</Label>
@@ -157,9 +170,20 @@ const submit = () => {
                 :tabindex="4"
                 :disabled="form.processing || (recaptchaSiteKey && recaptchaSiteKey.trim() !== '' && !recaptchaVerified)"
             >
-                <LoaderCircle v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
-                {{ form.processing ? 'Memproses...' : 'Masuk ke Sistem' }}
+                <LoaderCircle v-if="form.processing && !consentOpen" class="mr-2 h-4 w-4 animate-spin" />
+                {{ form.processing && !consentOpen ? 'Memproses...' : 'Masuk ke Sistem' }}
             </Button>
         </form>
+
+        <p class="text-muted-foreground mt-6 text-center text-sm">
+            Belum punya akun?
+            <TextLink :href="route('register')" class="underline underline-offset-4">Daftar sebagai peserta</TextLink>
+        </p>
+
+        <LoginConsentDialog
+            v-model:open="consentOpen"
+            :loading="form.processing"
+            @confirm="handleConfirmLogin"
+        />
     </AuthBase>
 </template>

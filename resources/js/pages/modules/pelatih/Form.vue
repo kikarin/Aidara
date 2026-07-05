@@ -256,6 +256,7 @@ const formInputs = computed(() => [
         name: 'jenis_kelamin',
         label: 'Jenis Kelamin',
         type: 'select' as const,
+        placeholder: 'Pilih jenis kelamin',
         required: true,
         options: [
             { value: 'L', label: 'Laki-laki' },
@@ -296,7 +297,7 @@ const formInputs = computed(() => [
         type: 'text' as const,
         placeholder: 'Contoh: Pelatih Kepala, Asisten Pelatih, Pelatih Fisik',
         required: false,
-        help: 'Jenis Pelatih bisa di isi setelah memilih Cabang Olahraga',
+        help: 'Jenis pelatih bisa diisi setelah memilih cabang olahraga.',
     },
     {
         name: 'is_active',

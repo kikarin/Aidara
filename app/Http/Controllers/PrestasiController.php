@@ -172,6 +172,7 @@ class PrestasiController extends Controller implements HasMiddleware
                     $q->where('is_active', 1)->whereNull('deleted_at')->with('cabor');
                 }]);
             },
+            'tingkat',
         ])
             ->whereNull('deleted_at')
             ->get()
@@ -186,10 +187,16 @@ class PrestasiController extends Controller implements HasMiddleware
                 
                 $caborKategoriTenagaPendukung = $tenagaPendukung->caborKategoriTenagaPendukung->first();
                 $cabor = $caborKategoriTenagaPendukung?->cabor;
-                $kategoriPeserta = $tenagaPendukung->kategoriPesertas ? $tenagaPendukung->kategoriPesertas->pluck('nama')->toArray() : [];
+                $kategoriPesertaItems = $tenagaPendukung->kategoriPesertas ?? collect();
+                $kategoriPesertaNama = $kategoriPesertaItems->isNotEmpty()
+                    ? $kategoriPesertaItems->pluck('nama')->implode(', ')
+                    : '-';
+                $kategoriPesertaId = $kategoriPesertaItems->first()?->id;
                 
                 return [
                     'id' => $prestasi->id,
+                    'prestasi_group_id' => null,
+                    'jenis_prestasi' => 'individu',
                     'peserta_type' => 'tenaga_pendukung',
                     'peserta_id' => $tenagaPendukung->id,
                     'nama' => $tenagaPendukung->nama ?? '-',
@@ -197,11 +204,12 @@ class PrestasiController extends Controller implements HasMiddleware
                     'nomor_posisi' => $caborKategoriTenagaPendukung?->posisi_atlet ?? '-',
                     'juara' => '-',
                     'medali' => '-',
-                    'kategori_peserta' => !empty($kategoriPeserta) ? implode(', ', $kategoriPeserta) : '-',
+                    'kategori_peserta' => $kategoriPesertaNama,
+                    'kategori_peserta_id' => $kategoriPesertaId,
                     'bonus' => $prestasi->bonus ?? 0,
                     'nama_event' => $prestasi->nama_event ?: 'Event Tanpa Nama',
                     'tanggal' => $prestasi->tanggal,
-                    'tingkat' => '-',
+                    'tingkat' => $prestasi->tingkat?->nama ?? '-',
                 ];
             })
             ->filter(); // Remove null values
@@ -281,13 +289,16 @@ class PrestasiController extends Controller implements HasMiddleware
         
         // Process prestasi individu (yang tidak beregu atau belum diproses)
         foreach ($allPrestasiCollection as $prestasi) {
+            $prestasiGroupId = $prestasi['prestasi_group_id'] ?? null;
+            $prestasiId = $prestasi['id'] ?? null;
+
             // Skip jika sudah diproses sebagai beregu
-            if ($prestasi['prestasi_group_id'] && in_array($prestasi['prestasi_group_id'], $processedGroupIds)) {
+            if ($prestasiGroupId && in_array($prestasiGroupId, $processedGroupIds)) {
                 continue;
             }
             
             // Skip anggota beregu
-            if ($prestasi['prestasi_group_id'] && $prestasi['id'] != $prestasi['prestasi_group_id']) {
+            if ($prestasiGroupId && $prestasiId != $prestasiGroupId) {
                 continue;
             }
             
@@ -298,7 +309,9 @@ class PrestasiController extends Controller implements HasMiddleware
         }
 
         // Group by kategori peserta
-        $groupedByKategori = collect($processedPrestasi)->groupBy('kategori_peserta_id')->map(function ($prestasiGroup, $kategoriId) {
+        $groupedByKategori = collect($processedPrestasi)->groupBy(function ($prestasi) {
+            return $prestasi['kategori_peserta_id'] ?? 'unknown';
+        })->map(function ($prestasiGroup, $kategoriId) {
             // Hitung total medali (untuk beregu, medali dihitung 1 per regu)
             $totalMedali = [
                 'Emas' => 0,
@@ -316,7 +329,7 @@ class PrestasiController extends Controller implements HasMiddleware
             }
             
             return [
-                'kategori_peserta_id' => $kategoriId,
+                'kategori_peserta_id' => is_numeric($kategoriId) ? (int) $kategoriId : null,
                 'kategori_peserta_nama' => $prestasiGroup->first()['kategori_peserta'] ?? '-',
                 'count' => $prestasiGroup->count(),
                 'total_bonus' => $prestasiGroup->sum('bonus'),

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use App\Models\Role;
-
+use App\Services\UserPesertaLinkService;
 
 class PelatihRepository
 {
@@ -638,19 +638,18 @@ class PelatihRepository
             'updated_by'      => $userId,
         ];
 
-        // Jika ada password, hash password
         if (isset($data['akun_password']) && $data['akun_password']) {
             $userData['password'] = bcrypt($data['akun_password']);
         }
 
-        // Jika sudah ada users_id, update user
+        $user = null;
+
         if (isset($data['users_id']) && $data['users_id']) {
             $user = User::find($data['users_id']);
             if ($user) {
                 $user->update($userData);
 
-                // Ensure role is assigned using Spatie Permission
-                $role = Role::find(36); // Role Pelatih
+                $role = Role::find(36);
                 if ($role && !$user->hasRole($role)) {
                     $user->assignRole($role);
                 }
@@ -661,16 +660,13 @@ class PelatihRepository
                 ]);
             }
         } else {
-            // Create new user
             $user = User::create($userData);
 
-            // Assign role Pelatih using Spatie Permission
-            $role = Role::find(36); // Role Pelatih
+            $role = Role::find(36);
             if ($role) {
                 $user->assignRole($role);
             }
 
-            // Also create users_role record for compatibility
             $user->users_role()->create([
                 'users_id'   => $user->id,
                 'role_id'    => 36,
@@ -678,12 +674,14 @@ class PelatihRepository
                 'updated_by' => $userId,
             ]);
 
-            $pelatih->update(['users_id' => $user->id]);
-
             Log::info('PelatihRepository: Created new user for pelatih', [
                 'pelatih_id' => $pelatih->id,
                 'user_id'    => $user->id,
             ]);
+        }
+
+        if ($user) {
+            app(UserPesertaLinkService::class)->link($user, 'pelatih', $pelatih->id);
         }
     }
 

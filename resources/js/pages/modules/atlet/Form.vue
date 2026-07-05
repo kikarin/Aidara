@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { useHandleFormSave } from '@/composables/useHandleFormSave';
 import FormInput from '@/pages/modules/base-page/FormInput.vue';
+import {
+    AGAMA_OPTIONS,
+    DISABILITAS_OPTIONS,
+    KELAS_SEKOLAH_OPTIONS,
+    KLASIFIKASI_NPCI_OPTIONS,
+    UKURAN_BAJU_OPTIONS,
+    UKURAN_CELANA_OPTIONS,
+    UKURAN_SEPATU_OPTIONS,
+} from '@/lib/biodataOptions';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -301,6 +310,7 @@ const formInputs = computed(() => {
             name: 'jenis_kelamin',
             label: 'Jenis Kelamin',
             type: 'select' as const,
+            placeholder: 'Pilih jenis kelamin',
             required: true,
             options: [
                 { value: 'L', label: 'Laki-laki' },
@@ -309,13 +319,43 @@ const formInputs = computed(() => {
         },
         { name: 'tempat_lahir', label: 'Tempat Lahir', type: 'text' as const, placeholder: 'Masukkan tempat lahir' },
         { name: 'tanggal_lahir', label: 'Tanggal Lahir', type: 'date' as const, placeholder: 'Pilih tanggal lahir' },
-        { name: 'agama', label: 'Agama', type: 'text' as const, placeholder: 'Masukkan agama' },
-        { name: 'alamat', label: 'Alamat', type: 'textarea' as const, placeholder: 'Masukkan alamat' },
-        { name: 'sekolah', label: 'Sekolah', type: 'text' as const, placeholder: 'Masukkan sekolah' },
-        { name: 'kelas_sekolah', label: 'Kelas Sekolah', type: 'text' as const, placeholder: 'Masukkan kelas sekolah' },
-        { name: 'ukuran_baju', label: 'Ukuran Baju', type: 'text' as const, placeholder: 'Masukkan ukuran baju' },
-        { name: 'ukuran_celana', label: 'Ukuran Celana', type: 'text' as const, placeholder: 'Masukkan ukuran celana' },
-        { name: 'ukuran_sepatu', label: 'Ukuran Sepatu', type: 'text' as const, placeholder: 'Masukkan ukuran sepatu' },
+        {
+            name: 'agama',
+            label: 'Agama',
+            type: 'select' as const,
+            placeholder: 'Pilih agama',
+            options: AGAMA_OPTIONS,
+        },
+        { name: 'alamat', label: 'Alamat', type: 'textarea' as const, placeholder: 'Masukkan alamat lengkap' },
+        { name: 'sekolah', label: 'Sekolah', type: 'text' as const, placeholder: 'Masukkan nama sekolah' },
+        {
+            name: 'kelas_sekolah',
+            label: 'Kelas Sekolah',
+            type: 'select' as const,
+            placeholder: 'Pilih kelas sekolah',
+            options: KELAS_SEKOLAH_OPTIONS,
+        },
+        {
+            name: 'ukuran_baju',
+            label: 'Ukuran Baju',
+            type: 'select' as const,
+            placeholder: 'Pilih ukuran baju',
+            options: UKURAN_BAJU_OPTIONS,
+        },
+        {
+            name: 'ukuran_celana',
+            label: 'Ukuran Celana',
+            type: 'select' as const,
+            placeholder: 'Pilih ukuran celana',
+            options: UKURAN_CELANA_OPTIONS,
+        },
+        {
+            name: 'ukuran_sepatu',
+            label: 'Ukuran Sepatu',
+            type: 'select' as const,
+            placeholder: 'Pilih ukuran sepatu',
+            options: UKURAN_SEPATU_OPTIONS,
+        },
         { name: 'kecamatan_id', label: 'Kecamatan', type: 'select' as const, placeholder: 'Pilih Kecamatan', options: kecamatanOptions.value },
         { name: 'kelurahan_id', label: 'Kelurahan', type: 'select' as const, placeholder: 'Pilih Kelurahan', options: kelurahanOptions.value },
         { name: 'no_hp', label: 'No HP', type: 'text' as const, placeholder: 'Masukkan nomor HP' },
@@ -339,15 +379,17 @@ const formInputs = computed(() => {
             {
                 name: 'disabilitas',
                 label: 'Disabilitas',
-                type: 'text' as const,
-                placeholder: 'Masukkan jenis disabilitas',
+                type: 'select' as const,
+                placeholder: 'Pilih jenis disabilitas',
+                options: DISABILITAS_OPTIONS,
                 required: false,
             },
             {
                 name: 'klasifikasi',
                 label: 'Klasifikasi',
-                type: 'text' as const,
-                placeholder: 'Masukkan klasifikasi',
+                type: 'select' as const,
+                placeholder: 'Pilih klasifikasi',
+                options: KLASIFIKASI_NPCI_OPTIONS,
                 required: false,
             }
         );
@@ -360,15 +402,16 @@ const formInputs = computed(() => {
             {
                 name: 'disabilitas',
                 label: 'Disabilitas',
-                type: 'text' as const,
-                placeholder: 'Masukkan jenis disabilitas',
+                type: 'select' as const,
+                placeholder: 'Pilih jenis disabilitas',
+                options: DISABILITAS_OPTIONS,
                 required: false,
             },
             {
                 name: 'iq',
                 label: 'IQ',
                 type: 'text' as const,
-                placeholder: 'Masukkan IQ',
+                placeholder: 'Masukkan nilai IQ',
                 required: false,
             }
         );

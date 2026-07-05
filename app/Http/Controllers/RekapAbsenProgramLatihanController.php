@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ProgramLatihan;
 use App\Models\RekapAbsenProgramLatihan;
+use App\Services\ProgramLatihanKehadiranService;
 use App\Traits\BaseTrait;
 use App\Traits\ManagesRekapAbsenFoto;
 use Illuminate\Http\Request;
@@ -17,8 +18,9 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
 {
     use BaseTrait, ManagesRekapAbsenFoto;
 
-    public function __construct()
-    {
+    public function __construct(
+        private ProgramLatihanKehadiranService $kehadiranService
+    ) {
         $this->initialize();
         $this->route                          = 'program-latihan';
         $this->commonData['kode_first_menu']  = 'PROGRAM-LATIHAN';
@@ -34,7 +36,7 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
 
     public function index($program_id)
     {
-        $programLatihan = ProgramLatihan::with(['cabor', 'caborKategori'])->findOrFail($program_id);
+        $programLatihan = ProgramLatihan::with(['cabor', 'caborKategori', 'pelatih'])->findOrFail($program_id);
         
         // Generate array tanggal dari periode_mulai sampai periode_selesai
         $tanggalList = $this->generateDateRange($programLatihan->periode_mulai, $programLatihan->periode_selesai);
@@ -70,9 +72,16 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
             ];
         });
 
-        // Ambil data pelatih dari rekap absen pertama (biasanya sama untuk semua)
+        // Ambil data pelatih dari program, fallback ke rekap absen pertama
         $pelatihData = null;
-        if ($rekapAbsen->isNotEmpty()) {
+        if ($programLatihan->pelatih) {
+            $pelatihData = [
+                'nama' => $programLatihan->pelatih->nama,
+                'kategori_peserta' => $programLatihan->caborKategori?->nama ?? '-',
+                'cabor' => $programLatihan->cabor?->nama ?? '-',
+                'jenis_pelatih' => '-',
+            ];
+        } elseif ($rekapAbsen->isNotEmpty()) {
             $firstRekap = $rekapAbsen->first();
             $user = $firstRekap->createdByUser;
             if ($user && $user->pelatih) {
@@ -111,7 +120,7 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
 
     public function show($program_id)
     {
-        $programLatihan = ProgramLatihan::with(['cabor', 'caborKategori'])->findOrFail($program_id);
+        $programLatihan = ProgramLatihan::with(['cabor', 'caborKategori', 'pelatih'])->findOrFail($program_id);
         
         // Ambil semua rekap absen yang sudah ada (hanya yang punya data)
         $rekapAbsen = RekapAbsenProgramLatihan::where('program_latihan_id', $program_id)
@@ -141,9 +150,16 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
             ];
         });
         
-        // Ambil data pelatih
+        // Ambil data pelatih dari program, fallback ke pelatih rekap pertama
         $pelatihData = null;
-        if ($rekapAbsen->isNotEmpty()) {
+        if ($programLatihan->pelatih) {
+            $pelatih = $programLatihan->pelatih;
+            $pelatihData = [
+                'nama' => $pelatih->nama,
+                'kategori_peserta' => $programLatihan->caborKategori?->nama ?? '-',
+                'cabor' => $programLatihan->cabor?->nama ?? '-',
+            ];
+        } elseif ($rekapAbsen->isNotEmpty()) {
             $firstRekap = $rekapAbsen->first();
             $user = $firstRekap->createdByUser;
             if ($user && $user->pelatih) {
@@ -170,6 +186,13 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
             'mental' => $rekapData->where('jenis_latihan', 'latihan_mental')->count(),
             'pemulihan' => $rekapData->where('jenis_latihan', 'latihan_pemulihan')->count(),
         ];
+
+        $bulanOptions = $this->generateBulanOptions($programLatihan->periode_mulai, $programLatihan->periode_selesai);
+        $defaultBulan = request('bulan', 'all');
+        $kehadiran = $this->kehadiranService->getRingkasanProgram(
+            (int) $program_id,
+            $defaultBulan === 'all' ? null : $defaultBulan
+        );
         
         $data = $this->commonData + [
             'program_latihan' => [
@@ -184,6 +207,9 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
             'rekap_data' => $rekapData->values()->toArray(),
             'pelatih_data' => $pelatihData,
             'stats' => $stats,
+            'kehadiran' => $kehadiran,
+            'bulan_options' => $bulanOptions,
+            'filter_bulan' => $defaultBulan,
         ];
         
         return Inertia::render('modules/program-latihan/RekapAbsenDetail', $data);
@@ -214,6 +240,8 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
         if ($request->tanggal !== $today) {
             return back()->withErrors(['tanggal' => 'Hanya dapat input rekap absen untuk tanggal hari ini']);
         }
+
+        app(\App\Services\ProgramLatihanAbsenWindowService::class)->assertWithinWindow($programLatihan);
 
         // Cari atau buat rekap absen
         $rekapAbsen = RekapAbsenProgramLatihan::firstOrCreate(
@@ -329,6 +357,23 @@ class RekapAbsenProgramLatihanController extends Controller implements HasMiddle
         }
 
         return $dates;
+    }
+
+    private function generateBulanOptions(string $startDate, string $endDate): array
+    {
+        $options = [['value' => 'all', 'label' => 'Semua Periode']];
+        $current = \Carbon\Carbon::parse($startDate)->startOfMonth();
+        $end = \Carbon\Carbon::parse($endDate)->startOfMonth();
+
+        while ($current <= $end) {
+            $options[] = [
+                'value' => $current->format('Y-m'),
+                'label' => $current->locale('id')->translatedFormat('F Y'),
+            ];
+            $current->addMonth();
+        }
+
+        return $options;
     }
 }
 

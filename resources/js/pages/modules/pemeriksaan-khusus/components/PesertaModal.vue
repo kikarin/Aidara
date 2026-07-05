@@ -95,7 +95,7 @@ const handleConfirmDelete = async () => {
     try {
         await axios.delete(`/pemeriksaan-khusus/${props.pemeriksaanKhususId}/peserta/${pesertaToDelete.value.id}`);
         toast({ 
-            title: `${getTipeLabel(props.tipe)} berhasil dihapus dari pemeriksaan khusus`, 
+            title: `${getTipeLabel(props.tipe)} berhasil dihapus dari pemeriksaan fisik`, 
             variant: 'success' 
         });
         showDeleteDialog.value = false;
@@ -207,7 +207,7 @@ const getColumns = () => {
                     <tbody>
                         <tr v-if="data.length === 0">
                             <td :colspan="canHapusPeserta ? 5 : 4" class="text-muted-foreground py-4 text-center">
-                                Tidak ada data {{ getTipeLabel(tipe) }} untuk pemeriksaan khusus ini
+                                Tidak ada data {{ getTipeLabel(tipe) }} untuk pemeriksaan fisik ini
                             </td>
                         </tr>
                         <tr v-for="(peserta, idx) in data" :key="peserta.id" class="hover:bg-muted/50">
@@ -263,12 +263,12 @@ const getColumns = () => {
     <AlertDialog :open="showDeleteDialog" @update:open="showDeleteDialog = $event">
         <AlertDialogContent>
             <AlertDialogHeader>
-                <AlertDialogTitle>Hapus Peserta dari Pemeriksaan Khusus?</AlertDialogTitle>
+                <AlertDialogTitle>Hapus Peserta dari Pemeriksaan Fisik?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Apakah Anda yakin ingin menghapus <strong>{{ pesertaToDelete?.nama }}</strong> dari pemeriksaan khusus ini?
+                    Apakah Anda yakin ingin menghapus <strong>{{ pesertaToDelete?.nama }}</strong> dari pemeriksaan fisik ini?
                     <br>
                     <span class="text-sm text-muted-foreground">
-                        Peserta akan dihapus dari pemeriksaan khusus, tetapi tetap ada di cabor.
+                        Peserta akan dihapus dari pemeriksaan fisik, tetapi tetap ada di cabor.
                     </span>
                 </AlertDialogDescription>
             </AlertDialogHeader>

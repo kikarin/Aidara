@@ -175,7 +175,7 @@ const dynamicTitle = computed(() => {
     } else if (activeTab.value === 'kesehatan-data') {
         return `Kesehatan : ${props.item.nama}`;
     } else if (activeTab.value === 'pemeriksaan-khusus-data') {
-        return `Pemeriksaan Khusus : ${props.item.nama}`;
+        return `Pemeriksaan Fisik : ${props.item.nama}`;
     }
     return `Atlet: ${props.item.nama}`;
 });
@@ -369,7 +369,7 @@ const tabsConfig = [
     },
     {
         value: 'pemeriksaan-khusus-data',
-        label: 'Pemeriksaan Khusus',
+        label: 'Pemeriksaan Fisik',
     },
 ];
 

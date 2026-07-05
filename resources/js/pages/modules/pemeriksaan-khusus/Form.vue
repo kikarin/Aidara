@@ -175,8 +175,8 @@ const handleSave = (form: any, setFormErrors: (errors: Record<string, string>) =
         url: '/pemeriksaan-khusus',
         mode: props.mode,
         id: props.initialData?.id,
-        successMessage: props.mode === 'create' ? 'Pemeriksaan khusus berhasil ditambahkan' : 'Pemeriksaan khusus berhasil diperbarui',
-        errorMessage: props.mode === 'create' ? 'Gagal menyimpan pemeriksaan khusus' : 'Gagal memperbarui pemeriksaan khusus',
+        successMessage: props.mode === 'create' ? 'Pemeriksaan fisik berhasil ditambahkan' : 'Pemeriksaan fisik berhasil diperbarui',
+        errorMessage: props.mode === 'create' ? 'Gagal menyimpan pemeriksaan fisik' : 'Gagal memperbarui pemeriksaan fisik',
         redirectUrl: '/pemeriksaan-khusus',
         onError: setFormErrors,
     });
@@ -260,7 +260,7 @@ const handleSave = (form: any, setFormErrors: (errors: Record<string, string>) =
                 </div>
 
                 <p class="mt-4 text-xs text-muted-foreground">
-                    * Semua peserta aktif dari kategori ini akan otomatis ditambahkan ke pemeriksaan khusus
+                    * Semua peserta aktif dari kategori ini akan otomatis ditambahkan ke pemeriksaan fisik
                 </p>
             </CardContent>
         </Card>

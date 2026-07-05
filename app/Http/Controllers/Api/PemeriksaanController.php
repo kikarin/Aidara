@@ -913,6 +913,8 @@ class PemeriksaanController extends Controller
                         'jenis_kelamin' => $pesertaModel->jenis_kelamin ?? null,
                         'tanggal_lahir' => $pesertaModel->tanggal_lahir ?? null,
                         'usia' => $usia,
+                        'foto' => $pesertaModel->foto ?? null,
+                        'foto_thumbnail' => $pesertaModel->foto_thumbnail ?? null,
                     ],
                     'status' => $peserta->status ? [
                         'id' => $peserta->status->id,

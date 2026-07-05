@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\MstParameter;
+use App\Services\UserPesertaLinkService;
 
 class AtletRepository
 {
@@ -742,24 +743,23 @@ class AtletRepository
             'email'           => $data['akun_email'],
             'no_hp'           => $atlet->no_hp,
             'is_active'       => 1,
-            'current_role_id' => 35, // Set current_role_id ke Role Atlet
+            'current_role_id' => 35,
             'created_by'      => $userId,
             'updated_by'      => $userId,
         ];
 
-        // Jika ada password, hash password
         if (isset($data['akun_password']) && $data['akun_password']) {
             $userData['password'] = bcrypt($data['akun_password']);
         }
 
-        // Jika sudah ada users_id, update user
+        $user = null;
+
         if (isset($data['users_id']) && $data['users_id']) {
             $user = User::find($data['users_id']);
             if ($user) {
                 $user->update($userData);
 
-                // Ensure role is assigned using Spatie Permission
-                $role = Role::find(35); // Role Atlet
+                $role = Role::find(35);
                 if ($role && !$user->hasRole($role)) {
                     $user->assignRole($role);
                 }
@@ -770,30 +770,28 @@ class AtletRepository
                 ]);
             }
         } else {
-            // Create new user
             $user = User::create($userData);
 
-            // Assign role Atlet using Spatie Permission
-            $role = Role::find(35); // Role Atlet
+            $role = Role::find(35);
             if ($role) {
                 $user->assignRole($role);
             }
 
-            // Also create users_role record for compatibility
             $user->users_role()->create([
                 'users_id'   => $user->id,
-                'role_id'    => 35, // Role Atlet
+                'role_id'    => 35,
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
-
-            // Update atlet dengan users_id
-            $atlet->update(['users_id' => $user->id]);
 
             Log::info('AtletRepository: Created new user for atlet', [
                 'atlet_id' => $atlet->id,
                 'user_id'  => $user->id,
             ]);
+        }
+
+        if ($user) {
+            app(UserPesertaLinkService::class)->link($user, 'atlet', $atlet->id);
         }
     }
 

@@ -232,6 +232,10 @@ class CategoryPermissionSeeder extends Seeder
                 'name'      => 'Turnamen',
                 'permission'=> 'CRUD',
             ],
+            [
+                'name'       => 'Pengaturan World Cup',
+                'permission' => ['Pengaturan World Cup Edit'],
+            ],
         ];
 
         $listCrud = ['Show', 'Add', 'Edit', 'Detail', 'Delete'];

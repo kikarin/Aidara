@@ -8,7 +8,8 @@ use App\Http\Requests\Api\ResendOtpRequest;
 use App\Http\Requests\Api\VerifyOtpRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
-use App\Notifications\EmailOtpNotification;
+use App\Services\OtpMailService;
+use App\Services\UserPesertaLinkService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
@@ -18,6 +19,28 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /**
+     * Guard mobile login untuk user peserta & status registrasi.
+     */
+    private function assertMobileLoginAllowed(User $user): void
+    {
+        try {
+            app(UserPesertaLinkService::class)->assertMobileLoginAllowed($user);
+        } catch (\InvalidArgumentException $e) {
+            throw ValidationException::withMessages([
+                'email' => [$e->getMessage()],
+            ]);
+        }
+    }
+
+    /**
+     * Kirim OTP ke email user + log untuk debugging lokal.
+     */
+    private function dispatchOtpEmail(User $user, string $otpCode, string $context): void
+    {
+        app(OtpMailService::class)->send($user->email, $otpCode, $context);
+    }
+
     /**
      * Login user - Step 1: Cek credentials & kirim OTP jika belum verified
      */
@@ -57,12 +80,7 @@ class AuthController extends Controller
                 ]);
 
                 // Kirim email OTP
-                $user->notify(new EmailOtpNotification($otpCode));
-
-                Log::info('OTP sent for login', [
-                    'user_id' => $user->id,
-                    'email' => $user->email,
-                ]);
+                $this->dispatchOtpEmail($user, $otpCode, 'login');
 
                 return response()->json([
                     'status'  => 'otp_required',
@@ -75,6 +93,8 @@ class AuthController extends Controller
             }
 
             // Jika sudah verified, langsung generate token
+            $this->assertMobileLoginAllowed($user);
+
             $user->tokens()->delete();
             $token = $user->createToken($request->device_name ?? 'mobile-app')->plainTextToken;
             $user->update(['last_login' => now()]);
@@ -131,6 +151,8 @@ class AuthController extends Controller
 
             // Jika sudah verified, langsung generate token
             if ($user->email_verified_at) {
+                $this->assertMobileLoginAllowed($user);
+
                 $user->tokens()->delete();
                 $token = $user->createToken('mobile-app')->plainTextToken;
 
@@ -180,6 +202,8 @@ class AuthController extends Controller
                 'is_verifikasi' => 1,
                 'last_login' => now(),
             ]);
+
+            $this->assertMobileLoginAllowed($user->fresh());
 
             $user->tokens()->delete();
             $token = $user->createToken('mobile-app')->plainTextToken;
@@ -234,7 +258,7 @@ class AuthController extends Controller
             $cooldownSeconds = 60;
 
             if ($lastSent && now()->diffInSeconds($lastSent) < $cooldownSeconds) {
-                $remainingSeconds = $cooldownSeconds - now()->diffInSeconds($lastSent);
+                $remainingSeconds = (int) ceil($cooldownSeconds - now()->diffInSeconds($lastSent));
                 return response()->json([
                     'status'  => 'error',
                     'message' => "Tunggu {$remainingSeconds} detik sebelum meminta kode OTP baru.",
@@ -250,15 +274,10 @@ class AuthController extends Controller
             ]);
 
             // Kirim email OTP
-            $user->notify(new EmailOtpNotification($otpCode));
+            $this->dispatchOtpEmail($user, $otpCode, 'resend');
 
             // Simpan waktu terakhir OTP dikirim
             Cache::put($cacheKey, now(), now()->addMinutes(2));
-
-            Log::info('OTP resent', [
-                'user_id' => $user->id,
-                'email' => $user->email,
-            ]);
 
             return response()->json([
                 'status'  => 'success',

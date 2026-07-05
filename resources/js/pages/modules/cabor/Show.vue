@@ -2,6 +2,7 @@
 import AppTabs from '@/components/AppTabs.vue';
 import PerbandinganMultiTes from './PerbandinganMultiTes.vue';
 import Ranking from './Ranking.vue';
+import CaborProgramLatihan from './components/CaborProgramLatihan.vue';
 import { useToast } from '@/components/ui/toast/useToast';
 import PageShow from '@/pages/modules/base-page/PageShow.vue';
 import { router, usePage } from '@inertiajs/vue3';
@@ -69,6 +70,10 @@ const tabsConfig = [
         value: 'ranking-data',
         label: 'Ranking',
     },
+    {
+        value: 'program-latihan-data',
+        label: 'Program Latihan',
+    },
 ];
 
 const fields = computed(() => [
@@ -120,6 +125,9 @@ const handleDelete = () => {
             </div>
             <div v-if="activeTab === 'ranking-data'">
                 <Ranking :cabor-id="props.item.id" :cabor-nama="props.item.nama" />
+            </div>
+            <div v-if="activeTab === 'program-latihan-data'">
+                <CaborProgramLatihan :cabor-id="props.item.id" :cabor-nama="props.item.nama" />
             </div>
         </template>
     </PageShow>

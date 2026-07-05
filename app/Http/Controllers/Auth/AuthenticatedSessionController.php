@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\OtpMailService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -43,24 +44,19 @@ class AuthenticatedSessionController extends Controller
 
         $user = Auth::user();
 
-        // Jika user belum verified, redirect ke OTP verification
+        // Jika user belum verified, kirim OTP baru lalu redirect ke halaman verifikasi
         if (!$user->email_verified_at) {
-            // Jika belum ada OTP, kirim OTP baru
-            if (!$user->email_otp || !$user->email_otp_expires_at) {
-                $otpCode = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
-                
-                $user->update([
-                    'email_otp' => bcrypt($otpCode),
-                    'email_otp_expires_at' => now()->addMinutes(10),
-                ]);
+            $otpCode = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
 
-                // Kirim email OTP
-                $user->notify(new \App\Notifications\EmailOtpNotification($otpCode));
-                
-                // Simpan waktu terakhir OTP dikirim untuk cooldown
-                $request->session()->put('otp_last_sent', now());
-            }
-            
+            $user->update([
+                'email_otp' => bcrypt($otpCode),
+                'email_otp_expires_at' => now()->addMinutes(10),
+            ]);
+
+            app(OtpMailService::class)->send($user->email, $otpCode, 'web-login');
+
+            $request->session()->put('otp_last_sent', now());
+
             return redirect()->route('email.otp.verify')
                 ->with('warning', 'Email Anda belum diverifikasi. Silakan masukkan kode OTP yang telah dikirim ke email Anda.');
         }

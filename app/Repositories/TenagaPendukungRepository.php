@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\CaborKategori;
 use App\Models\CaborKategoriTenagaPendukung;
+use App\Services\UserPesertaLinkService;
 
 class TenagaPendukungRepository
 {
@@ -621,19 +622,18 @@ class TenagaPendukungRepository
             'updated_by'      => $userId,
         ];
 
-        // Jika ada password, hash password
         if (isset($data['akun_password']) && $data['akun_password']) {
             $userData['password'] = bcrypt($data['akun_password']);
         }
 
-        // Jika sudah ada users_id, update user
+        $user = null;
+
         if (isset($data['users_id']) && $data['users_id']) {
             $user = User::find($data['users_id']);
             if ($user) {
                 $user->update($userData);
 
-                // Ensure role is assigned using Spatie Permission
-                $role = Role::find(37); // Role Tenaga Pendukung
+                $role = Role::find(37);
                 if ($role && !$user->hasRole($role)) {
                     $user->assignRole($role);
                 }
@@ -644,16 +644,13 @@ class TenagaPendukungRepository
                 ]);
             }
         } else {
-            // Create new user
             $user = User::create($userData);
 
-            // Assign role Tenaga Pendukung using Spatie Permission
-            $role = Role::find(37); // Role Tenaga Pendukung
+            $role = Role::find(37);
             if ($role) {
                 $user->assignRole($role);
             }
 
-            // Also create users_role record for compatibility
             $user->users_role()->create([
                 'users_id'   => $user->id,
                 'role_id'    => 37,
@@ -661,12 +658,14 @@ class TenagaPendukungRepository
                 'updated_by' => $userId,
             ]);
 
-            $tenagaPendukung->update(['users_id' => $user->id]);
-
             Log::info('TenagaPendukungRepository: Created new user for tenaga pendukung', [
                 'tenaga_pendukung_id' => $tenagaPendukung->id,
                 'user_id'             => $user->id,
             ]);
+        }
+
+        if ($user) {
+            app(UserPesertaLinkService::class)->link($user, 'tenaga_pendukung', $tenagaPendukung->id);
         }
     }
 

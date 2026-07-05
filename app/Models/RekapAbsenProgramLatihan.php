@@ -38,6 +38,11 @@ class RekapAbsenProgramLatihan extends Model implements HasMedia
         return $this->belongsTo(ProgramLatihan::class, 'program_latihan_id');
     }
 
+    public function absenAtlet()
+    {
+        return $this->hasMany(ProgramLatihanAbsenAtlet::class, 'rekap_absen_program_latihan_id');
+    }
+
     public function createdByUser()
     {
         return $this->belongsTo(User::class, 'created_by');

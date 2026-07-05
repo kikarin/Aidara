@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Notifications\EmailOtpNotification;
+use App\Services\OtpMailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -57,7 +57,7 @@ class EmailOtpVerificationController extends Controller
         
         // Hanya cek cooldown jika sudah pernah klik resend sebelumnya
         if ($lastOtpSent && now()->diffInSeconds($lastOtpSent) < $cooldownSeconds) {
-            $remainingSeconds = $cooldownSeconds - now()->diffInSeconds($lastOtpSent);
+            $remainingSeconds = (int) ceil($cooldownSeconds - now()->diffInSeconds($lastOtpSent));
             return back()->withErrors(['otp' => "Tunggu {$remainingSeconds} detik sebelum meminta kode OTP baru."]);
         }
 
@@ -69,8 +69,7 @@ class EmailOtpVerificationController extends Controller
             'email_otp_expires_at' => now()->addMinutes(10),
         ]);
 
-        // Kirim email OTP
-        $user->notify(new EmailOtpNotification($otpCode));
+        app(OtpMailService::class)->send($user->email, $otpCode, 'web-resend');
 
         // Simpan waktu terakhir OTP dikirim
         $request->session()->put('otp_last_sent', now());

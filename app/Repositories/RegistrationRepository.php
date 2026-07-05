@@ -222,7 +222,7 @@ class RegistrationRepository
             ]);
 
             // Selaraskan relasi akun-peserta agar tab Akun mengenali statusnya
-            $this->ensurePesertaUserLink($pesertaType, $pesertaId, $user);
+            app(\App\Services\UserPesertaLinkService::class)->link($user, $pesertaType, $pesertaId);
 
             // Update registration
             $registration->update([
@@ -809,7 +809,7 @@ class RegistrationRepository
     }
 
     /**
-     * Pastikan kolom users_id pada tabel peserta terisi dengan user yang tepat
+     * @deprecated Use UserPesertaLinkService::link() instead.
      */
     private function ensurePesertaUserLink(?string $pesertaType, ?int $pesertaId, User $user): void
     {
@@ -817,38 +817,6 @@ class RegistrationRepository
             return;
         }
 
-        $modelClass = match ($pesertaType) {
-            'atlet'            => \App\Models\Atlet::class,
-            'pelatih'          => \App\Models\Pelatih::class,
-            'tenaga_pendukung' => \App\Models\TenagaPendukung::class,
-            default            => null,
-        };
-
-        if (!$modelClass) {
-            return;
-        }
-
-        $peserta = $modelClass::find($pesertaId);
-
-        if (!$peserta) {
-            Log::warning('RegistrationRepository: Peserta model not found for syncing users_id', [
-                'peserta_type' => $pesertaType,
-                'peserta_id'   => $pesertaId,
-                'user_id'      => $user->id,
-            ]);
-            return;
-        }
-
-        if ((int) $peserta->users_id === (int) $user->id) {
-            return;
-        }
-
-        $peserta->update(['users_id' => $user->id]);
-
-        Log::info('RegistrationRepository: users_id synced on peserta record', [
-            'peserta_type' => $pesertaType,
-            'peserta_id'   => $pesertaId,
-            'user_id'      => $user->id,
-        ]);
+        app(\App\Services\UserPesertaLinkService::class)->link($user, $pesertaType, $pesertaId);
     }
 }

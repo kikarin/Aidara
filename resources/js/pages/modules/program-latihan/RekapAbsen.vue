@@ -10,6 +10,7 @@ import axios from 'axios';
 import AppLayout from '@/layouts/AppLayout.vue';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { drawGeoPhotoWatermark } from '@/lib/geo-photo';
 
 const props = defineProps<{
     program_latihan: {
@@ -343,28 +344,33 @@ const capturePhoto = () => {
 
     if (!context) return;
 
-    // Set canvas dimensions to match video
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
-    // Draw video frame to canvas
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Convert canvas to blob
+    const captureTime = new Date();
+    const address = locationAddress.value
+        || (currentLocation.value
+            ? `${currentLocation.value.latitude.toFixed(6)}, ${currentLocation.value.longitude.toFixed(6)}`
+            : 'Lokasi tidak tersedia');
+
+    drawGeoPhotoWatermark(context, canvas.width, canvas.height, {
+        timestamp: captureTime,
+        address,
+    });
+
     canvas.toBlob((blob) => {
         if (!blob) return;
 
-        // Create File from blob with timestamp and location in name
-        const now = new Date();
-        const timestamp = now.toISOString().replace(/[:.]/g, '-');
+        const timestamp = captureTime.toISOString().replace(/[:.]/g, '-');
         const fileName = `foto-absen-${timestamp}.jpg`;
         const file = new File([blob], fileName, { type: 'image/jpeg' });
 
-        // Add to fotoFiles
         fotoFiles.value.push(file);
 
         fotoLocations.value.push({
-            waktu_foto: getCurrentTime(),
+            waktu_foto: captureTime.toISOString().slice(0, 19).replace('T', ' '),
             ...(currentLocation.value
                 ? {
                     latitude: currentLocation.value.latitude,
@@ -374,13 +380,11 @@ const capturePhoto = () => {
                 : {}),
         });
         
-        // Create preview URL
         const previewUrl = URL.createObjectURL(blob);
         fotoPreviewUrls.value.push(previewUrl);
 
-        // Close camera
         closeCamera();
-    }, 'image/jpeg', 0.9);
+    }, 'image/jpeg', 0.92);
 };
 
 // Handle file selection (kept for compatibility, but won't be used for foto absen)

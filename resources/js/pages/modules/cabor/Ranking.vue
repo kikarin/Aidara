@@ -469,7 +469,7 @@ onMounted(() => {
         <Card v-else-if="rankingData">
             <CardHeader>
                 <CardTitle>Ranking Peserta</CardTitle>
-                <CardDescription>Ranking berdasarkan nilai keseluruhan pemeriksaan khusus</CardDescription>
+                <CardDescription>Ranking berdasarkan nilai keseluruhan pemeriksaan fisik</CardDescription>
             </CardHeader>
             <CardContent>
                 <!-- Sub-tabs -->
@@ -559,7 +559,7 @@ onMounted(() => {
 
         <Card v-else>
             <CardContent class="text-center py-8 text-muted-foreground">
-                Belum ada data ranking. Pastikan sudah ada pemeriksaan khusus dengan hasil tes.
+                Belum ada data ranking. Pastikan sudah ada pemeriksaan fisik dengan hasil tes.
             </CardContent>
         </Card>
 
@@ -636,7 +636,7 @@ onMounted(() => {
                 </div>
                 <div v-else class="text-center py-8 text-muted-foreground">
                     <p>Tidak ada data perbandingan tersedia</p>
-                    <p class="text-sm mt-2">Atlet ini belum memiliki 3 pemeriksaan khusus</p>
+                    <p class="text-sm mt-2">Atlet ini belum memiliki 3 pemeriksaan fisik</p>
                 </div>
             </DialogContent>
         </Dialog>

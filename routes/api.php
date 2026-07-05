@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CaborController;
 use App\Http\Controllers\Api\OptionsController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\ProgramLatihanAbsenAtletController;
 use App\Http\Controllers\Api\ProgramLatihanController;
 use App\Http\Controllers\Api\RekapAbsenController;
 use App\Http\Controllers\Api\PemeriksaanController;
@@ -62,6 +63,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Sertifikat
         Route::get('/sertifikat', [ProfileController::class, 'getSertifikat']);
         Route::post('/sertifikat', [ProfileController::class, 'storeSertifikat']);
+        Route::get('/sertifikat/{id}/file', [ProfileController::class, 'downloadSertifikat']);
         Route::delete('/sertifikat/{id}', [ProfileController::class, 'deleteSertifikat']);
         
         // Prestasi
@@ -72,6 +74,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Dokumen
         Route::get('/dokumen', [ProfileController::class, 'getDokumen']);
         Route::post('/dokumen', [ProfileController::class, 'storeDokumen']);
+        Route::get('/dokumen/{id}/file', [ProfileController::class, 'downloadDokumen']);
         Route::delete('/dokumen/{id}', [ProfileController::class, 'deleteDokumen']);
     });
     
@@ -85,6 +88,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Filter endpoints (bisa digunakan untuk filter dan form dropdown)
         Route::get('/filter/cabor', [ProgramLatihanController::class, 'getCaborList']);
         Route::get('/filter/kategori/{caborId}', [ProgramLatihanController::class, 'getKategoriByCabor']);
+        Route::get('/filter/pelatih/{caborKategoriId}', [ProgramLatihanController::class, 'getPelatihByKategori']);
         
         // Rekap Absen routes
         Route::prefix('{programId}/rekap-absen')->group(function () {
@@ -94,6 +98,16 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/{rekapId}', [RekapAbsenController::class, 'update']); // POST untuk update (PUT tidak reliable untuk file upload)
             Route::delete('/{rekapId}/media/{mediaId}', [RekapAbsenController::class, 'deleteMedia']);
         });
+
+        // Absen Atlet routes
+        Route::prefix('{programId}/absen-atlet')->group(function () {
+            Route::get('/', [ProgramLatihanAbsenAtletController::class, 'index']);
+            Route::get('/today', [ProgramLatihanAbsenAtletController::class, 'getToday']);
+            Route::post('/', [ProgramLatihanAbsenAtletController::class, 'store']);
+        });
+
+        Route::get('/{programId}/kehadiran', [ProgramLatihanAbsenAtletController::class, 'kehadiran']);
+        Route::get('/{programId}/kehadiran/atlet/{atletId}', [ProgramLatihanAbsenAtletController::class, 'riwayatAtlet']);
     });
     
     // Pemeriksaan routes (mobile API)
@@ -113,6 +127,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Cabor routes (mobile API)
     Route::prefix('v1/cabor')->group(function () {
         Route::get('/', [CaborController::class, 'index']);
+        Route::get('/{id}/peserta/{pesertaId}/last-three-pemeriksaan', [CaborController::class, 'getLastThreePemeriksaan']);
         Route::get('/{id}/peserta', [CaborController::class, 'getPeserta']);
         Route::get('/{id}/perbandingan', [CaborController::class, 'getPerbandingan']);
         Route::get('/{id}/ranking', [CaborController::class, 'getRanking']);

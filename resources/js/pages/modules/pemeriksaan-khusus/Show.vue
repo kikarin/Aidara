@@ -48,16 +48,16 @@ watch(
 
 const dynamicTitle = computed(() => {
     if (activeTab.value === 'informasi-data') {
-        return `Informasi : ${props.item.nama_pemeriksaan || 'Pemeriksaan Khusus'}`;
+        return `Informasi : ${props.item.nama_pemeriksaan || 'Pemeriksaan Fisik'}`;
     } else if (activeTab.value === 'visualisasi-data') {
-        return `Visualisasi : ${props.item.nama_pemeriksaan || 'Pemeriksaan Khusus'}`;
+        return `Visualisasi : ${props.item.nama_pemeriksaan || 'Pemeriksaan Fisik'}`;
     }
-    return `Pemeriksaan Khusus : ${props.item.nama_pemeriksaan || ''}`;
+    return `Pemeriksaan Fisik : ${props.item.nama_pemeriksaan || ''}`;
 });
 
 const breadcrumbs = [
-    { title: 'Pemeriksaan Khusus', href: '/pemeriksaan-khusus' },
-    { title: 'Detail Pemeriksaan Khusus', href: `/pemeriksaan-khusus/${props.item.id}` },
+    { title: 'Pemeriksaan Fisik', href: '/pemeriksaan-khusus' },
+    { title: 'Detail Pemeriksaan Fisik', href: `/pemeriksaan-khusus/${props.item.id}` },
 ];
 
 const tabsConfig = [
@@ -121,11 +121,11 @@ const actionFields = computed(() => {
 const handleDelete = () => {
     router.delete(`/pemeriksaan-khusus/${props.item.id}`, {
         onSuccess: () => {
-            toast({ title: 'Data pemeriksaan khusus berhasil dihapus', variant: 'success' });
+            toast({ title: 'Data pemeriksaan fisik berhasil dihapus', variant: 'success' });
             router.visit('/pemeriksaan-khusus');
         },
         onError: () => {
-            toast({ title: 'Gagal menghapus data pemeriksaan khusus', variant: 'destructive' });
+            toast({ title: 'Gagal menghapus data pemeriksaan fisik', variant: 'destructive' });
         },
     });
 };
@@ -430,12 +430,12 @@ const exportToPDF = () => {
         // Header
         doc.setFontSize(18);
         doc.setFont('helvetica', 'bold');
-        doc.text('Laporan Hasil Pemeriksaan Khusus', pageWidth / 2, yPos, { align: 'center' });
+        doc.text('Laporan Hasil Pemeriksaan Fisik', pageWidth / 2, yPos, { align: 'center' });
         yPos += 10;
 
         doc.setFontSize(14);
         doc.setFont('helvetica', 'normal');
-        doc.text(props.item.nama_pemeriksaan || 'Pemeriksaan Khusus', pageWidth / 2, yPos, { align: 'center' });
+        doc.text(props.item.nama_pemeriksaan || 'Pemeriksaan Fisik', pageWidth / 2, yPos, { align: 'center' });
         yPos += 15;
 
         // Informasi Atlet

@@ -276,7 +276,7 @@ onMounted(() => {
         </div>
 
         <div v-else-if="pemeriksaanData.length === 0" class="py-8 text-center">
-            <p class="text-muted-foreground">Belum ada data pemeriksaan khusus untuk atlet ini</p>
+            <p class="text-muted-foreground">Belum ada data pemeriksaan fisik untuk atlet ini</p>
         </div>
 
         <div v-else class="space-y-4">
@@ -443,7 +443,7 @@ onMounted(() => {
                 </div>
                 <div v-else class="text-center py-8 text-muted-foreground">
                     <p>Tidak ada data perbandingan tersedia</p>
-                    <p class="text-sm mt-2">Atlet ini belum memiliki 3 pemeriksaan khusus</p>
+                    <p class="text-sm mt-2">Atlet ini belum memiliki 3 pemeriksaan fisik</p>
                 </div>
             </DialogContent>
         </Dialog>
