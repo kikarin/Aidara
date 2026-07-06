@@ -963,11 +963,11 @@ class PemeriksaanController extends Controller
         try {
             $user = $request->user()->fresh();
             
-            // Check permission
-            if (!Gate::allows('Pemeriksaan Edit')) {
+            // Check permission — kelola peserta atau edit pemeriksaan
+            if (!Gate::allows('Pemeriksaan Peserta Kelola') && !Gate::allows('Pemeriksaan Edit')) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Anda tidak memiliki izin untuk mengupdate pemeriksaan.',
+                    'message' => 'Anda tidak memiliki izin untuk mengupdate nilai pemeriksaan.',
                 ], 403);
             }
             
