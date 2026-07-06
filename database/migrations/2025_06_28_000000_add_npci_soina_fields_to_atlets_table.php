@@ -8,9 +8,17 @@ return new class () extends Migration {
     public function up(): void
     {
         Schema::table('atlets', function (Blueprint $table) {
-            $table->string('disabilitas', 255)->nullable()->after('email');
-            $table->string('klasifikasi', 255)->nullable()->after('disabilitas');
-            $table->string('iq', 50)->nullable()->after('klasifikasi');
+            if (!Schema::hasColumn('atlets', 'disabilitas')) {
+                $table->string('disabilitas', 255)->nullable()->after('email');
+            }
+            
+            if (!Schema::hasColumn('atlets', 'klasifikasi')) {
+                $table->string('klasifikasi', 255)->nullable()->after('disabilitas');
+            }
+            
+            if (!Schema::hasColumn('atlets', 'iq')) {
+                $table->string('iq', 50)->nullable()->after('klasifikasi');
+            }
         });
     }
 
@@ -21,4 +29,3 @@ return new class () extends Migration {
         });
     }
 };
-
