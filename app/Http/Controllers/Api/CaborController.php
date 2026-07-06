@@ -1043,7 +1043,7 @@ class CaborController extends Controller
             $rankingPerbandingan3TesTerakhir = [];
             $last3Pemeriksaan = $pemeriksaanList->sortByDesc('tanggal_pemeriksaan')->take(3)->values();
             
-            if ($last3Pemeriksaan->count() >= 2) {
+            if ($last3Pemeriksaan->isNotEmpty()) {
                 foreach ($uniquePeserta as $pesertaData) {
                     $nilaiList = [];
 
