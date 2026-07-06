@@ -107,7 +107,7 @@ const showWorldCupSection = () => Boolean(page.props.worldcup?.enabled && page.p
 </script>
 
 <template>
-    <Head title="AIDARA — Aplikasi Intregasi Data Olahraga Dispora Kabupaten Bogor" />
+    <Head title="AIDARA — Aplikasi Informasi Data Olahraga Dispora Kabupaten Bogor" />
 
     <div class="welcome-page bg-background text-foreground min-h-screen">
         <!-- Navbar -->
@@ -182,7 +182,7 @@ const showWorldCupSection = () => Boolean(page.props.worldcup?.enabled && page.p
                         <h1 class="mb-4 text-4xl leading-tight font-bold tracking-tight lg:text-5xl">
                             <span class="text-[var(--brand-green,#2e7d32)]">AIDARA</span>
                         </h1>
-                        <p class="text-muted-foreground mb-2 text-xl font-medium">Aplikasi Intregasi Data Olahraga</p>
+                        <p class="text-muted-foreground mb-2 text-xl font-medium">Aplikasi Informasi Data Olahraga</p>
                         <p class="text-muted-foreground mb-8 max-w-xl text-base leading-relaxed">
                             Sistem terpadu milik Dispora Kabupaten Bogor untuk pengelolaan data cabang olahraga, atlet, pelatih, dan
                             tenaga pendukung — modern, terstruktur, dan mudah diakses guna mendukung terwujudnya kemandirian pemuda

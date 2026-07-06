@@ -6,23 +6,52 @@ function escapeHtml(text: string): string {
         .replace(/"/g, '&quot;');
 }
 
-function closeLists(state: { ol: boolean; ul: boolean }, out: string[]): void {
+type ListState = {
+    ol: boolean;
+    ul: boolean;
+    olLiOpen: boolean;
+    nestedUl: boolean;
+};
+
+function closeOlItem(state: ListState, out: string[]): void {
+    if (state.ul && state.nestedUl) {
+        out.push('</ul>');
+        state.ul = false;
+        state.nestedUl = false;
+    }
+
+    if (state.olLiOpen) {
+        out.push('</li>');
+        state.olLiOpen = false;
+    }
+}
+
+function closeAllLists(state: ListState, out: string[]): void {
+    closeOlItem(state, out);
+
     if (state.ol) {
         out.push('</ol>');
         state.ol = false;
     }
+
     if (state.ul) {
         out.push('</ul>');
         state.ul = false;
+        state.nestedUl = false;
     }
 }
 
-function openOl(state: { ol: boolean; ul: boolean }, out: string[]): void {
+function appendOlItem(state: ListState, out: string[], content: string): void {
     if (!state.ol) {
-        closeLists(state, out);
+        closeAllLists(state, out);
         out.push('<ol class="chat-ol">');
         state.ol = true;
+    } else {
+        closeOlItem(state, out);
     }
+
+    out.push(`<li>${content}`);
+    state.olLiOpen = true;
 }
 
 /**
@@ -38,21 +67,20 @@ export function renderChatMarkdown(raw: string): string {
 
     const lines = text.split('\n');
     const out: string[] = [];
-    const state = { ol: false, ul: false };
+    const state: ListState = { ol: false, ul: false, olLiOpen: false, nestedUl: false };
 
     for (const line of lines) {
         const trimmed = line.trim();
 
         const headingOlMatch = trimmed.match(/^#{1,3}\s+(\d+)\.\s+(.+)$/);
         if (headingOlMatch) {
-            openOl(state, out);
-            out.push(`<li>${headingOlMatch[2]}</li>`);
+            appendOlItem(state, out, headingOlMatch[2]);
             continue;
         }
 
         const headingMatch = trimmed.match(/^#{1,3}\s+(.+)$/);
         if (headingMatch) {
-            closeLists(state, out);
+            closeAllLists(state, out);
             out.push(`<p class="chat-h3">${headingMatch[1]}</p>`);
             continue;
         }
@@ -61,31 +89,41 @@ export function renderChatMarkdown(raw: string): string {
         const ulMatch = trimmed.match(/^[*\-]\s+(.+)$/);
 
         if (olMatch) {
-            openOl(state, out);
-            out.push(`<li>${olMatch[2]}</li>`);
+            appendOlItem(state, out, olMatch[2]);
             continue;
         }
 
         if (ulMatch) {
+            if (state.olLiOpen) {
+                if (!state.ul) {
+                    out.push('<ul class="chat-ul">');
+                    state.ul = true;
+                    state.nestedUl = true;
+                }
+
+                out.push(`<li>${ulMatch[1]}</li>`);
+                continue;
+            }
+
             if (!state.ul) {
-                closeLists(state, out);
+                closeAllLists(state, out);
                 out.push('<ul class="chat-ul">');
                 state.ul = true;
             }
+
             out.push(`<li>${ulMatch[1]}</li>`);
             continue;
         }
-
-        closeLists(state, out);
 
         if (trimmed === '') {
             continue;
         }
 
+        closeAllLists(state, out);
         out.push(`<p class="chat-p">${trimmed}</p>`);
     }
 
-    closeLists(state, out);
+    closeAllLists(state, out);
 
     return out.join('');
 }
