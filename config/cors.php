@@ -6,11 +6,9 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        // Development - React + Vite
-        'http://localhost:5173',
-        'http://localhost:5174',
-        // Production - Mobile PWA
-        'https://aidara-mobile.bogorkab.go.id',
+        env('FRONTEND_URL'),
+        env('FRONTEND_URL_ALT'),
+        env('FRONTEND_URL_PROD'),
     ],
 
     'allowed_origins_patterns' => [],
