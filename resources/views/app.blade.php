@@ -6,6 +6,7 @@
         <meta name="theme-color" content="#2e7d32">
         <meta name="msapplication-TileColor" content="#2e7d32">
         <meta name="msapplication-TileImage" content="/mstile-150x150.png">
+        <meta name="google-site-verification" content="IoRqhZpr_2AWDqs7GI9kGGcvNCXmYbsTz-QMC0DCA70">
 
         <!-- FontAwesome CDN -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />

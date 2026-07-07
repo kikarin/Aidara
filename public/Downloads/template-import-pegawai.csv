@@ -1,0 +1,2 @@
+employee_number,national_id,name,email,phone,organization_code,organization_name,position_name,employee_type,employment_status,supervisor_employee_number
+"198806182011012010,1234567890123456,""Contoh Pegawai"",contoh@bangkabarat.go.id,081234567890,BKPSDM,BKPSDM,""Analis Kepegawaian"",asn,active,"
