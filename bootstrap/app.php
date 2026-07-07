@@ -3,6 +3,8 @@
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\InjectUserPermissions;
+use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\SetPublicCacheHeaders;
 use App\Http\Middleware\ApiResponseMiddleware;
 use App\Http\Middleware\CheckProgramLatihanPermission;
 use App\Http\Middleware\CheckPemeriksaanPermission;
@@ -13,7 +15,14 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
+use Illuminate\Auth\Access\AuthorizationException;
+use Inertia\Inertia;
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -23,6 +32,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->trustProxies(at: '*');
+
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         $middleware->web(append: [
@@ -30,6 +41,8 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             InjectUserPermissions::class,
+            SetPublicCacheHeaders::class,
+            SecurityHeaders::class,
             // EnsureFrontendRequestsAreStateful::class,
         ]);
 
@@ -58,5 +71,33 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->respond(function (Response $response, \Throwable $exception, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return $response;
+            }
+
+            if (! $request->acceptsHtml()) {
+                return $response;
+            }
+
+            $status = match (true) {
+                $exception instanceof TokenMismatchException => 419,
+                $exception instanceof TooManyRequestsHttpException => 429,
+                $exception instanceof AuthorizationException => 403,
+                $exception instanceof NotFoundHttpException => 404,
+                default => $response->getStatusCode(),
+            };
+
+            if (! in_array($status, [403, 404, 419, 429, 500, 503], true)) {
+                return $response;
+            }
+
+            if ($status === 500 && config('app.debug')) {
+                return $response;
+            }
+
+            return Inertia::render("errors/Error{$status}")
+                ->toResponse($request)
+                ->setStatusCode($status);
+        });
     })->create();

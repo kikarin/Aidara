@@ -3,6 +3,9 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#2e7d32">
+        <meta name="msapplication-TileColor" content="#2e7d32">
+        <meta name="msapplication-TileImage" content="/mstile-150x150.png">
 
         <!-- FontAwesome CDN -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -64,13 +67,19 @@
             }
         </style>
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <title inertia>{{ config('app.name', 'AIDARA') }}</title>
 
+        <link rel="manifest" href="/site.webmanifest">
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#2e7d32">
 
-        <link rel="preconnect" href="https://api.fontshare.com">
+        <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+        <link rel="dns-prefetch" href="https://api.fontshare.com">
+        <link rel="preload" href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,900&display=swap" as="style">
         <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,900&display=swap" rel="stylesheet">
 
         @routes

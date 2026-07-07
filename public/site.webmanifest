@@ -1,6 +1,7 @@
 {
-    "name": "DISPORA",
-    "short_name": "DISPORA",
+    "name": "Aidara",
+    "short_name": "Aidara",
+    "start_url": "/",
     "icons": [
         {
             "src": "/web-app-manifest-192x192.png",

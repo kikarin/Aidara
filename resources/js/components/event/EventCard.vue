@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { EventStatus, PublicEventSummary } from '@/types/event';
+import AppImage from '@/components/AppImage.vue';
 import { Link } from '@inertiajs/vue3';
 import { CalendarDays, MapPin } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -50,7 +51,7 @@ const dateRange = computed(() => {
         class="content-panel group flex h-full flex-col overflow-hidden transition-shadow hover:shadow-md"
     >
         <div class="relative aspect-[16/10] overflow-hidden bg-muted">
-            <img
+            <AppImage
                 v-if="event.foto_url"
                 :src="event.foto_url"
                 :alt="event.nama_event"

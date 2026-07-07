@@ -16,5 +16,9 @@ const pagesWithoutShell = new Set([
 ]);
 
 export function shouldUsePersistentShell(pageName: string): boolean {
+    if (pageName.startsWith('errors/')) {
+        return false;
+    }
+
     return !pagesWithoutShell.has(pageName);
 }

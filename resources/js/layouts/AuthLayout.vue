@@ -5,11 +5,12 @@ defineProps<{
     title?: string;
     description?: string;
     wide?: boolean;
+    indexable?: boolean;
 }>();
 </script>
 
 <template>
-    <AuthLayout :title="title" :description="description" :wide="wide">
+    <AuthLayout :title="title" :description="description" :wide="wide" :indexable="indexable">
         <slot />
     </AuthLayout>
 </template>

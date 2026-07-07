@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft } from 'lucide-vue-next';
 
 defineProps<{
     title?: string;
     description?: string;
     wide?: boolean;
+    indexable?: boolean;
 }>();
 </script>
 
 <template>
+    <Head v-if="!indexable">
+        <meta head-key="robots" content="noindex, nofollow" name="robots" />
+    </Head>
+
     <div class="welcome-page bg-background relative flex min-h-svh flex-col items-center justify-center gap-6 overflow-hidden p-6 md:p-10">
         <div class="welcome-hero absolute inset-0 opacity-40"></div>
 
@@ -28,7 +33,7 @@ defineProps<{
                         <div class="flex items-center gap-2 rounded-2xl bg-white/80 p-3 shadow-md dark:bg-gray-900/60">
                             <img src="/kabupaten_bogor.webp" alt="Logo Kabupaten Bogor" class="size-10 object-contain" />
                             <span class="bg-border/80 h-9 w-px"></span>
-                            <img src="/Logo.png" alt="Logo Dispora Kabupaten Bogor" class="size-10 object-contain" />
+                            <img src="/Logo.svg" alt="Logo Aidara" class="size-10 object-contain" />
                         </div>
                         <span class="sr-only">{{ title }}</span>
                     </Link>

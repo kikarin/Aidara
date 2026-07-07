@@ -3,10 +3,14 @@ import GroupStandingsTable from '@/components/worldcup/GroupStandingsTable.vue';
 import KnockoutBracket from '@/components/worldcup/KnockoutBracket.vue';
 import MatchCard from '@/components/worldcup/MatchCard.vue';
 import WorldCupPublicHeader from '@/components/worldcup/WorldCupPublicHeader.vue';
+import PublicSiteFooter from '@/components/PublicSiteFooter.vue';
+import SeoHead from '@/components/SeoHead.vue';
 import { Button } from '@/components/ui/button';
 import { useWorldCupLive } from '@/composables/useWorldCupLive';
+import { SEO_DEFAULT_KEYWORDS } from '@/lib/seo';
+import { buildBreadcrumbSchema, buildWebPageSchema } from '@/lib/schema';
 import type { WorldCupGroup, WorldCupMatch } from '@/types/worldcup';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { LoaderCircle, RefreshCw } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
@@ -141,16 +145,47 @@ const formattedLastUpdated = computed(() => {
 
     return lastUpdated.value.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 });
+
+const worldCupDescription = computed(
+    () => `Jadwal, klasemen, dan hasil ${props.sectionTitle} FIFA World Cup 2026 di platform AIDARA Dispora Kabupaten Bogor.`,
+);
+
+const page = usePage();
+const pageUrl = computed(() => route('worldcup.index', undefined, true));
+const siteBaseUrl = computed(() => {
+    const ziggy = page.props.ziggy as { url?: string } | undefined;
+
+    return (ziggy?.url ?? '').replace(/\/$/, '');
+});
+const pageSchema = computed(() => [
+    buildWebPageSchema({
+        baseUrl: siteBaseUrl.value,
+        name: props.sectionTitle,
+        description: worldCupDescription.value,
+        url: pageUrl.value,
+    }),
+    buildBreadcrumbSchema([
+        { name: 'Beranda', url: route('home', undefined, true) },
+        { name: props.sectionTitle, url: pageUrl.value },
+    ]),
+]);
 </script>
 
 <template>
-    <Head :title="`${sectionTitle} — AIDARA`" />
+    <SeoHead
+        :title="sectionTitle"
+        :description="worldCupDescription"
+        :keywords="SEO_DEFAULT_KEYWORDS"
+        :canonical="pageUrl"
+        :schema="pageSchema"
+    />
 
-    <div class="welcome-page bg-background text-foreground min-h-screen">
+    <div class="welcome-page bg-background text-foreground flex min-h-screen flex-col">
+        <a href="#konten-utama" class="skip-link">Lompat ke konten utama</a>
         <WorldCupPublicHeader />
 
-        <main class="mx-auto max-w-6xl px-6 py-10">
-            <nav class="text-muted-foreground mb-6 text-xs">
+        <main id="konten-utama" class="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+            <nav class="text-muted-foreground mb-6 text-xs" aria-label="Breadcrumb">
                 <Link :href="route('home')" class="hover:text-foreground transition-colors">Beranda</Link>
                 <span class="mx-2">→</span>
                 <span class="text-foreground font-medium">{{ sectionTitle }}</span>
@@ -164,15 +199,33 @@ const formattedLastUpdated = computed(() => {
                 </p>
             </div>
 
-            <div class="mb-6 flex flex-wrap justify-center gap-2">
-                <Button :variant="activeTab === 'schedule' ? 'default' : 'outline'" size="sm" @click="selectTab('schedule')">
+            <div class="mb-6 flex flex-wrap justify-center gap-2" role="tablist" aria-label="Bagian Piala Dunia">
+                <Button
+                    role="tab"
+                    :aria-selected="activeTab === 'schedule'"
+                    :variant="activeTab === 'schedule' ? 'default' : 'outline'"
+                    size="sm"
+                    @click="selectTab('schedule')"
+                >
                     Jadwal &amp; Live
                     <span v-if="hasLiveMatches" class="worldcup-live-dot ml-1.5 inline-block h-2 w-2 rounded-full bg-red-500"></span>
                 </Button>
-                <Button :variant="activeTab === 'groups' ? 'default' : 'outline'" size="sm" @click="selectTab('groups')">
+                <Button
+                    role="tab"
+                    :aria-selected="activeTab === 'groups'"
+                    :variant="activeTab === 'groups' ? 'default' : 'outline'"
+                    size="sm"
+                    @click="selectTab('groups')"
+                >
                     Klasemen Grup
                 </Button>
-                <Button :variant="activeTab === 'bracket' ? 'default' : 'outline'" size="sm" @click="selectTab('bracket')">
+                <Button
+                    role="tab"
+                    :aria-selected="activeTab === 'bracket'"
+                    :variant="activeTab === 'bracket' ? 'default' : 'outline'"
+                    size="sm"
+                    @click="selectTab('bracket')"
+                >
                     Bracket Knockout
                 </Button>
             </div>
@@ -261,5 +314,7 @@ const formattedLastUpdated = computed(() => {
 
             <p class="text-muted-foreground mt-10 text-center text-xs">Data: FIFA World Cup 2026 API · worldcup26.ir</p>
         </main>
+
+        <PublicSiteFooter />
     </div>
 </template>

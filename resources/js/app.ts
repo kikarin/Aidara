@@ -36,10 +36,10 @@ declare module 'vite/client' {
     }
 }
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+import { formatPageTitle } from './lib/seo';
 
 createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
+    title: (title) => formatPageTitle(title),
     resolve: async (name) => {
         const page = await resolvePageComponent(`./pages/${name}.vue`, import.meta.glob<DefineComponent>('./pages/**/*.vue'));
 

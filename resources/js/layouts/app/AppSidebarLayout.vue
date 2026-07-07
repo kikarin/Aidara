@@ -8,7 +8,7 @@ import AppSidebarHeader from '@/components/AppSidebarHeader.vue';
 import { useLayoutBreadcrumbs } from '@/composables/useLayoutBreadcrumbs';
 import { getPageTransitionKey } from '@/lib/navigation';
 import ChatbotWidget from '@/components/chatbot/ChatbotWidget.vue';
-import { usePage } from '@inertiajs/vue3';
+import { Head, usePage } from '@inertiajs/vue3';
 import { useToast } from '@/components/ui/toast/useToast';
 import { computed, watch } from 'vue';
 
@@ -35,6 +35,10 @@ watch(
 </script>
 
 <template>
+    <Head>
+        <meta head-key="robots" content="noindex, nofollow" name="robots" />
+    </Head>
+
     <AppShell variant="sidebar">
         <AppSidebar />
         <AppContent variant="sidebar" class="flex min-h-svh flex-col">

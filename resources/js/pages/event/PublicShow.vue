@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import EventPublicHeader from '@/components/event/EventPublicHeader.vue';
+import AppImage from '@/components/AppImage.vue';
+import PublicSiteFooter from '@/components/PublicSiteFooter.vue';
+import SeoHead from '@/components/SeoHead.vue';
 import type { EventStatus, PublicEventSummary } from '@/types/event';
-import { Head, Link } from '@inertiajs/vue3';
+import { SEO_DEFAULT_KEYWORDS, truncateDescription } from '@/lib/seo';
+import { buildBreadcrumbSchema, buildEventSchema } from '@/lib/schema';
+import { Link, usePage } from '@inertiajs/vue3';
 import { CalendarDays, MapPin, Trophy } from 'lucide-vue-next';
 import { computed } from 'vue';
 
@@ -42,22 +47,72 @@ const dateRange = computed(() => {
 
     return `${mulai} – ${selesai}`;
 });
+
+const eventDescription = computed(() => {
+    const source = props.event.deskripsi_singkat || props.event.deskripsi;
+
+    if (!source) {
+        return `Informasi event ${props.event.nama_event} dari Dispora Kabupaten Bogor di platform AIDARA.`;
+    }
+
+    return truncateDescription(source);
+});
+
+const page = usePage();
+const pageUrl = computed(() => route('event.public.show', props.event.id, true));
+const siteBaseUrl = computed(() => {
+    const ziggy = page.props.ziggy as { url?: string } | undefined;
+
+    return (ziggy?.url ?? '').replace(/\/$/, '');
+});
+
+const pageSchema = computed(() => [
+    buildEventSchema({
+        baseUrl: siteBaseUrl.value,
+        name: props.event.nama_event,
+        description: eventDescription.value,
+        url: pageUrl.value,
+        image: props.event.foto_url,
+        startDate: props.event.tanggal_mulai,
+        endDate: props.event.tanggal_selesai,
+        location: props.event.lokasi,
+        status: props.event.status,
+    }),
+    buildBreadcrumbSchema([
+        { name: 'Beranda', url: route('home', undefined, true) },
+        { name: 'Event & Kegiatan', url: route('event.public.index', undefined, true) },
+        { name: props.event.nama_event, url: pageUrl.value },
+    ]),
+]);
 </script>
 
 <template>
-    <Head :title="`${event.nama_event} — Event AIDARA`" />
+    <SeoHead
+        :title="`${event.nama_event} — Event`"
+        :description="eventDescription"
+        :keywords="SEO_DEFAULT_KEYWORDS"
+        :canonical="pageUrl"
+        :image="event.foto_url"
+        type="article"
+        :schema="pageSchema"
+    />
 
-    <div class="welcome-page bg-background text-foreground min-h-screen">
+    <div class="welcome-page bg-background text-foreground flex min-h-screen flex-col">
+        <a href="#konten-utama" class="skip-link">Lompat ke konten utama</a>
         <EventPublicHeader active="list" />
 
-        <main class="mx-auto max-w-4xl px-6 py-10 lg:py-14">
-            <Link :href="route('event.public.index')" class="text-muted-foreground hover:text-foreground mb-6 inline-flex text-sm transition-colors">
-                ← Semua Event
-            </Link>
+        <main id="konten-utama" class="mx-auto w-full max-w-4xl flex-1 px-6 py-10 lg:py-14">
+            <nav class="text-muted-foreground mb-6 text-xs" aria-label="Breadcrumb">
+                <Link :href="route('home')" class="hover:text-foreground transition-colors">Beranda</Link>
+                <span class="mx-2" aria-hidden="true">→</span>
+                <Link :href="route('event.public.index')" class="hover:text-foreground transition-colors">Event</Link>
+                <span class="mx-2" aria-hidden="true">→</span>
+                <span class="text-foreground font-medium" aria-current="page">{{ event.nama_event }}</span>
+            </nav>
 
             <article class="content-panel overflow-hidden">
                 <div v-if="event.foto_url" class="aspect-[21/9] w-full overflow-hidden bg-muted">
-                    <img :src="event.foto_url" :alt="event.nama_event" class="h-full w-full object-cover" />
+                    <AppImage :src="event.foto_url" :alt="event.nama_event" class="h-full w-full object-cover" />
                 </div>
 
                 <div class="space-y-6 p-6 lg:p-8">
@@ -106,5 +161,7 @@ const dateRange = computed(() => {
                 </div>
             </article>
         </main>
+
+        <PublicSiteFooter />
     </div>
 </template>

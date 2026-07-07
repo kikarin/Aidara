@@ -6,6 +6,18 @@ import path from 'path';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+    build: {
+        cssMinify: true,
+        minify: 'esbuild',
+        sourcemap: false,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    vendor: ['vue', '@inertiajs/vue3'],
+                },
+            },
+        },
+    },
     plugins: [
         laravel({
             input: ['resources/js/app.ts'],

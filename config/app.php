@@ -52,7 +52,7 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'https://dispora.summitbreak.com'),
+    'url' => env('APP_URL', 'https://aidara.bogorkab.go.id'),
 
     /*
     |--------------------------------------------------------------------------

@@ -48,19 +48,21 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <section id="piala-dunia">
+    <section id="piala-dunia" class="border-border/60 border-t bg-muted/30" aria-labelledby="worldcup-preview-heading">
         <div class="mx-auto max-w-6xl px-6 py-16">
             <div class="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
                     <p class="text-muted-foreground mb-2 text-sm font-medium tracking-widest uppercase">FIFA World Cup 2026</p>
-                    <h2 class="text-foreground text-2xl font-bold lg:text-3xl">{{ title }}</h2>
-                    <p class="text-muted-foreground mt-2 max-w-2xl text-sm">
-                        Preview jadwal knockout mendatang dan skor live — host: USA, Canada &amp; Mexico.
+                    <h2 id="worldcup-preview-heading" class="text-foreground text-2xl font-bold lg:text-3xl">{{ title }}</h2>
+                    <p class="text-muted-foreground mt-2 max-w-2xl text-sm leading-relaxed">
+                        Jadwal Piala Dunia 2026, skor live, dan preview knockout — host USA, Canada &amp; Mexico.
+                        Ikuti perkembangan FIFA World Cup langsung di AIDARA.
                     </p>
                 </div>
                 <Link
                     :href="route('worldcup.index')"
                     class="welcome-cta inline-flex shrink-0 items-center rounded-md px-5 py-2 text-sm font-medium transition-colors"
+                    aria-label="Lihat jadwal dan skor Piala Dunia 2026 lengkap"
                 >
                     Selengkapnya →
                 </Link>

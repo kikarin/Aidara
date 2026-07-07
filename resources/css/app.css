@@ -563,3 +563,35 @@ body:not(.dark) .apexcharts-menu {
     opacity: 0;
     transform: translateY(-4px);
 }
+
+/* Accessibility: keyboard focus & skip link */
+.skip-link {
+    position: absolute;
+    left: 1rem;
+    top: -100%;
+    z-index: 100;
+    border-radius: 0.375rem;
+    background-color: var(--foreground);
+    color: var(--background);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.skip-link:focus {
+    top: 1rem;
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--brand-green, #2e7d32);
+    outline-offset: 2px;
+}
+
+details > summary {
+    transition: color 0.15s ease;
+}
+
+details[open] > summary {
+    color: var(--foreground);
+}
