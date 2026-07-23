@@ -357,7 +357,7 @@ const formInputs = computed(() => {
             options: UKURAN_SEPATU_OPTIONS,
         },
         { name: 'kecamatan_id', label: 'Kecamatan', type: 'select' as const, placeholder: 'Pilih Kecamatan', options: kecamatanOptions.value },
-        { name: 'kelurahan_id', label: 'Kelurahan', type: 'select' as const, placeholder: 'Pilih Kelurahan', options: kelurahanOptions.value },
+        { name: 'kelurahan_id', label: 'Kelurahan/Desa', type: 'select' as const, placeholder: 'Pilih Kelurahan', options: kelurahanOptions.value },
         { name: 'no_hp', label: 'No HP', type: 'text' as const, placeholder: 'Masukkan nomor HP' },
         { name: 'email', label: 'Email', type: 'email' as const, placeholder: 'Masukkan email' },
         { name: 'tanggal_bergabung', label: 'Tanggal Bergabung', type: 'date' as const, placeholder: 'Pilih tanggal bergabung' },
