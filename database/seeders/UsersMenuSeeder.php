@@ -26,6 +26,15 @@ class UsersMenuSeeder extends Seeder
                 'permission_id' => 'Dashboard Show',
             ],
             [
+                'nama'          => 'Manual Book',
+                'kode'          => 'MANUAL-BOOK',
+                'url'           => '/manual-book',
+                'icon'          => 'BookOpen',
+                'rel'           => 0,
+                'urutan'        => 2,
+                'permission_id' => 'Dashboard Show',
+            ],
+            [
                 'nama'          => 'Atlet',
                 'kode'          => 'ATLET',
                 'url'           => '/atlet',

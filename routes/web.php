@@ -17,6 +17,7 @@ use App\Http\Controllers\CategoryPermissionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DesaController;
 use App\Http\Controllers\LegalController;
+use App\Http\Controllers\ManualBookController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Settings\WorldCupSettingController;
 use App\Http\Controllers\WorldCupController;
@@ -115,6 +116,10 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard/settings')->group(fun
 });
 
 Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'ensure.email.verified', 'check.registration.status'])->name('dashboard');
+
+Route::get('/manual-book', [ManualBookController::class, 'index'])
+    ->middleware(['auth', 'ensure.email.verified', 'check.registration.status'])
+    ->name('manual-book.index');
 
 // Chatbot bantuan Aplikasi (Gemini)
 Route::middleware(['auth', 'verified', 'check.registration.status', 'throttle:gemini-chat'])->group(function () {

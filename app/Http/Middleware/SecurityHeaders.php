@@ -42,6 +42,7 @@ class SecurityHeaders
             "base-uri 'self'",
             "form-action 'self'",
             "frame-ancestors 'self'",
+            "frame-src 'self'",
             "object-src 'none'",
             "img-src 'self' data: blob: https:",
             "font-src 'self' data: https://api.fontshare.com https://cdnjs.cloudflare.com",

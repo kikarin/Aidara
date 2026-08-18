@@ -8,6 +8,7 @@ import { Link } from '@inertiajs/vue3';
 import {
     Activity,
     BarChart,
+    BookOpen,
     Calendar,
     CalendarCheck,
     CalendarSync,
@@ -50,6 +51,7 @@ import AppLogo from './AppLogo.vue';
 
 const iconMap: Record<string, unknown> = {
     LayoutGrid,
+    BookOpen,
     Flag,
     FolderKanban,
     FileStack,
