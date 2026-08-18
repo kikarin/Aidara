@@ -236,6 +236,11 @@ class CategoryPermissionSeeder extends Seeder
                 'name'       => 'Pengaturan World Cup',
                 'permission' => ['Pengaturan World Cup Edit'],
             ],
+            [
+                'name'              => 'Seleksi PPOPM',
+                'permission'        => 'CRUD',
+                'permission_common' => ['Seleksi PPOPM Verifikasi', 'Seleksi PPOPM Input Tes', 'Seleksi PPOPM Pleno'],
+            ],
         ];
 
         $listCrud = ['Show', 'Add', 'Edit', 'Detail', 'Delete'];

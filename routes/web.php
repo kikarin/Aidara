@@ -18,6 +18,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DesaController;
 use App\Http\Controllers\LegalController;
 use App\Http\Controllers\ManualBookController;
+use App\Http\Controllers\SeleksiPpopmController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Settings\WorldCupSettingController;
 use App\Http\Controllers\WorldCupController;
@@ -120,6 +121,23 @@ Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['aut
 Route::get('/manual-book', [ManualBookController::class, 'index'])
     ->middleware(['auth', 'ensure.email.verified', 'check.registration.status'])
     ->name('manual-book.index');
+
+Route::middleware(['auth', 'verified', 'check.registration.status'])->group(function () {
+    Route::get('/seleksi-ppopm', [SeleksiPpopmController::class, 'index'])->name('seleksi-ppopm.index');
+    Route::get('/seleksi-ppopm/syarat', [SeleksiPpopmController::class, 'syarat'])->name('seleksi-ppopm.syarat');
+    Route::get('/seleksi-ppopm/pendaftar', [SeleksiPpopmController::class, 'pendaftarIndex'])->name('seleksi-ppopm.pendaftar.index');
+    Route::get('/seleksi-ppopm/pendaftar/create', [SeleksiPpopmController::class, 'create'])->name('seleksi-ppopm.pendaftar.create');
+    Route::post('/seleksi-ppopm/pendaftar', [SeleksiPpopmController::class, 'store'])->name('seleksi-ppopm.pendaftar.store');
+    Route::get('/seleksi-ppopm/pendaftar/{id}', [SeleksiPpopmController::class, 'show'])->whereNumber('id')->name('seleksi-ppopm.pendaftar.show');
+    Route::post('/seleksi-ppopm/pendaftar/{id}/verify', [SeleksiPpopmController::class, 'verify'])->whereNumber('id')->name('seleksi-ppopm.pendaftar.verify');
+    Route::post('/seleksi-ppopm/pendaftar/{id}/reject', [SeleksiPpopmController::class, 'reject'])->whereNumber('id')->name('seleksi-ppopm.pendaftar.reject');
+    Route::post('/seleksi-ppopm/pendaftar/{id}/tes', [SeleksiPpopmController::class, 'updateTes'])->whereNumber('id')->name('seleksi-ppopm.pendaftar.tes');
+    Route::post('/seleksi-ppopm/pendaftar/{id}/promote', [SeleksiPpopmController::class, 'promote'])->whereNumber('id')->name('seleksi-ppopm.pendaftar.promote');
+    Route::delete('/seleksi-ppopm/pendaftar/{id}', [SeleksiPpopmController::class, 'destroy'])->whereNumber('id')->name('seleksi-ppopm.pendaftar.destroy');
+    Route::get('/seleksi-ppopm/pleno', [SeleksiPpopmController::class, 'pleno'])->name('seleksi-ppopm.pleno');
+    Route::post('/seleksi-ppopm/pleno', [SeleksiPpopmController::class, 'runPleno'])->name('seleksi-ppopm.pleno.run');
+    Route::get('/api/seleksi-ppopm/pendaftar', [SeleksiPpopmController::class, 'apiPendaftar'])->name('api.seleksi-ppopm.pendaftar');
+});
 
 // Chatbot bantuan Aplikasi (Gemini)
 Route::middleware(['auth', 'verified', 'check.registration.status', 'throttle:gemini-chat'])->group(function () {

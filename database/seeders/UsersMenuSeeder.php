@@ -143,6 +143,15 @@ class UsersMenuSeeder extends Seeder
                 'permission_id' => 'Event Show',
             ],
             [
+                'nama'          => 'Seleksi PPOPM',
+                'kode'          => 'SELEKSI-PPOPM',
+                'url'           => '/seleksi-ppopm',
+                'icon'          => 'ClipboardList',
+                'rel'           => 0,
+                'urutan'        => 33,
+                'permission_id' => 'Seleksi PPOPM Show',
+            ],
+            [
                 'nama'          => 'Data Master',
                 'kode'          => 'DATA-MASTER',
                 'url'           => '/data-master',
