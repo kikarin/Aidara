@@ -20,6 +20,7 @@ use App\Http\Controllers\LegalController;
 use App\Http\Controllers\ManualBookController;
 use App\Http\Controllers\SeleksiPpopmController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\KecamatanController;
 use App\Http\Controllers\Settings\WorldCupSettingController;
 use App\Http\Controllers\WorldCupController;
 use App\Http\Controllers\MstJenisDokumenController;
