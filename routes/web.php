@@ -775,9 +775,6 @@ Route::get('/api/pemeriksaan/{pemeriksaan}/peserta/{peserta}/parameter', [Pemeri
 
 // API untuk Pemeriksaan Peserta
 Route::get('/api/pemeriksaan/{pemeriksaan}/peserta/{jenis_peserta?}', [PemeriksaanPesertaController::class, 'apiIndex'])->name('api.pemeriksaan.peserta.index');
-Route::put('/pemeriksaan/{pemeriksaan}/peserta/{peserta}', [PemeriksaanPesertaController::class, 'update'])->name('pemeriksaan.peserta.update');
-Route::delete('/pemeriksaan/{pemeriksaan}/peserta/{peserta}', [PemeriksaanPesertaController::class, 'destroy'])->name('pemeriksaan.peserta.destroy');
-Route::post('/pemeriksaan/{pemeriksaan}/peserta/{peserta}', [PemeriksaanPesertaController::class, 'update']);
 
 // API untuk detail atlet, pelatih, dan tenaga pendukung
 Route::get('/api/atlet/{id}', [AtletController::class, 'apiShow']);

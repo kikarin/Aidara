@@ -64,7 +64,7 @@ class LoginController extends Controller
 
                 $request->session()->put('otp_last_sent', now());
 
-                return redirect()->route('email.otp.verify')
+                return redirect()->route('email.otp.show')
                     ->with('warning', 'Email Anda belum diverifikasi. Silakan masukkan kode OTP yang telah dikirim ke email Anda.');
             }
             

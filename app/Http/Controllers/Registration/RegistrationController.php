@@ -172,7 +172,7 @@ class RegistrationController extends Controller
 
             // IMPORTANT: Pastikan user tetap login dan redirect ke OTP verification
             // User akan tetap login meskipun belum verified, sehingga bisa akses registration steps setelah verify
-            return redirect()->route('email.otp.verify')
+            return redirect()->route('email.otp.show')
                 ->with('success', 'Kode OTP telah dikirim ke email Anda. Silakan cek inbox email Anda.');
         } catch (\Exception $e) {
             Log::error('RegistrationController: Error creating registration user', [
