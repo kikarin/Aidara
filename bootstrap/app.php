@@ -10,6 +10,7 @@ use App\Http\Middleware\CheckProgramLatihanPermission;
 use App\Http\Middleware\CheckPemeriksaanPermission;
 use App\Http\Middleware\CheckTurnamenPermission;
 use App\Http\Middleware\CheckRegistrationStatus;
+use App\Http\Middleware\EnsureBookingRole;
 use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -18,6 +19,7 @@ use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,6 +32,11 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        then: function () {
+            Route::middleware('api')
+                ->prefix('api/booking')
+                ->group(base_path('routes/booking.php'));
+        },
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->trustProxies(at: '*');
@@ -58,6 +65,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'turnamen.permission'        => CheckTurnamenPermission::class,
             'check.registration.status'  => CheckRegistrationStatus::class,
             'ensure.email.verified'       => \App\Http\Middleware\EnsureEmailVerified::class,
+            'booking.role'               => EnsureBookingRole::class,
         ]);
 
         // Sanctum middleware untuk stateful API (Remove)

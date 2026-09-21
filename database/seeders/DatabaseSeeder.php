@@ -62,5 +62,6 @@ class DatabaseSeeder extends Seeder
         $this->call(MstParameterSeeder::class);
         $this->call(TurnamenSeeder::class);
         $this->call(MstKategoriPesertaSeeder::class);
+        $this->call(\Database\Seeders\Booking\BookingSeeder::class);
     }
 }
