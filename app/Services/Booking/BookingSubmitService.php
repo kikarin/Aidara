@@ -28,9 +28,16 @@ class BookingSubmitService
      */
     public function submit(User $user, array $input): Booking
     {
-        $profile = BookingPenyewaProfile::query()->where('user_id', $user->id)->first();
+        $profile = BookingPenyewaProfile::query()
+            ->with(['documents.documentType'])
+            ->where('user_id', $user->id)
+            ->first();
         if (! $profile) {
             throw new InvalidArgumentException('Lengkapi profil penyewa sebelum submit booking.');
+        }
+
+        if (! $this->hasUploadedKtp($profile)) {
+            throw new InvalidArgumentException('Unggah KTP terlebih dahulu sebelum submit booking.');
         }
 
         if (empty($input['terms_accepted'])) {
@@ -141,6 +148,15 @@ class BookingSubmitService
 
             return $booking->load(['items', 'addonSelected', 'venue', 'area', 'penyewaProfile']);
         });
+    }
+
+    private function hasUploadedKtp(BookingPenyewaProfile $profile): bool
+    {
+        return $profile->documents
+            ->contains(function ($doc) {
+                return $doc->documentType?->code === 'ktp'
+                    && filled($doc->file_path);
+            });
     }
 
     private function generateNomor(): string

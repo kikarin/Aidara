@@ -115,6 +115,8 @@ class BookingController extends Controller
                     'bukti_path' => $payment->bukti_path,
                     'bukti_url' => $payment->bukti_path ? Storage::disk('public')->url($payment->bukti_path) : null,
                     'paid_at' => optional($payment->paid_at)->toDateTimeString(),
+                    'expires_at' => $payment->meta['expires_at'] ?? null,
+                    'expire_hours' => $payment->meta['expire_hours'] ?? null,
                 ] : null,
             ],
         ]);

@@ -78,19 +78,24 @@ class VenuePolicyService
         }
 
         $isDayH = $today->equalTo($starts);
-        $hardLocked = in_array($booking->status, [
+
+        // Policy: hangus (forfeited) hanya jika batal hari H DAN sudah bayar/confirmed.
+        // Belum bayar (awaiting_payment / approved / review) → cancelled (bukan hangus).
+        $alreadyPaidOrConfirmed = in_array($booking->status, [
             BookingStatus::CONFIRMED,
             BookingStatus::PAID,
             BookingStatus::RESCHEDULE_PENDING,
         ], true);
 
-        $outcome = ($isDayH && $hardLocked)
+        $outcome = ($isDayH && $alreadyPaidOrConfirmed)
             ? BookingStatus::FORFEITED
             : BookingStatus::CANCELLED;
 
         $note = $reason ?? ($outcome === BookingStatus::FORFEITED
-            ? 'Pembatalan hari H — hangus (forfeited)'
-            : 'Dibatalkan ≤ H-1');
+            ? 'Pembatalan hari H setelah bayar/confirmed — hangus (forfeited)'
+            : ($isDayH
+                ? 'Dibatalkan hari H sebelum lunas — cancelled (belum hangus)'
+                : 'Dibatalkan ≤ H-1'));
 
         return DB::transaction(function () use ($booking, $actor, $note, $outcome) {
             $booking = $this->statuses->transition($booking, $outcome, $note, $actor->id);

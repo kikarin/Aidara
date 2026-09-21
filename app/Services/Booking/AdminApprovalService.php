@@ -39,11 +39,9 @@ class AdminApprovalService
         $force = (bool) ($options['force'] ?? false);
 
         if ($conflict['needs_clarification'] && ! $force) {
-            $booking = $this->markKlarifikasi(
-                $booking,
-                $admin,
-                'Bentrok tingkat prioritas sama. Hubungi admin: '.$conflict['kontak_klarifikasi']
-            );
+            $message = 'Bentrok tingkat prioritas sama. Hubungi admin: '.$conflict['kontak_klarifikasi'];
+            $booking = $this->markKlarifikasi($booking, $admin, $message);
+            $this->syncPeersToKlarifikasi($conflict['peers'], $admin, $message);
 
             return [
                 'booking' => $booking->load(['priorityRule', 'payments', 'venue', 'area', 'items']),
@@ -120,16 +118,10 @@ class AdminApprovalService
         $conflict = $this->conflicts->resolve($booking->id);
         $message = $note ?? ('Perlu klarifikasi konflik. Hubungi: '.$conflict['kontak_klarifikasi']);
 
-        $booking->priority_flag = 'normal';
-        $booking->admin_notes = $message;
-        $booking->save();
+        $booking = $this->applyKlarifikasi($booking, $admin, $message);
+        $this->syncPeersToKlarifikasi($conflict['peers'], $admin, $message);
 
-        return $this->statuses->transition(
-            $booking,
-            BookingStatus::PERLU_KLARIFIKASI,
-            $message,
-            $admin->id
-        )->load(['priorityRule', 'venue', 'area', 'items']);
+        return $booking->load(['priorityRule', 'venue', 'area', 'items']);
     }
 
     public function analyze(Booking $booking): array
@@ -140,6 +132,54 @@ class AdminApprovalService
         }
 
         return $this->conflicts->resolve($booking->id);
+    }
+
+    /**
+     * Semua peer bentrok (tingkat prioritas sama) ikut status perlu_klarifikasi.
+     *
+     * @param  array<int, int>  $peerIds
+     */
+    private function syncPeersToKlarifikasi(array $peerIds, User $admin, string $message): void
+    {
+        if ($peerIds === []) {
+            return;
+        }
+
+        $peers = Booking::query()
+            ->whereIn('id', $peerIds)
+            ->whereIn('status', [
+                BookingStatus::MENUNGGU_APPROVAL,
+                BookingStatus::PERLU_KLARIFIKASI,
+            ])
+            ->get();
+
+        foreach ($peers as $peer) {
+            if ($peer->status === BookingStatus::PERLU_KLARIFIKASI
+                && ($peer->admin_notes === $message)
+            ) {
+                continue;
+            }
+
+            $this->applyKlarifikasi($peer, $admin, $message);
+        }
+    }
+
+    private function applyKlarifikasi(Booking $booking, User $admin, string $message): Booking
+    {
+        $booking->priority_flag = 'normal';
+        $booking->admin_notes = $message;
+        $booking->save();
+
+        if ($booking->status === BookingStatus::PERLU_KLARIFIKASI) {
+            return $booking->refresh();
+        }
+
+        return $this->statuses->transition(
+            $booking,
+            BookingStatus::PERLU_KLARIFIKASI,
+            $message,
+            $admin->id
+        );
     }
 
     private function assertReviewable(Booking $booking): void

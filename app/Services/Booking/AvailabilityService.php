@@ -151,6 +151,24 @@ class AvailabilityService
         return $result;
     }
 
+    /**
+     * Alias ketat untuk konfirmasi slot: gagal jika ada hard-lock booking lain.
+     * (Hold/soft tidak memblokir — race double-confirm dicegah lewat lock overlap di PaymentService.)
+     *
+     * @param  array{
+     *   venue_id: int,
+     *   area_id?: int|null,
+     *   starts_at: string|\DateTimeInterface,
+     *   ends_at: string|\DateTimeInterface,
+     *   exclude_booking_id?: int|null
+     * }  $input
+     * @return array<string, mixed>
+     */
+    public function assertConfirmable(array $input): array
+    {
+        return $this->assertBookable($input);
+    }
+
     private function lockLevel(string $status): ?string
     {
         if (in_array($status, BookingStatus::hardLock(), true)) {

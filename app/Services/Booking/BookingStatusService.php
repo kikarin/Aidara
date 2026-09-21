@@ -30,7 +30,11 @@ class BookingStatusService
             BookingStatus::EXPIRED,
             BookingStatus::CANCELLED,
         ],
-        BookingStatus::PAID => [BookingStatus::CONFIRMED, BookingStatus::CANCELLED],
+        BookingStatus::PAID => [
+            BookingStatus::CONFIRMED,
+            BookingStatus::CANCELLED,
+            BookingStatus::FORFEITED,
+        ],
         BookingStatus::CONFIRMED => [
             BookingStatus::COMPLETED,
             BookingStatus::CANCELLED,
@@ -38,7 +42,11 @@ class BookingStatusService
             BookingStatus::NO_COMPENSATION,
             BookingStatus::FORFEITED,
         ],
-        BookingStatus::RESCHEDULE_PENDING => [BookingStatus::CONFIRMED, BookingStatus::CANCELLED, BookingStatus::FORFEITED],
+        BookingStatus::RESCHEDULE_PENDING => [
+            BookingStatus::CONFIRMED,
+            BookingStatus::CANCELLED,
+            BookingStatus::FORFEITED,
+        ],
         BookingStatus::NO_COMPENSATION => [BookingStatus::COMPLETED],
     ];
 

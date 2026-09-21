@@ -93,12 +93,13 @@ class BookingMetaSeeder extends Seeder
 
     private function seedAddons(): void
     {
+        // Harga sementara (placeholder) sampai UPT tetapkan angka resmi.
         BookingAddon::query()->updateOrCreate(
             ['code' => 'loading'],
             [
                 'name' => 'Loading',
-                'description' => 'Biaya loading — harga belum di katalog UPT, diisi admin',
-                'harga' => null,
+                'description' => 'Biaya loading (placeholder sementara — ubah via admin jika sudah ada angka resmi UPT)',
+                'harga' => 500_000,
                 'is_active' => true,
                 'sort_order' => 1,
             ]
@@ -108,8 +109,8 @@ class BookingMetaSeeder extends Seeder
             ['code' => 'closing'],
             [
                 'name' => 'Closing',
-                'description' => 'Biaya closing — harga belum di katalog UPT, diisi admin',
-                'harga' => null,
+                'description' => 'Biaya closing (placeholder sementara — ubah via admin jika sudah ada angka resmi UPT)',
+                'harga' => 500_000,
                 'is_active' => true,
                 'sort_order' => 2,
             ]
@@ -126,6 +127,11 @@ class BookingMetaSeeder extends Seeder
         ], 'Rekening transfer manual (dari tata cara UPT)');
         BookingSetting::setValue('kontak_klarifikasi', '085777183633', 'Nomor kontak admin untuk klarifikasi konflik');
         BookingSetting::setValue('branding_name', 'E-Booking', 'Nama tampilan modul');
+        BookingSetting::setValue(
+            'payment_expire_hours',
+            48,
+            'Tenggat jam menunggu bayar sejak payment dibuat; job booking:expire-payments'
+        );
         BookingSetting::setValue('terms_tennis', [
             'title' => 'Tata Tertib Lapangan Tennis Kapten Muslihat',
             'points' => [
