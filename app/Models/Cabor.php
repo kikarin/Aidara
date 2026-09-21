@@ -23,6 +23,7 @@ class Cabor extends Model
         'nama',
         'deskripsi',
         'kategori_peserta_id',
+        'icon',
         'created_by',
         'updated_by',
         'deleted_by',

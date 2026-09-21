@@ -24,7 +24,7 @@ const loading = ref(false);
 const breadcrumbs = [
     { title: 'Menu & Permissions', href: '#' },
     { title: 'Roles', href: '/menu-permissions/roles' },
-    { title: 'Set Permissions', href: '#' },
+    { title: 'Atur Izin', href: '#' },
 ];
 
 const savePermissions = () => {

@@ -4,11 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast/useToast';
 import PageIndex from '@/pages/modules/base-page/PageIndex.vue';
+import { formatCaborWithIcon } from '@/utils/caborFormatter';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { ref } from 'vue';
 
 const breadcrumbs = [{ title: 'Atlet', href: '/atlet' }];
+
+// Helper function untuk format cabor dengan icon
+const formatCabor = (caborName: string, caborIcon: string | null): string => {
+    if (!caborIcon) {
+        return caborName;
+    }
+    const iconClass = caborIcon.startsWith('fa-') ? caborIcon : `fa-${caborIcon}`;
+    return `<div class="flex items-center gap-2"><i class="fa-solid ${iconClass} text-sm text-muted-foreground"></i><span>${caborName}</span></div>`;
+};
+
 const calculateAge = (birthDate: string | null | undefined): number | string => {
     if (!birthDate) return '-';
     const today = new Date();
@@ -31,7 +42,7 @@ const columns = [
                     <img src="${row.foto}" alt="Foto ${row.nama}" class="w-12 h-12 object-cover rounded-full border hover:shadow-md transition-shadow" />
                 </div>`;
             }
-            return '<div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-xs">No</div>';
+            return '<div class="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground">No</div>';
         },
     },
     { key: 'nama', label: 'Nama' },
@@ -42,8 +53,8 @@ const columns = [
             return row.jenis_kelamin === 'L' ? 'Laki-laki' : row.jenis_kelamin === 'P' ? 'Perempuan' : '-';
         },
     },
-    { key: 'tempat_lahir', label: 'Tempat Lahir' },
-    { key: 'agama', label: 'Agama' },
+    // { key: 'tempat_lahir', label: 'Tempat Lahir' },
+    // { key: 'agama', label: 'Agama' },
     // {
     //     key: 'tanggal_lahir',
     //     label: 'Tanggal Lahir',
@@ -83,15 +94,47 @@ const columns = [
         format: (row: any) => getLamaBergabung(row.tanggal_bergabung),
     },
     {
+        key: 'kategori_peserta',
+        label: 'Kategori Peserta',
+        format: (row: any) => {
+            if (row.kategori_pesertas && row.kategori_pesertas.length > 0) {
+                const kategoriList = row.kategori_pesertas.map((item: any) => {
+                    const kategoriName = typeof item === 'object' ? item.nama : item;
+                    return kategoriName;
+                });
+                return kategoriList.join(', ');
+            }
+            return '-';
+        },
+    },
+    {
         key: 'cabor',
         label: 'Cabor',
         format: (row: any) => {
             if (row.cabor_kategori_atlet && row.cabor_kategori_atlet.length > 0) {
-                const caborList = row.cabor_kategori_atlet.map((item: any) => {
-                    const caborName = item.cabor?.nama || '-';
-                    return `${caborName}`;
+                // Filter untuk menghindari duplikasi berdasarkan cabor_id
+                const uniqueCaborMap = new Map();
+                row.cabor_kategori_atlet.forEach((item: any) => {
+                    const caborId = item.cabor_id;
+                    if (caborId && !uniqueCaborMap.has(caborId)) {
+                        uniqueCaborMap.set(caborId, item);
+                    }
                 });
-                return caborList.join(', ');
+                
+                // Convert map values ke array dan format
+                const caborItems = Array.from(uniqueCaborMap.values()).map((item: any) => {
+                    const caborName = item.cabor?.nama || '-';
+                    const caborIcon = item.cabor?.icon || null;
+                    const posisi = item.posisi_atlet ? ` (${item.posisi_atlet})` : '';
+                    
+                    // Format dengan icon - hanya nama cabor dan posisi (tanpa kategori)
+                    if (caborIcon) {
+                        const iconClass = caborIcon.startsWith('fa-') ? caborIcon : `fa-${caborIcon}`;
+                        return `<span class="flex items-center gap-2 inline-flex"><i class="fa-solid ${iconClass} text-sm text-muted-foreground"></i><span>${caborName}${posisi}</span></span>`;
+                    }
+                    return `<span>${caborName}${posisi}</span>`;
+                });
+                return caborItems.join(', ');
             }
             return '-';
         },
@@ -102,7 +145,7 @@ const columns = [
         label: 'Status',
         format: (row: any) => {
             return row.is_active
-                ? '<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Aktif</span>'
+                ? '<span class="badge-success">Aktif</span>'
                 : '<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Nonaktif</span>';
         },
     },
@@ -122,7 +165,7 @@ const actions = (row: any) => [
         permission: 'Atlet Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/atlet/${row.id}/edit`),
         permission: 'Atlet Edit',
     },
@@ -132,7 +175,7 @@ const actions = (row: any) => [
         permission: 'Atlet Detail',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Atlet Delete',
     },
@@ -277,6 +320,62 @@ const handleFilter = (filters: any) => {
     pageIndex.value.handleFilterFromParent(filters);
     toast({ title: 'Filter berhasil diterapkan', variant: 'success' });
 };
+
+const exportLoading = ref(false);
+
+const handleExport = async () => {
+    exportLoading.value = true;
+    try {
+        // Get current params from pageIndex
+        const currentParams = pageIndex.value?.getCurrentParams();
+        
+        const params: any = {
+            search: currentParams?.search || '',
+            sort: currentParams?.sort || '',
+            order: currentParams?.order || 'asc',
+        };
+
+        // Add filters to params
+        if (currentParams?.filters) {
+            Object.keys(currentParams.filters).forEach((key) => {
+                if (currentParams.filters[key]) {
+                    params[key] = currentParams.filters[key];
+                }
+            });
+        }
+
+        // Build query string
+        const queryString = new URLSearchParams(params).toString();
+        
+        // Use axios to download file with proper responseType
+        const response = await axios.get(`/atlet/export?${queryString}`, {
+            responseType: 'blob',
+            headers: {
+                'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            }
+        });
+        
+        // Create blob and download
+        const blob = new Blob([response.data], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Data_Atlet_${new Date().toISOString().split('T')[0]}_${Date.now()}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        toast({ title: 'Export berhasil!', variant: 'success' });
+    } catch (error: any) {
+        console.error('Export error:', error);
+        toast({ title: error.response?.data?.message || 'Gagal export data', variant: 'destructive' });
+    } finally {
+        pageIndex.value.exportLoading = false;
+    }
+};
 </script>
 
 <template>
@@ -297,10 +396,10 @@ const handleFilter = (filters: any) => {
             :on-delete-row="deleteAtlet"
             @import="openImportModal"
             :showImport="true"
-            :showStatistik="true"
-            statistik-url="/atlet/karakteristik"
             :showFilter="true"
+            :showExport="true"
             @filter="bukaFilterModal"
+            @export="handleExport"
         />
 
         <!-- Filter Modal -->

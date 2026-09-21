@@ -114,12 +114,12 @@ const actions = (row: any) => [
         permission: 'Tenaga Pendukung Sertifikat Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/tenaga-pendukung/${props.tenagaPendukungId}/sertifikat/${row.id}/edit`),
         permission: 'Tenaga Pendukung Sertifikat Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => handleDeleteRow(row),
         permission: 'Tenaga Pendukung Sertifikat Delete',
     },
@@ -240,7 +240,7 @@ const idsToDelete = ref<number[]>([]);
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen w-full bg-gray-100 dark:bg-neutral-950">
+        <div class="page-surface">
             <div class="container mx-auto">
                 <div class="mx-auto px-4 py-4">
                     <!-- Tabs -->
@@ -262,7 +262,7 @@ const idsToDelete = ref<number[]>([]);
                     />
                 </div>
 
-                <div class="mx-4 rounded-xl bg-white pt-4 shadow dark:bg-neutral-900">
+                <div class="content-panel mx-4 pt-4">
                     <DataTable
                         :columns="columns"
                         :rows="rows"

@@ -29,7 +29,7 @@ const columns = [
             const badges = roles
                 .map(
                     (role: string) =>
-                        `<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full mr-1 mb-1">${role.trim()}</span>`,
+                        `<span class="badge-role inline-flex items-center px-2 py-1 text-xs font-medium rounded-full mr-1 mb-1">${role.trim()}</span>`,
                 )
                 .join('');
 
@@ -41,8 +41,8 @@ const columns = [
         label: 'Status',
         format: (row: any) => {
             return row.is_active
-                ? '<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Active</span>'
-                : '<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Inactive</span>';
+                ? '<span class="badge-success">Aktif</span>'
+                : '<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Nonaktif</span>';
         },
     },
 ];
@@ -64,19 +64,19 @@ const actions = (row: any) => {
             permission: 'Users Detail',
         },
         {
-            label: 'Edit',
+            label: 'Ubah',
             onClick: () => router.visit(`/users/${row.id}/edit`),
             permission: 'Users Edit',
         },
         {
-            label: 'Delete',
+            label: 'Hapus',
             onClick: () => pageIndex.value.handleDeleteRow(row),
             permission: 'Users Delete',
         },
     ];
     if (row.id !== currentUserId.value) {
         baseActions.push({
-            label: 'Login As',
+            label: 'Masuk Sebagai',
             onClick: () => router.visit(`/users/${row.id}/login-as`),
             permission: 'Users Show',
         });

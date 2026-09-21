@@ -4,7 +4,9 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ApiResponseMiddleware
 {
@@ -17,13 +19,22 @@ class ApiResponseMiddleware
     {
         $response = $next($request);
 
-        // Jika response sudah dalam format JSON, skip
-        if ($response->headers->get('Content-Type') === 'application/json') {
+        $contentType = $response->headers->get('Content-Type') ?? '';
+
+        // Skip JSON responses
+        if (str_contains($contentType, 'application/json')) {
             return $response;
         }
 
+        // Skip file/stream downloads (e.g. profile sertifikat/dokumen preview)
+        if ($response instanceof BinaryFileResponse || $response instanceof StreamedResponse) {
+            return $response;
+        }
+
+        $statusCode = $response->getStatusCode();
+
         // Jika ada error validation, format response
-        if ($response->status() === 422) {
+        if ($statusCode === 422) {
             $content = json_decode($response->getContent(), true);
 
             return response()->json([
@@ -34,7 +45,7 @@ class ApiResponseMiddleware
         }
 
         // Jika ada error 500 atau error lainnya
-        if ($response->status() >= 500) {
+        if ($statusCode >= 500) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Internal server error',
@@ -42,7 +53,7 @@ class ApiResponseMiddleware
         }
 
         // Jika ada error 404
-        if ($response->status() === 404) {
+        if ($statusCode === 404) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Resource not found',
@@ -50,7 +61,7 @@ class ApiResponseMiddleware
         }
 
         // Jika ada error 401 (Unauthorized)
-        if ($response->status() === 401) {
+        if ($statusCode === 401) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Unauthorized',
@@ -58,7 +69,7 @@ class ApiResponseMiddleware
         }
 
         // Jika ada error 403 (Forbidden)
-        if ($response->status() === 403) {
+        if ($statusCode === 403) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Forbidden',

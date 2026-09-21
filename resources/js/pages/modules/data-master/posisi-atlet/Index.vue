@@ -25,12 +25,12 @@ const actions = (row: any) => [
         permission: 'Mst Posisi Atlet Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/data-master/posisi-atlet/${row.id}/edit`),
         permission: 'Mst Posisi Atlet Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Mst Posisi Atlet Delete',
     },

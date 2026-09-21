@@ -71,12 +71,12 @@ const actions = (row: any) => [
         permission: 'Users Menu Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/menu-permissions/menus/${row.id}/edit`),
         permission: 'Users Menu Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => {
             if (confirm(`Delete menu "${row.name}"?`)) {
                 router.delete(`/menu-permissions/menus/${row.id}`);

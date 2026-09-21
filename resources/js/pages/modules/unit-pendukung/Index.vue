@@ -26,12 +26,12 @@ const actions = (row: any) => [
         permission: 'Unit Pendukung Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/unit-pendukung/${row.id}/edit`),
         permission: 'Unit Pendukung Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Unit Pendukung Delete',
     },

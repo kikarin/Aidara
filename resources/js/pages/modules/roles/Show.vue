@@ -35,16 +35,16 @@ const breadcrumbs = [
 const fields = [
     { label: 'Name', value: props.item.name },
     { label: 'BG', value: props.item.bg },
-    { label: 'Default Page', value: props.item.init_page_login },
-    { label: 'Can Login', value: props.item.is_allow_login },
+    { label: 'Halaman Default', value: props.item.init_page_login },
+    { label: 'Bisa Login', value: props.item.is_allow_login },
     { label: 'Menu Type', value: props.item.is_vertical_menu },
 ];
 
 const actionFields = [
-    { label: 'Created At', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Created By', value: props.item.created_by_user?.name || '-' },
-    { label: 'Updated At', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Updated By', value: props.item.updated_by_user?.name || '-' },
+    { label: 'Dibuat Pada', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Dibuat Oleh', value: props.item.created_by_user?.name || '-' },
+    { label: 'Diperbarui Pada', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Diperbarui Oleh', value: props.item.updated_by_user?.name || '-' },
 ];
 
 const handleEdit = () => {

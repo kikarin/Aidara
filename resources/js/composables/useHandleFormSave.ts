@@ -100,9 +100,6 @@ export function useHandleFormSave() {
             return router.post(`${url}/${id}`, requestData, {
                 ...(requestData instanceof FormData ? { forceFormData: true } : {}),
                 onSuccess: (response: any) => {
-                    // Jangan tampilkan toast jika sudah ada flash message dari backend
-                    // Flash message akan ditampilkan oleh AppSidebarLayout
-                    // toast({ title: successMessage, variant: 'success' });
                     if (onSuccess) {
                         onSuccess(response);
                     }

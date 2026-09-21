@@ -68,7 +68,12 @@ class LoginRequest extends FormRequest
         }
 
         $user = Auth::user();
-        if ($user && $user->is_active == 0) {
+        
+        // Izinkan login jika user masih dalam proses registrasi (belum punya peserta_id atau registration_status = 'pending')
+        $isInRegistrationProcess = !$user->peserta_id || !$user->peserta_type || $user->registration_status === 'pending';
+        
+        // Jika user tidak aktif, cek apakah masih dalam proses registrasi
+        if ($user && $user->is_active == 0 && !$isInRegistrationProcess) {
             Auth::logout();
             throw ValidationException::withMessages([
                 'email' => 'Your account is not active!',

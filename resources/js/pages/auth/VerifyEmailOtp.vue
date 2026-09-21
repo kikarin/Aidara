@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import AuthBase from '@/layouts/AuthLayout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import { LoaderCircle, Mail } from 'lucide-vue-next';
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
 
 const props = defineProps<{
     email?: string;

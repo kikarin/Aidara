@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardSkeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast/useToast';
 import axios from 'axios';
 import { onMounted, ref } from 'vue';
@@ -38,7 +39,7 @@ const loadParameterUmumData = async () => {
 
 // Get performa color
 const getPerformaColor = (persentase: number | null) => {
-    if (persentase === null) return 'text-gray-400';
+    if (persentase === null) return 'text-muted-foreground';
     if (persentase > 75) return 'text-red-600';
     if (persentase >= 40) return 'text-yellow-600';
     return 'text-green-600';
@@ -80,8 +81,8 @@ const calculatePerforma = (nilai: string | null, nilaiTarget: string | null, per
 
 <template>
     <div class="space-y-4">
-        <div v-if="loading" class="py-8 text-center">
-            <p class="text-muted-foreground">Memuat data parameter umum...</p>
+        <div v-if="loading" class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <CardSkeleton v-for="n in 6" :key="n" :lines="2" />
         </div>
 
         <div v-else-if="parameterUmumData.length === 0" class="py-8 text-center">
@@ -89,7 +90,7 @@ const calculatePerforma = (nilai: string | null, nilaiTarget: string | null, per
         </div>
 
         <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card v-for="param in parameterUmumData" :key="param.id" class="overflow-hidden bg-gray-100 dark:bg-neutral-900">
+            <Card v-for="param in parameterUmumData" :key="param.id" class="overflow-hidden bg-muted/40">
                 <CardHeader class="">
                     <CardTitle class="text-lg">{{ param.nama }}</CardTitle>
                     <p class="text-muted-foreground mt-1 text-sm">

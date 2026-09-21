@@ -38,11 +38,11 @@ const actions = (row: any) => [
         permission: 'Pemeriksaan Parameter Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/pemeriksaan/${pemeriksaanId.value}/pemeriksaan-parameter/${row.id}/edit`),
         permission: 'Pemeriksaan Parameter Edit',
     },
-    { label: 'Delete', onClick: () => pageIndex.value.handleDeleteRow(row), permission: 'Pemeriksaan Parameter Delete' },
+    { label: 'Hapus', onClick: () => pageIndex.value.handleDeleteRow(row), permission: 'Pemeriksaan Parameter Delete' },
 ];
 
 const deleteSelected = async () => {

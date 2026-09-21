@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Http\Requests\UsersRequest;
 use App\Models\User;
+use App\Services\UserPesertaLinkService;
 use App\Traits\RepositoryTrait;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -146,13 +147,17 @@ class UsersRepository
                 if (! $item->relationLoaded('users_role')) {
                     $item->load('users_role');
                 }
+                $item->load(['atlet', 'pelatih', 'tenagaPendukung']);
                 $data['selected_roles'] = $item->users_role_id_array;
+                $data['peserta_info']    = app(UserPesertaLinkService::class)->formatPesertaInfo($item);
             } catch (\Exception $e) {
                 $data['selected_roles'] = [];
+                $data['peserta_info']   = null;
                 Log::warning('Error loading user roles: '.$e->getMessage());
             }
         } else {
             $data['selected_roles'] = [];
+            $data['peserta_info']   = null;
         }
 
         return $data;
@@ -273,7 +278,7 @@ class UsersRepository
     public function getDetailWithUserTrack($id)
     {
         return $this->model
-            ->with(['role', 'created_by_user', 'updated_by_user', 'users_role.role'])
+            ->with(['role', 'created_by_user', 'updated_by_user', 'users_role.role', 'atlet', 'pelatih', 'tenagaPendukung'])
             ->where('id', $id)
             ->first();
     }
@@ -286,8 +291,9 @@ class UsersRepository
             return redirect()->back()->with('error', 'User not found');
         }
 
-        $itemArray              = $item->toArray();
-        $itemArray['all_roles'] = $item->list_role_name_str;
+        $itemArray                = $item->toArray();
+        $itemArray['all_roles']   = $item->list_role_name_str;
+        $itemArray['peserta_info'] = app(UserPesertaLinkService::class)->formatPesertaInfo($item);
 
         return \Inertia\Inertia::render('modules/users/Show', [
             'item' => $itemArray,

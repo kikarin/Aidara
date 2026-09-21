@@ -13,8 +13,8 @@ defineProps<{
 }>();
 
 const breadcrumbs = [
-    { title: 'Menu & Permissions', href: '#' },
-    { title: 'Permissions', href: '/menu-permissions/permissions' },
+    { title: 'Menu & Izin', href: '#' },
+    { title: 'Izin', href: '/menu-permissions/permissions' },
 ];
 </script>
 
@@ -22,8 +22,8 @@ const breadcrumbs = [
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="space-y-4 p-4">
             <div class="flex items-center justify-between">
-                <h1 class="text-2xl font-semibold">Permissions</h1>
-                <Button @click="router.visit('/menu-permissions/permissions/create')"> + Create Category </Button>
+                <h1 class="text-2xl font-semibold">Izin</h1>
+                <Button @click="router.visit('/menu-permissions/permissions/create')"> + Tambah Kategori </Button>
             </div>
             <div class="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
                 <PermissionCard v-for="category in categories" :key="category.id" :category="category" />

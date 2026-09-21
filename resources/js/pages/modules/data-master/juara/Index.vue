@@ -25,12 +25,12 @@ const actions = (row: any) => [
         permission: 'Mst Juara Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/data-master/juara/${row.id}/edit`),
         permission: 'Mst Juara Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Mst Juara Delete',
     },

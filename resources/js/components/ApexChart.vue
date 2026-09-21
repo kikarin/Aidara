@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { getChartBorderColor, getChartForeColor, getChartMutedColor, isDarkTheme } from '@/lib/theme';
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import '../../../resources/css/app.css';
 
-// Extend Window interface for ApexCharts
 declare global {
     interface Window {
         ApexCharts: any;
@@ -11,21 +11,82 @@ declare global {
 
 const chartRef = ref<HTMLElement | null>(null);
 let chart: any = null;
+let themeObserver: MutationObserver | null = null;
 
 const props = defineProps<{
     options: any;
     series: any[];
 }>();
 
+const buildThemeOptions = (options: any) => {
+    const isDark = isDarkTheme();
+    const muted = getChartMutedColor();
+    const border = getChartBorderColor();
+
+    return {
+        ...options,
+        chart: {
+            ...options.chart,
+            background: 'transparent',
+            foreColor: getChartForeColor(),
+        },
+        tooltip: {
+            ...options.tooltip,
+            theme: isDark ? 'dark' : 'light',
+            style: {
+                fontSize: '12px',
+            },
+        },
+        xaxis: {
+            ...options.xaxis,
+            labels: {
+                ...options.xaxis?.labels,
+                style: {
+                    colors: muted,
+                },
+            },
+            axisBorder: {
+                color: border,
+            },
+            axisTicks: {
+                color: border,
+            },
+        },
+        yaxis: {
+            ...options.yaxis,
+            labels: {
+                ...options.yaxis?.labels,
+                style: {
+                    colors: muted,
+                },
+            },
+        },
+        grid: {
+            ...options.grid,
+            borderColor: border,
+            xaxis: {
+                lines: {
+                    show: true,
+                    color: border,
+                },
+            },
+            yaxis: {
+                lines: {
+                    show: true,
+                    color: border,
+                },
+            },
+        },
+    };
+};
+
 const loadApexCharts = (): Promise<any> => {
     return new Promise((resolve, reject) => {
-        // Check if ApexCharts is already loaded
         if (window.ApexCharts) {
             resolve(window.ApexCharts);
             return;
         }
 
-        // Load ApexCharts from CDN
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/apexcharts@3.45.2/dist/apexcharts.min.js';
         script.onload = () => {
@@ -41,90 +102,29 @@ const loadApexCharts = (): Promise<any> => {
 };
 
 const renderChart = async () => {
-    if (chartRef.value) {
-        try {
-            const ApexCharts = await loadApexCharts();
+    if (!chartRef.value) {
+        return;
+    }
 
-            // Destroy existing chart if any
-            if (chart) {
-                chart.destroy();
-            }
+    try {
+        const ApexCharts = await loadApexCharts();
 
-            // Wait for next tick to ensure DOM is ready
-            await nextTick();
+        if (chart) {
+            chart.destroy();
+        }
 
-            // Detect current theme
-            const isDark = document.documentElement.classList.contains('dark');
+        await nextTick();
 
-            // Update chart options based on theme
-            const themeOptions = {
-                ...props.options,
-                chart: {
-                    ...props.options.chart,
-                    background: 'transparent',
-                    foreColor: isDark ? '#ffffff' : '#000000',
-                },
-                tooltip: {
-                    ...props.options.tooltip,
-                    theme: isDark ? 'dark' : 'light',
-                    style: {
-                        fontSize: '12px',
-                    },
-                },
-                xaxis: {
-                    ...props.options.xaxis,
-                    labels: {
-                        ...props.options.xaxis?.labels,
-                        style: {
-                            colors: isDark ? '#9ca3af' : '#6b7280',
-                        },
-                    },
-                    axisBorder: {
-                        color: isDark ? '#374151' : '#e5e7eb',
-                    },
-                    axisTicks: {
-                        color: isDark ? '#374151' : '#e5e7eb',
-                    },
-                },
-                yaxis: {
-                    ...props.options.yaxis,
-                    labels: {
-                        ...props.options.yaxis?.labels,
-                        style: {
-                            colors: isDark ? '#9ca3af' : '#6b7280',
-                        },
-                    },
-                },
-                grid: {
-                    ...props.options.grid,
-                    borderColor: isDark ? '#374151' : '#e5e7eb',
-                    xaxis: {
-                        lines: {
-                            show: true,
-                            color: isDark ? '#374151' : '#e5e7eb',
-                        },
-                    },
-                    yaxis: {
-                        lines: {
-                            show: true,
-                            color: isDark ? '#374151' : '#e5e7eb',
-                        },
-                    },
-                },
-            };
+        chart = new ApexCharts(chartRef.value, {
+            ...buildThemeOptions(props.options),
+            series: props.series,
+        });
 
-            chart = new ApexCharts(chartRef.value, {
-                ...themeOptions,
-                series: props.series,
-            });
-
-            chart.render();
-        } catch (error) {
-            console.error('Error loading ApexCharts:', error);
-            // Fallback: show a simple message
-            if (chartRef.value) {
-                chartRef.value.innerHTML = '<div class="p-4 text-center text-muted-foreground">Grafik sedang dimuat...</div>';
-            }
+        chart.render();
+    } catch (error) {
+        console.error('Error loading ApexCharts:', error);
+        if (chartRef.value) {
+            chartRef.value.innerHTML = '<div class="p-4 text-center text-muted-foreground">Grafik sedang dimuat...</div>';
         }
     }
 };
@@ -132,86 +132,22 @@ const renderChart = async () => {
 onMounted(() => {
     renderChart();
 
-    // Listen for theme changes
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                // Re-render chart when theme changes
-                renderChart();
-            }
-        });
+    themeObserver = new MutationObserver(() => {
+        renderChart();
     });
 
-    observer.observe(document.documentElement, {
+    themeObserver.observe(document.documentElement, {
         attributes: true,
-        attributeFilter: ['class'],
+        attributeFilter: ['class', 'data-theme'],
     });
 });
 
-// Watch for changes in props and update chart
 watch(
     [() => props.options, () => props.series],
     () => {
-        if (chart && chart.updateOptions) {
-            // Detect current theme
-            const isDark = document.documentElement.classList.contains('dark');
-
-            // Update chart options based on theme
-            const themeOptions = {
-                ...props.options,
-                chart: {
-                    ...props.options.chart,
-                    background: 'transparent',
-                    foreColor: isDark ? '#ffffff' : '#000000',
-                },
-                tooltip: {
-                    ...props.options.tooltip,
-                    theme: isDark ? 'dark' : 'light',
-                },
-                xaxis: {
-                    ...props.options.xaxis,
-                    labels: {
-                        ...props.options.xaxis?.labels,
-                        style: {
-                            colors: isDark ? '#9ca3af' : '#6b7280',
-                        },
-                    },
-                    axisBorder: {
-                        color: isDark ? '#374151' : '#e5e7eb',
-                    },
-                    axisTicks: {
-                        color: isDark ? '#374151' : '#e5e7eb',
-                    },
-                },
-                yaxis: {
-                    ...props.options.yaxis,
-                    labels: {
-                        ...props.options.yaxis?.labels,
-                        style: {
-                            colors: isDark ? '#9ca3af' : '#6b7280',
-                        },
-                    },
-                },
-                grid: {
-                    ...props.options.grid,
-                    borderColor: isDark ? '#374151' : '#e5e7eb',
-                    xaxis: {
-                        lines: {
-                            show: true,
-                            color: isDark ? '#374151' : '#e5e7eb',
-                        },
-                    },
-                    yaxis: {
-                        lines: {
-                            show: true,
-                            color: isDark ? '#374151' : '#e5e7eb',
-                        },
-                    },
-                },
-            };
-
+        if (chart?.updateOptions) {
             chart.updateOptions({
-                ...themeOptions,
+                ...buildThemeOptions(props.options),
                 series: props.series,
             });
         }
@@ -220,13 +156,11 @@ watch(
 );
 
 onUnmounted(() => {
-    if (chart && chart.destroy) {
-        chart.destroy();
-    }
+    themeObserver?.disconnect();
+    chart?.destroy?.();
 });
 </script>
 
 <template>
     <div ref="chartRef" class="apex-chart-container h-[350px] w-full"></div>
 </template>
-\

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -63,7 +64,7 @@ onMounted(() => {
     <Head title="Karakteristik Pelatih" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen w-full space-y-6 bg-gray-100 p-6 dark:bg-neutral-950">
+        <div class="page-surface space-y-6 p-6">
             <!-- Filter Section -->
             <Card>
                 <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
@@ -129,15 +130,17 @@ onMounted(() => {
                     <CardDescription> Tabel detail karakteristik pelatih berdasarkan kategori </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div v-if="loading" class="flex justify-center py-8">
-                        <div class="border-primary h-8 w-8 animate-spin rounded-full border-b-2"></div>
-                    </div>
+                    <TableSkeleton
+                        v-if="loading"
+                        :rows="6"
+                        :column-labels="['#', 'Karakteristik', 'Indikator', 'Jumlah', 'Persentase']"
+                    />
 
                     <div v-else-if="dataKarakteristik.length === 0" class="text-muted-foreground py-8 text-center">Tidak ada data karakteristik</div>
 
                     <div v-else class="overflow-x-auto">
                         <Table>
-                            <TableHeader class="bg-gray-200 dark:bg-neutral-800">
+                            <TableHeader class="bg-muted">
                                 <TableRow>
                                     <TableHead class="w-[5%]">#</TableHead>
                                     <TableHead class="w-[20%]">Karakteristik</TableHead>
@@ -165,7 +168,7 @@ onMounted(() => {
                                     </template>
 
                                     <!-- Separator row between different characteristics -->
-                                    <TableRow v-if="index < dataKarakteristik.length - 1" class="bg-gray-200 dark:bg-neutral-800">
+                                    <TableRow v-if="index < dataKarakteristik.length - 1" class="bg-muted">
                                         <TableCell colspan="5" class="h-8"></TableCell>
                                     </TableRow>
                                 </template>

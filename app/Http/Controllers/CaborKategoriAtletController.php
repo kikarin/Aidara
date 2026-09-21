@@ -143,28 +143,70 @@ class CaborKategoriAtletController extends Controller implements HasMiddleware
     {
         $ids = $request->input('ids', []);
         if (empty($ids)) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Pilih data yang akan dihapus!'], 400);
+            }
             return redirect()->back()->with('error', 'Pilih data yang akan dihapus!');
         }
-        $this->repository->delete_selected($ids);
-
-        return redirect()->route('cabor-kategori-atlet.index')->with('success', 'Data berhasil dihapus!');
+        
+        try {
+            $this->repository->delete_selected($ids);
+            
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Data berhasil dihapus!']);
+            }
+            
+            return redirect()->route('cabor-kategori-atlet.index')->with('success', 'Data berhasil dihapus!');
+        } catch (\Exception $e) {
+            Log::error('Error in destroy_selected', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'ids' => $ids,
+            ]);
+            
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Gagal menghapus data: ' . $e->getMessage()], 500);
+            }
+            
+            return redirect()->back()->with('error', 'Gagal menghapus data: ' . $e->getMessage());
+        }
     }
 
     public function apiIndex()
     {
-        $data = $this->repository->customIndex([]);
+        try {
+            $data = $this->repository->customIndex([]);
 
-        return response()->json([
-            'data' => $data['records'],
-            'meta' => [
-                'total'        => $data['total'],
-                'current_page' => $data['currentPage'],
-                'per_page'     => $data['perPage'],
-                'search'       => $data['search'],
-                'sort'         => $data['sort'],
-                'order'        => $data['order'],
-            ],
-        ]);
+            return response()->json([
+                'data' => $data['records'] ?? [],
+                'meta' => [
+                    'total'        => $data['total'] ?? 0,
+                    'current_page' => $data['currentPage'] ?? 1,
+                    'per_page'     => $data['perPage'] ?? 10,
+                    'search'       => $data['search'] ?? '',
+                    'sort'         => $data['sort'] ?? '',
+                    'order'        => $data['order'] ?? 'asc',
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in apiIndex CaborKategoriAtlet', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'data' => [],
+                'meta' => [
+                    'total'        => 0,
+                    'current_page' => 1,
+                    'per_page'     => 10,
+                    'search'       => '',
+                    'sort'         => '',
+                    'order'        => 'asc',
+                ],
+                'error' => 'Terjadi kesalahan saat mengambil data',
+            ], 500);
+        }
     }
 
     // Method untuk halaman daftar atlet per kategori

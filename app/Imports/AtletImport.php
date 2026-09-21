@@ -32,6 +32,69 @@ class AtletImport implements ToCollection, WithBatchInserts, WithChunkReading, W
      * @return \Illuminate\Database\Eloquent\Model|null
      */
     /**
+     * Get field value from row with multiple possible column names
+     *
+     * @param  array  $row
+     * @param  array  $possibleColumnNames
+     * @return string|null
+     */
+    private function getFieldValue($row, array $possibleColumnNames)
+    {
+        foreach ($possibleColumnNames as $columnName) {
+            if (isset($row[$columnName]) && !empty(trim($row[$columnName]))) {
+                $value = trim($row[$columnName]);
+                return $value !== '' ? $value : null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Convert tanggal bergabung - jika hanya tahun, convert ke 1 Januari tahun tersebut
+     *
+     * @param  mixed  $tanggalBergabung
+     * @return string|null
+     */
+    private function convertTanggalBergabung($tanggalBergabung)
+    {
+        // Kosong → null
+        if (empty($tanggalBergabung)) {
+            return null;
+        }
+    
+        // Jika string → trim biar tidak ada trailing/hidden space
+        if (is_string($tanggalBergabung)) {
+            $tanggalBergabung = trim($tanggalBergabung);
+    
+            // Jika kosong setelah trim
+            if ($tanggalBergabung === '') {
+                return null;
+            }
+            
+            // Jika hanya 4 digit angka (tahun saja), convert ke 1 Januari tahun tersebut
+            if (preg_match('/^\d{4}$/', $tanggalBergabung)) {
+                $tahun = (int) $tanggalBergabung;
+                // Validasi tahun (misal: antara 1900-2100)
+                if ($tahun >= 1900 && $tahun <= 2100) {
+                    return sprintf('%d-01-01', $tahun);
+                }
+            }
+        }
+    
+        // Jika numeric dan hanya 4 digit (tahun saja)
+        if (is_numeric($tanggalBergabung)) {
+            $numValue = (float) $tanggalBergabung;
+            // Jika antara 1900-2100 dan tidak ada desimal, kemungkinan tahun saja
+            if ($numValue >= 1900 && $numValue <= 2100 && floor($numValue) == $numValue) {
+                return sprintf('%d-01-01', (int) $numValue);
+            }
+        }
+    
+        // Jika bukan hanya tahun, gunakan convertExcelDate untuk format tanggal lengkap
+        return $this->convertExcelDate($tanggalBergabung);
+    }
+
+    /**
      * Convert Excel date serial number to YYYY-MM-DD format
      *
      * @param  mixed  $excelDate
@@ -135,6 +198,11 @@ class AtletImport implements ToCollection, WithBatchInserts, WithChunkReading, W
                     'kategori_atlet_id' => $row['kategori_atlet_id'] ?? null,
                     'no_hp'             => $row['no_hp']             ?? null,
                     'email'             => $row['email']             ?? null,
+                    'tanggal_bergabung' => $this->convertTanggalBergabung($row['tanggal_bergabung'] ?? $row['tahun_bergabung'] ?? null),
+                    // Field khusus NPCI dan SOIna
+                    'disabilitas'       => $this->getFieldValue($row, ['disabilitas', 'jenis_disabilitas', 'disabilitas_jenis']),
+                    'klasifikasi'       => $this->getFieldValue($row, ['klasifikasi', 'klasifikasi_npci']),
+                    'iq'                => $this->getFieldValue($row, ['iq', 'iq_soina', 'intelligence_quotient']),
                     'is_active'         => $row['is_active']         ?? 1,
                 ];
 
@@ -288,17 +356,66 @@ class AtletImport implements ToCollection, WithBatchInserts, WithChunkReading, W
                 if ($caborNama && !empty(trim($caborNama))) {
                     $caborNama = trim($caborNama);
                     
-                    // Cari atau buat cabor berdasarkan nama
-                    $cabor = Cabor::where('nama', $caborNama)->first();
+                    // Tentukan kategori_peserta_id berdasarkan kategori_peserta dari Excel
+                    $kategoriPesertaId = null;
+                    $kategoriPesertaInput = $row['kategori_peserta'] ?? $row['jenis_peserta'] ?? $row['kategori'] ?? $row['jenis'] ?? null;
+                    
+                    if ($kategoriPesertaInput && !empty(trim($kategoriPesertaInput))) {
+                        // Ambil kategori pertama jika multiple (dipisahkan koma, semicolon, atau slash)
+                        $kategoriNames = preg_split('/[,;\/]+/', trim($kategoriPesertaInput));
+                        $firstKategoriName = strtoupper(trim($kategoriNames[0]));
+                        
+                        if (!empty($firstKategoriName)) {
+                            // Cari kategori peserta berdasarkan nama (case insensitive)
+                            $kategoriPeserta = MstKategoriPeserta::whereRaw('UPPER(nama) = ?', [$firstKategoriName])->first();
+                            if ($kategoriPeserta) {
+                                $kategoriPesertaId = $kategoriPeserta->id;
+                                Log::info('AtletImport: Found kategori_peserta for cabor', [
+                                    'kategori_name' => $firstKategoriName,
+                                    'kategori_id' => $kategoriPesertaId,
+                                ]);
+                            }
+                        }
+                    }
+                    
+                    // Cari atau buat cabor berdasarkan nama (abaikan soft delete)
+                    $cabor = Cabor::withTrashed()->where('nama', $caborNama)->first();
                     if (!$cabor) {
                         // Buat cabor baru jika belum ada
                         $cabor = Cabor::create([
                             'nama' => $caborNama,
                             'deskripsi' => 'Dibuat otomatis dari import',
+                            'kategori_peserta_id' => $kategoriPesertaId,
                             'created_by' => Auth::id(),
                             'updated_by' => Auth::id(),
                         ]);
-                        Log::info('AtletImport: Created new cabor', ['cabor_id' => $cabor->id, 'nama' => $caborNama]);
+                        Log::info('AtletImport: Created new cabor', [
+                            'cabor_id' => $cabor->id,
+                            'nama' => $caborNama,
+                            'kategori_peserta_id' => $kategoriPesertaId,
+                        ]);
+                    } else {
+                        // Jika cabor sudah di-soft delete, restore dulu
+                        if ($cabor->trashed()) {
+                            $cabor->restore();
+                            Log::info('AtletImport: Restored soft-deleted cabor', [
+                                'cabor_id' => $cabor->id,
+                                'nama' => $caborNama,
+                            ]);
+                        }
+                        
+                        // Update kategori_peserta_id jika cabor sudah ada tapi belum punya kategori_peserta_id
+                        if (!$cabor->kategori_peserta_id && $kategoriPesertaId) {
+                            $cabor->update([
+                                'kategori_peserta_id' => $kategoriPesertaId,
+                                'updated_by' => Auth::id(),
+                            ]);
+                            Log::info('AtletImport: Updated cabor kategori_peserta_id', [
+                                'cabor_id' => $cabor->id,
+                                'nama' => $caborNama,
+                                'kategori_peserta_id' => $kategoriPesertaId,
+                            ]);
+                        }
                     }
 
                     // Cek apakah sudah ada relasi atlet ke cabor ini

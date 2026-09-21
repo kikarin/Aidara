@@ -25,10 +25,10 @@ const fields = computed(() => [
 ]);
 
 const actionFields = [
-    { label: 'Created At', value: props.item.created_at || '-' },
-    { label: 'Created By', value: props.item.created_by_user?.name || '-' },
-    { label: 'Updated At', value: props.item.updated_at || '-' },
-    { label: 'Updated By', value: props.item.updated_by_user?.name || '-' },
+    { label: 'Dibuat Pada', value: props.item.created_at || '-' },
+    { label: 'Dibuat Oleh', value: props.item.created_by_user?.name || '-' },
+    { label: 'Diperbarui Pada', value: props.item.updated_at || '-' },
+    { label: 'Diperbarui Oleh', value: props.item.updated_by_user?.name || '-' },
 ];
 </script>
 

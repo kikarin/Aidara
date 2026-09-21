@@ -91,7 +91,8 @@ class PemeriksaanPesertaRepository
             $query->orderBy('id', 'desc');
         }
 
-        $query->with(['peserta']);
+        // Pastikan semua relasi tetap dimuat (terutama pemeriksaanPesertaParameter untuk prefilling data)
+        $query->with($this->with);
 
         // Handle show entries all
         if ($perPage == -1) {
@@ -121,11 +122,20 @@ class PemeriksaanPesertaRepository
                         'id'   => $item->status?->id   ?? '',
                         'nama' => $item->status?->nama ?? '',
                     ],
-                    'catatan_umum'      => $item->catatan_umum,
-                    'created_at'        => $item->created_at,
-                    'updated_at'        => $item->updated_at,
-                    'parameter_peserta' => true,
-                    'jumlah_parameter'  => $item->pemeriksaanParameter ? $item->pemeriksaanParameter()->count() : 0,
+                    'ref_status_pemeriksaan_id' => $item->ref_status_pemeriksaan_id,
+                    'catatan_umum'              => $item->catatan_umum,
+                    'created_at'                => $item->created_at,
+                    'updated_at'                => $item->updated_at,
+                    'parameter_peserta'         => true,
+                    'jumlah_parameter'          => $item->pemeriksaanParameter ? $item->pemeriksaanParameter()->count() : 0,
+                    'pemeriksaanPesertaParameter' => $item->pemeriksaanPesertaParameter ? $item->pemeriksaanPesertaParameter->map(function ($param) {
+                        return [
+                            'id'                      => $param->id,
+                            'pemeriksaan_parameter_id' => $param->pemeriksaan_parameter_id,
+                            'nilai'                    => $param->nilai,
+                            'trend'                    => $param->trend,
+                        ];
+                    })->toArray() : [],
                 ];
             });
             if ($sortField === 'jumlah_parameter') {

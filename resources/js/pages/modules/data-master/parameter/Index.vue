@@ -29,12 +29,12 @@ const actions = (row: any) => [
         permission: 'Mst Parameter Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/data-master/parameter/${row.id}/edit`),
         permission: 'Mst Parameter Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Mst Parameter Delete',
     },

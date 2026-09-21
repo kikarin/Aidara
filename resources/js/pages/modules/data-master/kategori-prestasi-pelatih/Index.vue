@@ -25,12 +25,12 @@ const actions = (row: any) => [
         permission: 'Mst Kategori Prestasi Pelatih Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/data-master/kategori-prestasi-pelatih/${row.id}/edit`),
         permission: 'Mst Kategori Prestasi Pelatih Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Mst Kategori Prestasi Pelatih Delete',
     },

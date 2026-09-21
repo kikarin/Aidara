@@ -6,9 +6,10 @@ import { router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { ref } from 'vue';
 import BadgeGroup from '../components/BadgeGroup.vue';
+import PesertaModal from './components/PesertaModal.vue';
 
 const { toast } = useToast();
-const breadcrumbs = [{ title: 'Pemeriksaan Khusus', href: '/pemeriksaan-khusus' }];
+const breadcrumbs = [{ title: 'Pemeriksaan Fisik', href: '/pemeriksaan-khusus' }];
 
 const columns = [
     { key: 'peserta', label: 'Peserta', orderable: false },
@@ -22,9 +23,9 @@ const columns = [
         format: (row: any) => {
             if (row.status === 'belum') return '<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-300 rounded-full">Belum</span>';
             if (row.status === 'sebagian')
-                return '<span class="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">Sebagian</span>';
+                return '<span class="badge-warning">Sebagian</span>';
             if (row.status === 'selesai')
-                return '<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Selesai</span>';
+                return '<span class="badge-success">Selesai</span>';
             return row.status;
         },
     },
@@ -35,6 +36,12 @@ const selected = ref<number[]>([]);
 // Filter state
 const showFilterModal = ref(false);
 const currentFilters = ref<any>({});
+
+// Peserta modal state
+const showPesertaModal = ref(false);
+const selectedPesertaData = ref<any[]>([]);
+const selectedPesertaTipe = ref<string>('');
+const selectedPemeriksaanKhususId = ref<number | null>(null);
 
 const actions = (row: any) => [
     {
@@ -53,12 +60,12 @@ const actions = (row: any) => [
         permission: 'Pemeriksaan Khusus Setup',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/pemeriksaan-khusus/${row.id}/edit`),
         permission: 'Pemeriksaan Khusus Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Pemeriksaan Khusus Delete',
     },
@@ -80,13 +87,69 @@ const deleteSelected = async () => {
     }
 };
 
+const bukaFilterModal = () => {
+    showFilterModal.value = true;
+};
+
+const handleFilter = (filters: any) => {
+    currentFilters.value = filters;
+    showFilterModal.value = false;
+    
+    // Apply filters to PageIndex
+    if (pageIndex.value) {
+        pageIndex.value.handleFilterFromParent(filters);
+    }
+    toast({ title: 'Filter berhasil diterapkan', variant: 'success' });
+};
+
+const handlePesertaClick = async (pemeriksaanKhususId: number, tipe: string) => {
+    try {
+        const response = await axios.get(`/api/pemeriksaan-khusus/${pemeriksaanKhususId}/peserta?jenis_peserta=${tipe}`);
+        if (response.data.success) {
+            selectedPesertaData.value = response.data.data || [];
+            selectedPesertaTipe.value = tipe;
+            selectedPemeriksaanKhususId.value = pemeriksaanKhususId;
+            showPesertaModal.value = true;
+        } else {
+            toast({ title: 'Gagal mengambil data peserta', variant: 'destructive' });
+        }
+    } catch (error: any) {
+        console.error('Gagal mengambil data peserta:', error);
+        toast({ 
+            title: error.response?.data?.message || 'Gagal mengambil data peserta', 
+            variant: 'destructive' 
+        });
+    }
+};
+
+const handleRefreshPeserta = async () => {
+    if (selectedPemeriksaanKhususId.value && selectedPesertaTipe.value) {
+        try {
+            const response = await axios.get(`/api/pemeriksaan-khusus/${selectedPemeriksaanKhususId.value}/peserta?jenis_peserta=${selectedPesertaTipe.value}`);
+            if (response.data.success) {
+                selectedPesertaData.value = response.data.data || [];
+                // Refresh data table juga
+                pageIndex.value?.fetchData();
+            }
+        } catch (error) {
+            console.error('Gagal refresh data peserta:', error);
+        }
+    }
+};
+
+const closePesertaModal = () => {
+    showPesertaModal.value = false;
+    selectedPesertaData.value = [];
+    selectedPesertaTipe.value = '';
+    selectedPemeriksaanKhususId.value = null;
+};
 
 </script>
 
 <template>
     <PageIndex
-        title="Pemeriksaan Khusus"
-        module-name="Pemeriksaan Khusus"
+        title="Pemeriksaan Fisik"
+        module-name="Pemeriksaan Fisik"
         :breadcrumbs="breadcrumbs"
         :columns="columns"
         :create-url="'/pemeriksaan-khusus/create'"
@@ -98,6 +161,8 @@ const deleteSelected = async () => {
         ref="pageIndex"
         :showImport="false"
         :showDelete="false"
+        :showFilter="true"
+        @filter="bukaFilterModal"
     >       
         <template #cell-peserta="{ row }">
             <BadgeGroup
@@ -105,17 +170,20 @@ const deleteSelected = async () => {
                     {
                         label: 'Atlet',
                         value: row.jumlah_atlet || 0,
-                        colorClass: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
+                        colorClass: 'stat-chip stat-chip-atlet hover:opacity-90',
+                        onClick: () => handlePesertaClick(row.id, 'atlet'),
                     },
                     {
                         label: 'Pelatih',
                         value: row.jumlah_pelatih || 0,
-                        colorClass: 'bg-green-100 text-green-800 hover:bg-green-200',
+                        colorClass: 'stat-chip stat-chip-pelatih hover:opacity-90',
+                        onClick: () => handlePesertaClick(row.id, 'pelatih'),
                     },
                     {
                         label: 'Tenaga Pendukung',
                         value: row.jumlah_tenaga_pendukung || 0,
-                        colorClass: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
+                        colorClass: 'stat-chip stat-chip-tenaga hover:opacity-90',
+                        onClick: () => handlePesertaClick(row.id, 'tenaga_pendukung'),
                     },
                 ]"
             />
@@ -129,6 +197,16 @@ const deleteSelected = async () => {
         module-type="pemeriksaan-khusus"
         :initial-filters="currentFilters"
         @filter="handleFilter"
+    />
+
+    <!-- Peserta Modal -->
+    <PesertaModal
+        :show="showPesertaModal"
+        :data="selectedPesertaData"
+        :tipe="selectedPesertaTipe"
+        :pemeriksaan-khusus-id="selectedPemeriksaanKhususId"
+        @close="closePesertaModal"
+        @refresh="handleRefreshPeserta"
     />
 </template>
 

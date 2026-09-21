@@ -48,7 +48,7 @@ const confirmDelete = () => {
 <template>
     <Head :title="`Detail ${title}`" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen space-y-4 bg-gray-100 p-4 dark:bg-neutral-950">
+        <div class="page-surface space-y-4 p-4">
             <!-- Header & Action Buttons -->
             <HeaderShow :title="`Detail ${title}`">
                 <slot name="custom-action" />
@@ -58,7 +58,7 @@ const confirmDelete = () => {
                     @click="onEdit"
                 >
                     <component :is="onEditIcon || Pencil" class="h-4 w-4" />
-                    {{ onEditLabel || 'Edit' }}
+                    {{ onEditLabel || 'Ubah' }}
                 </button>
                 <button
                     v-if="onDelete"
@@ -66,14 +66,14 @@ const confirmDelete = () => {
                     @click="handleDelete"
                 >
                     <Trash2 class="h-4 w-4 text-red-500" />
-                    Delete
+                    Hapus
                 </button>
                 <button
                     class="border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center gap-1 rounded-md border px-3 py-2 text-sm transition-colors"
                     @click="() => router.visit(backUrl || '#')"
                 >
                     <ArrowLeft class="h-4 w-4" />
-                    Back
+                    Kembali
                 </button>
             </HeaderShow>
 
@@ -85,7 +85,7 @@ const confirmDelete = () => {
                     <div class="bg-card border-border rounded-2xl border shadow-sm">
                         <div class="border-border flex items-center gap-2 border-b px-6 py-4">
                             <Info class="text-muted-foreground h-4 w-4" />
-                            <h2 class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">Information</h2>
+                            <h2 class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">Informasi</h2>
                         </div>
                         <div class="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
                             <div v-for="field in fields" :key="field.label" class="space-y-1" :class="field.label === 'Data' ? 'sm:col-span-2' : ''">
@@ -108,7 +108,7 @@ const confirmDelete = () => {
                                 </div>
                                 <!-- Text Field with HTML support -->
                                 <div
-                                    v-else-if="field.value && field.value.startsWith && field.value.startsWith('<div')"
+                                    v-else-if="field.value && field.value.startsWith && (field.value.startsWith('<div') || field.value.startsWith('<span'))"
                                     :class="['text-foreground text-sm font-semibold break-words whitespace-pre-wrap', field.className]"
                                     v-html="field.value"
                                 ></div>
@@ -128,7 +128,7 @@ const confirmDelete = () => {
                     <div class="bg-card border-border rounded-2xl border shadow-sm">
                         <div class="border-border flex items-center gap-2 border-b px-6 py-4">
                             <Clock class="text-muted-foreground h-4 w-4" />
-                            <h2 class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">Action Time</h2>
+                            <h2 class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">Riwayat Perubahan</h2>
                         </div>
                         <div class="grid grid-cols-1 gap-3 p-6">
                             <div v-for="field in actionFields" :key="field.label" class="space-y-1">

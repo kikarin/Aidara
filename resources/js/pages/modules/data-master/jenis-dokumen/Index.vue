@@ -25,12 +25,12 @@ const actions = (row: any) => [
         permission: 'Mst Jenis Dokumen Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/data-master/jenis-dokumen/${row.id}/edit`),
         permission: 'Mst Jenis Dokumen Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Mst Jenis Dokumen Delete',
     },

@@ -39,7 +39,7 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     // Email OTP Verification Routes
     Route::get('email/otp/verify', [EmailOtpVerificationController::class, 'show'])
-        ->name('email.otp.verify');
+        ->name('email.otp.show');
 
     Route::post('email/otp/verify', [EmailOtpVerificationController::class, 'verify'])
         ->name('email.otp.verify');

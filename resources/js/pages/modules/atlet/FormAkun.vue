@@ -87,7 +87,7 @@ const handleSave = async (dataFromFormInput: any, setFormErrors: (errors: Record
 
 <template>
     <div>
-        <div v-if="hasAccount" class="mb-4 rounded-lg border border-green-200 bg-green-50 p-4">
+        <div v-if="hasAccount" class="mb-4 alert-success">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
@@ -107,7 +107,7 @@ const handleSave = async (dataFromFormInput: any, setFormErrors: (errors: Record
             </div>
         </div>
 
-        <div v-else class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div v-else class="mb-4 rounded-lg border border-border bg-muted p-4">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">

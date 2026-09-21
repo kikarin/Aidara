@@ -11,7 +11,7 @@ const props = defineProps<{
 const breadcrumbs = computed(() => [
     { title: 'Pelatih', href: '/pelatih' },
     { title: 'Sertifikat', href: `/pelatih/${props.pelatihId}/sertifikat` },
-    { title: 'Edit', href: `/pelatih/${props.pelatihId}/sertifikat/${props.item.id}/edit` },
+    { title: 'Ubah', href: `/pelatih/${props.pelatihId}/sertifikat/${props.item.id}/edit` },
 ]);
 
 const title = computed(() => `Edit Sertifikat: ${props.item.nama_sertifikat || '-'}`);

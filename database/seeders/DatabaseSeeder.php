@@ -20,6 +20,9 @@ class DatabaseSeeder extends Seeder
         $this->call(IdentitySeeder::class);
         $this->call(CategoryPermissionSeeder::class);
         $this->call(UsersMenuSeeder::class);
+        $this->call(WorldCupSeeder::class);
+        $this->call(ManualBookSeeder::class);
+        $this->call(SeleksiPpopmSeeder::class);
         $this->call(RoleSeeder::class);
         $this->call(UsersSeeder::class);
         $this->call(SetRolePermissionSeeder::class);
@@ -59,5 +62,6 @@ class DatabaseSeeder extends Seeder
         $this->call(MstParameterSeeder::class);
         $this->call(TurnamenSeeder::class);
         $this->call(MstKategoriPesertaSeeder::class);
+        $this->call(\Database\Seeders\Booking\BookingSeeder::class);
     }
 }

@@ -2,6 +2,7 @@
 import AppTabs from '@/components/AppTabs.vue';
 import { useToast } from '@/components/ui/toast/useToast';
 import PageShow from '@/pages/modules/base-page/PageShow.vue';
+import { formatCaborWithIcon } from '@/utils/caborFormatter';
 import { router, usePage } from '@inertiajs/vue3';
 import { Pencil, Plus } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
@@ -71,11 +72,18 @@ interface Kesehatan {
 
 interface CaborData {
     id: number;
-    cabor_nama: string;
-    cabor_kategori_nama: string;
-    jenis_tenaga_pendukung_nama: string;
-    is_active: boolean;
-    created_at: string;
+    cabor_id: number;
+    cabor_kategori_id: number | null;
+    jenis_tenaga_pendukung: string | null;
+    cabor?: {
+        id: number;
+        nama: string;
+        kategori_peserta_id: number | null;
+    };
+    caborKategori?: {
+        id: number;
+        nama: string;
+    } | null;
 }
 
 const props = defineProps<{
@@ -101,7 +109,22 @@ const props = defineProps<{
         prestasi?: Prestasi[];
         dokumen?: Dokumen[];
         kesehatan?: Kesehatan | null;
-        cabor_kategori_tenaga_pendukung?: CaborData[];
+        cabor_kategori_tenaga_pendukung?: Array<{
+            id: number;
+            cabor_id: number;
+            cabor_kategori_id: number | null;
+            jenis_tenaga_pendukung: string | null;
+            cabor?: {
+                id: number;
+                nama: string;
+                kategori_peserta_id: number | null;
+                icon?: string | null;
+            };
+            caborKategori?: {
+                id: number;
+                nama: string;
+            } | null;
+        }>;
         kecamatan?: { nama: string } | null;
         kelurahan?: { nama: string } | null;
         tanggal_bergabung?: string;
@@ -198,6 +221,38 @@ const fields = computed(() => {
                     ? props.item.kategori_pesertas.map((k: { nama: string }) => k.nama).join(', ')
                     : '-',
         },
+        {
+            label: 'Cabang Olahraga',
+            value: props.item?.cabor_kategori_tenaga_pendukung && props.item.cabor_kategori_tenaga_pendukung.length > 0
+                ? (() => {
+                    // Filter unique berdasarkan cabor_id untuk menghindari duplikasi
+                    const uniqueCaborMap = new Map();
+                    props.item.cabor_kategori_tenaga_pendukung.forEach((c: any) => {
+                        const caborId = c.cabor_id;
+                        if (caborId && !uniqueCaborMap.has(caborId)) {
+                            uniqueCaborMap.set(caborId, c);
+                        }
+                    });
+                    
+                    // Format setiap cabor dengan icon dan gabungkan
+                    const caborItems = Array.from(uniqueCaborMap.values()).map((c: any) => {
+                        const caborName = c.cabor?.nama || 'Cabor tidak diketahui';
+                        const caborIcon = c.cabor?.icon || null;
+                        const posisi = c.jenis_tenaga_pendukung ? ` (${c.jenis_tenaga_pendukung})` : '';
+                        
+                        // Format dengan icon - hanya nama cabor dan posisi (tanpa kategori)
+                        if (caborIcon) {
+                            const iconClass = caborIcon.startsWith('fa-') ? caborIcon : `fa-${caborIcon}`;
+                            return `<span class="flex items-center gap-2 inline-flex"><i class="fa-solid ${iconClass} text-sm text-muted-foreground"></i><span>${caborName}${posisi}</span></span>`;
+                        }
+                        return `<span>${caborName}${posisi}</span>`;
+                    });
+                    // Join dengan separator yang tidak merusak HTML
+                    return caborItems.join(', ');
+                })()
+                : '-',
+            className: 'sm:col-span-2',
+        },
         { label: 'No HP', value: props.item?.no_hp || '-' },
         { label: 'Email', value: props.item?.email || '-' },
         {
@@ -219,29 +274,29 @@ const fields = computed(() => {
 });
 
 const actionFields = computed(() => [
-    { label: 'Created At', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Created By', value: props.item.created_by_user?.name || '-' },
-    { label: 'Updated At', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Updated By', value: props.item.updated_by_user?.name || '-' },
+    { label: 'Dibuat Pada', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Dibuat Oleh', value: props.item.created_by_user?.name || '-' },
+    { label: 'Diperbarui Pada', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Diperbarui Oleh', value: props.item.updated_by_user?.name || '-' },
 ]);
 
 const kesehatanActionFields = computed(() => {
     const o = props.item.kesehatan;
     return [
         {
-            label: 'Created At',
+            label: 'Dibuat Pada',
             value: o?.created_at ? new Date(o.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-',
         },
         {
-            label: 'Created By',
+            label: 'Dibuat Oleh',
             value: o?.created_by_user?.name || '-',
         },
         {
-            label: 'Updated At',
+            label: 'Diperbarui Pada',
             value: o?.updated_at ? new Date(o.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-',
         },
         {
-            label: 'Updated By',
+            label: 'Diperbarui Oleh',
             value: o?.updated_by_user?.name || '-',
         },
     ];
@@ -393,7 +448,7 @@ function getLamaBergabung(tanggalBergabung: string) {
         :back-url="'/tenaga-pendukung'"
         :on-edit="currentOnEditHandler"
         :on-delete="currentOnDeleteHandler"
-        :on-edit-label="activeTab === 'kesehatan-data' && !props.item.kesehatan ? 'Create' : 'Edit'"
+        :on-edit-label="activeTab === 'kesehatan-data' && !props.item.kesehatan ? 'Tambah' : 'Ubah'"
         :on-edit-icon="activeTab === 'kesehatan-data' && !props.item.kesehatan ? Plus : Pencil"
     >
         <template #tabs>

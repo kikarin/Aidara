@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormFieldsSkeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast/useToast';
 import axios from 'axios';
@@ -69,7 +70,7 @@ onMounted(loadData);
                 <CardTitle>Parameter Umum</CardTitle>
             </CardHeader>
             <CardContent>
-                <div v-if="loading" class="text-muted-foreground py-8 text-center">Memuat data...</div>
+                <FormFieldsSkeleton v-if="loading" :fields="6" />
                 <div v-else>
                     <div v-if="parameters.length === 0" class="text-muted-foreground py-8 text-center">Tidak ada parameter umum di master data.</div>
                     <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2">

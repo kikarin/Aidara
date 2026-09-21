@@ -7,7 +7,8 @@ interface Prestasi {
     nama_event: string;
     tingkat?: { nama: string };
     tanggal?: string;
-    peringkat?: string;
+    juara?: string;
+    medali?: string;
     keterangan?: string;
     file_url?: string;
 }
@@ -37,7 +38,8 @@ const columns = [
         format: (row: Prestasi) =>
             row.tanggal ? new Date(row.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'numeric', year: 'numeric' }) : '-',
     },
-    { key: 'peringkat', label: 'Peringkat' },
+    { key: 'juara', label: 'Juara' },
+    { key: 'medali', label: 'Medali' },
     { key: 'keterangan', label: 'Keterangan' },
 ];
 </script>

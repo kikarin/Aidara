@@ -25,12 +25,12 @@ const actions = (row: any) => [
         permission: 'Mst Tingkat Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/data-master/tingkat/${row.id}/edit`),
         permission: 'Mst Tingkat Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Mst Tingkat Delete',
     },

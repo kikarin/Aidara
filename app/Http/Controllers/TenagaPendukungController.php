@@ -437,7 +437,7 @@ class TenagaPendukungController extends Controller implements HasMiddleware
      */
     public function karakteristik()
     {
-        return Inertia::render('modules/tenaga-pendukung/Karakteristik');
+        return redirect()->route('dashboard', ['statistik' => 'tenaga-pendukung']);
     }
 
     /**

@@ -42,6 +42,16 @@ class CheckRegistrationStatus
 
         // Daftar route yang diizinkan untuk user pending
         $allowedRoutes = [
+            // Registration steps routes
+            'registration.steps',
+            'registration.steps.1',
+            'registration.steps.submit',
+            'registration.steps.draft',
+            'registration.success',
+            // Email OTP routes
+            'email.otp.verify',
+            'email.otp.resend',
+            'email.otp.show',
             // Edit page peserta utama
             'atlet.edit',
             'pelatih.edit',

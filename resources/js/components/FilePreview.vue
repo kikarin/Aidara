@@ -24,7 +24,7 @@ function isPdf(url: string) {
                 <a :href="props.fileUrl" target="_blank" class="text-blue-600 underline">Lihat File PDF</a>
             </template>
             <template v-else>
-                <a :href="props.fileUrl" target="_blank" class="text-blue-600 underline">Download File</a>
+                <a :href="props.fileUrl" target="_blank" class="text-blue-600 underline">Unduh Berkas</a>
             </template>
         </template>
         <template v-else>

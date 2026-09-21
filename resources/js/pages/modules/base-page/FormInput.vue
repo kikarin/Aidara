@@ -37,6 +37,7 @@ const props = defineProps<{
         help?: string;
         options?: { value: string | number; label: string }[];
         showPassword?: { value: boolean };
+        disabled?: boolean;
     }[];
     initialData?: Record<string, any>;
     modelValue?: Record<string, any>;
@@ -236,6 +237,12 @@ const toggleMultiSelect = (fieldName: string) => {
     multiSelectOpen.value[fieldName] = !multiSelectOpen.value[fieldName];
 };
 
+const emitFieldUpdate = (fieldName: string) => {
+    const value = form[fieldName];
+    emit('field-updated', { field: fieldName, value });
+    emit('update:modelValue', form.data());
+};
+
 const selectMultiOption = (fieldName: string, value: string | number) => {
     const currentValues = form[fieldName] || [];
     if (currentValues.includes(value)) {
@@ -243,11 +250,13 @@ const selectMultiOption = (fieldName: string, value: string | number) => {
     } else {
         form[fieldName] = [...currentValues, value];
     }
+    emitFieldUpdate(fieldName);
 };
 
 const removeMultiOption = (fieldName: string, value: string | number) => {
     const currentValues = form[fieldName] || [];
     form[fieldName] = currentValues.filter((v: any) => v !== value);
+    emitFieldUpdate(fieldName);
 };
 
 const getSelectedLabels = (fieldName: string, options: { value: string | number; label: string }[]) => {
@@ -473,7 +482,7 @@ defineExpose({
         <!-- ALERT ERROR -->
         <Alert v-if="Object.keys(formErrors).length" variant="destructive" class="mb-4 shadow-none hover:shadow-none">
             <AlertCircle class="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
+            <AlertTitle>Kesalahan</AlertTitle>
             <AlertDescription>
                 <ul class="list-disc pl-5">
                     <li v-for="(msg, field) in formErrors" :key="field">{{ msg }}</li>
@@ -600,6 +609,7 @@ defineExpose({
                                                 } else {
                                                     form[input.name] = selected.filter((v: any) => v !== option.value);
                                                 }
+                                                emitFieldUpdate(input.name);
                                             }
                                         "
                                     />
@@ -655,17 +665,23 @@ defineExpose({
                             v-else-if="input.type === 'select'"
                             :required="input.required"
                             :model-value="form[input.name]"
+                            :disabled="input.disabled"
                             @update:modelValue="
                                 (val: any) => {
+                                    if (!input.disabled) {
                                     console.log(`FormInput: Select ${input.name} updated to:`, val);
                                     form[input.name] = val;
+                                    // Emit field-updated immediately
                                     emit('field-updated', { field: input.name, value: val });
+                                    // Also emit update:modelValue to sync with parent
+                                    emit('update:modelValue', form.data());
                                     console.log(`FormInput: Form data after select update:`, form.data());
+                                    }
                                 }
                             "
                             :key="`select-${input.name}-${JSON.stringify(input.options || [])}`"
                         >
-                            <SelectTrigger class="w-full">
+                            <SelectTrigger class="w-full" :disabled="input.disabled">
                                 <SelectValue :placeholder="input.placeholder" />
                             </SelectTrigger>
                             <SelectContent>
@@ -832,7 +848,7 @@ defineExpose({
                                 <a v-else :href="filePreview" target="_blank" class="flex items-center gap-2 text-blue-600 underline">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-gray-500"
+                                        class="h-5 w-5 text-muted-foreground"
                                         fill="none"
                                         viewBox="0 0 24 24"
                                         stroke="currentColor"
@@ -875,7 +891,7 @@ defineExpose({
             <div v-if="!hideButtons" class="grid grid-cols-1 items-center md:grid-cols-12">
                 <div class="hidden md:col-span-3 md:block"></div>
                 <div class="col-span-full md:col-span-9">
-                    <ButtonsForm :showSave="true" :showCancel="true" :saveText="saveText || 'Save'" @save="handleSubmit" @cancel="handleCancel" />
+                    <ButtonsForm :showSave="true" :showCancel="true" :saveText="saveText || 'Simpan'" @save="handleSubmit" @cancel="handleCancel" />
                 </div>
             </div>
         </form>

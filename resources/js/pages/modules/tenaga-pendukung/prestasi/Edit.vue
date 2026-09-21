@@ -11,7 +11,7 @@ const props = defineProps<{
 const breadcrumbs = computed(() => [
     { title: 'Tenaga Pendukung', href: '/tenaga-pendukung' },
     { title: 'Prestasi', href: `/tenaga-pendukung/${props.tenagaPendukungId}/prestasi` },
-    { title: 'Edit', href: `/tenaga-pendukung/${props.tenagaPendukungId}/prestasi/${props.item.id}/edit` },
+    { title: 'Ubah', href: `/tenaga-pendukung/${props.tenagaPendukungId}/prestasi/${props.item.id}/edit` },
 ]);
 
 const title = computed(() => `Edit Prestasi: ${props.item.nama_event || '-'}`);

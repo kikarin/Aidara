@@ -8,7 +8,7 @@ const props = defineProps<{ tenagaPendukungId: number }>();
 const breadcrumbs = computed(() => [
     { title: 'Tenaga Pendukung', href: '/tenaga-pendukung' },
     { title: 'Sertifikat', href: `/tenaga-pendukung/${props.tenagaPendukungId}/sertifikat` },
-    { title: 'Create', href: `/tenaga-pendukung/${props.tenagaPendukungId}/sertifikat/create` },
+    { title: 'Tambah', href: `/tenaga-pendukung/${props.tenagaPendukungId}/sertifikat/create` },
 ]);
 </script>
 

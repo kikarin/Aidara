@@ -19,13 +19,13 @@ const breadcrumbs = [
 const getTrendColor = (trend: string) => {
     switch (trend) {
         case 'stabil':
-            return 'bg-green-100 text-green-800';
+            return 'badge-success';
         case 'kenaikan':
-            return 'bg-yellow-100 text-yellow-800';
+            return 'badge-warning';
         case 'penurunan':
             return 'bg-red-100 text-red-800';
         default:
-            return 'bg-gray-100 text-gray-800';
+            return 'badge-muted';
     }
 };
 
@@ -47,7 +47,7 @@ const getTrendLabel = (trend: string) => {
     <Head title="Detail Parameter Pemeriksaan" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen space-y-4 bg-gray-100 p-4 dark:bg-neutral-950">
+        <div class="page-surface space-y-4 p-4">
             <!-- Header -->
             <div class="ml-1 flex items-center justify-between">
                 <div class="flex items-center gap-4">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppTabs from '@/components/AppTabs.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast/useToast';
@@ -13,10 +14,11 @@ import { computed, onMounted, ref, watch } from 'vue';
 
 const props = defineProps<{ atletId: number }>();
 const { toast } = useToast();
-const page = usePage();
+const pageInertia = usePage();
+const page = ref(1);
 
 // Ambil user registration_status dari props
-const user = computed(() => (page.props as any)?.auth?.user);
+const user = computed(() => (pageInertia.props as any)?.auth?.user);
 const registrationStatus = computed(() => user.value?.registration_status);
 const isPendingRegistration = computed(() => registrationStatus.value === 'pending');
 
@@ -34,7 +36,8 @@ const columns = [
         format: (row: any) =>
             row.tanggal ? new Date(row.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'numeric', year: 'numeric' }) : '-',
     },
-    { key: 'peringkat', label: 'Peringkat' },
+    { key: 'juara', label: 'Juara' },
+    { key: 'medali', label: 'Medali' },
     { key: 'keterangan', label: 'Keterangan' },
 ];
 
@@ -45,6 +48,26 @@ const loading = ref(false);
 const search = ref('');
 const perPage = ref(10);
 const sort = ref<{ key: string; order: 'asc' | 'desc' }>({ key: '', order: 'asc' });
+
+// Total medali
+const totalMedali = computed(() => {
+    const medali = {
+        Emas: 0,
+        Perak: 0,
+        Perunggu: 0,
+    };
+    
+    rows.value.forEach((row: any) => {
+        if (row.medali && row.medali !== '-') {
+            const medaliType = row.medali as keyof typeof medali;
+            if (medali[medaliType] !== undefined) {
+                medali[medaliType]++;
+            }
+        }
+    });
+    
+    return medali;
+});
 const handleSearchDebounced = debounce((val: string) => {
     search.value = val;
     fetchData();
@@ -105,12 +128,12 @@ const actions = (row: any) => [
         permission: 'Atlet Prestasi Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/atlet/${props.atletId}/prestasi/${row.id}/edit`),
         permission: 'Atlet Prestasi Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => handleDeleteRow(row),
         permission: 'Atlet Prestasi Delete',
     },
@@ -166,12 +189,6 @@ const tabsConfig = computed(() => {
             label: 'Atlet',
             onClick: () => router.visit(`/atlet/${props.atletId}/edit?tab=atlet-data`),
             allowedForPending: true, // Data diri bisa diakses
-        },
-        {
-            value: 'parameter-umum-data',
-            label: 'Parameter Umum',
-            onClick: () => router.visit(`/atlet/${props.atletId}/edit?tab=parameter-umum-data`),
-            allowedForPending: false, // TIDAK bisa diakses untuk pending
         },
         {
             value: 'orang-tua-data',
@@ -243,7 +260,7 @@ const idsToDelete = ref<number[]>([]);
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen w-full bg-gray-100 dark:bg-neutral-950">
+        <div class="page-surface">
             <div class="container mx-auto">
                 <div class="mx-auto px-4 py-4">
                     <!-- Tabs -->
@@ -258,9 +275,25 @@ const idsToDelete = ref<number[]>([]);
                         :selected="selected"
                         :on-delete-selected="deleteSelected"
                     />
+                    
+                    <!-- Total Medali -->
+                    <div v-if="rows.length > 0" class="mt-4 flex items-center gap-4 rounded-lg border bg-card p-4">
+                        <div class="text-sm font-medium text-muted-foreground">Total Medali:</div>
+                        <div class="flex items-center gap-2">
+                            <Badge variant="default" class="gap-1">
+                                🥇 {{ totalMedali.Emas }}
+                            </Badge>
+                            <Badge variant="secondary" class="gap-1">
+                                🥈 {{ totalMedali.Perak }}
+                            </Badge>
+                            <Badge variant="outline" class="gap-1">
+                                🥉 {{ totalMedali.Perunggu }}
+                            </Badge>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="mx-4 rounded-xl bg-white pt-4 shadow dark:bg-neutral-900">
+                <div class="content-panel mx-4 pt-4">
                     <DataTable
                         :columns="columns"
                         :rows="rows"

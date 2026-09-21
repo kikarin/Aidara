@@ -26,7 +26,7 @@ const columns = [
                     <img src="${row.foto_url}" alt="Foto ${row.nama}" class="h-16 w-16 rounded object-cover border hover:shadow-md transition-shadow" />
                 </div>`;
             }
-            return '<div class="h-16 w-16 bg-gray-200 rounded flex items-center justify-center text-gray-500 text-xs">-</div>';
+            return '<div class="flex h-16 w-16 items-center justify-center rounded bg-muted text-xs text-muted-foreground">-</div>';
         },
     },
     { key: 'cabor_kategori_nama', label: 'Cabor Kategori', orderable: false },
@@ -82,12 +82,12 @@ const actions = (row: any) => [
         permission: 'Turnamen Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/turnamen/${row.id}/edit`),
         permission: 'Turnamen Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Turnamen Delete',
     },
@@ -210,19 +210,19 @@ const triggerDatePicker = (fieldId: string) => {
                         {
                             label: 'Atlet',
                             value: row.peserta_counts?.atlet || 0,
-                            colorClass: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
+                            colorClass: 'stat-chip stat-chip-atlet hover:opacity-90',
                             onClick: () => router.visit(`/turnamen/${row.id}/peserta?jenis_peserta=atlet`),
                         },
                         {
                             label: 'Pelatih',
                             value: row.peserta_counts?.pelatih || 0,
-                            colorClass: 'bg-green-100 text-green-800 hover:bg-green-200',
+                            colorClass: 'stat-chip stat-chip-pelatih hover:opacity-90',
                             onClick: () => router.visit(`/turnamen/${row.id}/peserta?jenis_peserta=pelatih`),
                         },
                         {
                             label: 'Tenaga Pendukung',
                             value: row.peserta_counts?.tenaga_pendukung || 0,
-                            colorClass: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
+                            colorClass: 'stat-chip stat-chip-tenaga hover:opacity-90',
                             onClick: () => router.visit(`/turnamen/${row.id}/peserta?jenis_peserta=tenaga-pendukung`),
                         },
                     ]"
@@ -319,7 +319,7 @@ const triggerDatePicker = (fieldId: string) => {
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" @click="resetFilters"> Reset </Button>
+                    <Button variant="outline" @click="resetFilters"> Atur Ulang </Button>
                     <Button @click="handleFilter(currentFilters)"> Terapkan Filter </Button>
                 </DialogFooter>
             </DialogContent>

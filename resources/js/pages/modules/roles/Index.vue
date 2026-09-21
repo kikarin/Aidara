@@ -12,8 +12,8 @@ const breadcrumbs = [
 
 const columns = [
     { key: 'name', label: 'Name', searchable: true, orderable: true, visible: true },
-    { key: 'init_page_login', label: 'Default Page', searchable: true, orderable: true, visible: true },
-    { key: 'is_allow_login', label: 'Can Login', searchable: false, orderable: true, visible: true },
+    { key: 'init_page_login', label: 'Halaman Default', searchable: true, orderable: true, visible: true },
+    { key: 'is_allow_login', label: 'Bisa Login', searchable: false, orderable: true, visible: true },
 ];
 
 const selected = ref<number[]>([]);
@@ -29,17 +29,17 @@ const actions = (row: any) => [
         permission: 'Role Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/menu-permissions/roles/${row.id}/edit`),
         permission: 'Role Edit',
     },
     {
-        label: 'Set Permissions',
+        label: 'Atur Izin',
         onClick: () => router.visit(`/menu-permissions/roles/set-permissions/${row.id}`),
         permission: 'Role Set Permission',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Role Delete',
     },

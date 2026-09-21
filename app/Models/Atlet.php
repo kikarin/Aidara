@@ -42,6 +42,9 @@ class Atlet extends Model implements HasMedia
         'kelurahan_id',
         'no_hp',
         'email',
+        'disabilitas',
+        'klasifikasi',
+        'iq',
         'is_active',
         'foto',
         'users_id',
@@ -176,6 +179,11 @@ class Atlet extends Model implements HasMedia
     public function kategoriAtlets()
     {
         return $this->kategoriPesertas();
+    }
+
+    public function absenProgramLatihan()
+    {
+        return $this->hasMany(ProgramLatihanAbsenAtlet::class, 'atlet_id');
     }
 
     /**

@@ -16,12 +16,14 @@ const kategoriPesertaOptions = ref<{ value: number; label: string }[]>([]);
 onMounted(async () => {
     try {
         const res = await axios.get('/api/kategori-peserta-list');
-        kategoriPesertaOptions.value = (res.data || []).map((item: { id: number; nama: string }) => ({
+        const kategoriData = Array.isArray(res.data) ? res.data : [];
+        kategoriPesertaOptions.value = kategoriData.map((item: { id: number; nama: string }) => ({
             value: item.id,
             label: item.nama,
         }));
     } catch (error) {
         console.error('Gagal mengambil data kategori peserta:', error);
+        kategoriPesertaOptions.value = [];
     }
 });
 
@@ -30,6 +32,7 @@ const formData = computed(() => {
         nama: props.initialData?.nama || '',
         deskripsi: props.initialData?.deskripsi || '',
         kategori_peserta_id: props.initialData?.kategori_peserta_id || '',
+        icon: props.initialData?.icon || '',
         id: props.initialData?.id || undefined,
     };
     return base;
@@ -42,6 +45,14 @@ const formInputs = computed(() => [
         type: 'text' as const,
         placeholder: 'Masukkan nama cabor',
         required: true,
+    },
+    {
+        name: 'icon',
+        label: 'Icon (FontAwesome)',
+        type: 'text' as const,
+        placeholder: 'Contoh: futbol, basketball, volleyball',
+        help: 'Masukkan class FontAwesome (tanpa fa- prefix, akan ditambahkan otomatis)',
+        required: false,
     },
     {
         name: 'kategori_peserta_id',
@@ -65,6 +76,7 @@ const handleSave = (form: any) => {
         nama: form.nama,
         deskripsi: form.deskripsi,
         kategori_peserta_id: form.kategori_peserta_id || null,
+        icon: form.icon || null,
     };
     if (props.mode === 'edit' && props.initialData?.id) {
         dataToSave.id = props.initialData.id;

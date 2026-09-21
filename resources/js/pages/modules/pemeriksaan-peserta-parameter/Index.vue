@@ -55,11 +55,11 @@ const columns = [
         key: 'trend',
         label: 'Trend',
         format: (row: any) => {
-            if (row.trend === 'stabil') return '<span class="px-2 py-1 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">Stabil</span>';
+            if (row.trend === 'stabil') return '<span class="stat-chip stat-chip-atlet">Stabil</span>';
             if (row.trend === 'penurunan')
                 return '<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Penurunan</span>';
             if (row.trend === 'kenaikan')
-                return '<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Kenaikan</span>';
+                return '<span class="badge-success">Kenaikan</span>';
             return row.trend;
         },
     },
@@ -74,13 +74,13 @@ const actions = (row: any) => [
             router.visit(`/pemeriksaan/${props.pemeriksaan.id}/peserta/${props.peserta.id}/parameter/${row.id}?jenis_peserta=${jenisPeserta.value}`),
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () =>
             router.visit(
                 `/pemeriksaan/${props.pemeriksaan.id}/peserta/${props.peserta.id}/parameter/${row.id}/edit?jenis_peserta=${jenisPeserta.value}`,
             ),
     },
-    { label: 'Delete', onClick: () => handleDeleteRow(row) },
+    { label: 'Hapus', onClick: () => handleDeleteRow(row) },
 ];
 
 const pageIndex = ref();

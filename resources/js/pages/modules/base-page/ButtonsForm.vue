@@ -14,8 +14,8 @@ const emit = defineEmits(['save', 'cancel']);
 <template>
     <div class="mt-4 flex justify-end gap-2">
         <Button v-if="showSave !== false" type="button" variant="default" :disabled="saveDisabled" @click="emit('save')">
-            {{ saveText || 'Save' }}
+            {{ saveText || 'Simpan' }}
         </Button>
-        <Button v-if="showCancel !== false" type="button" variant="outline" @click="emit('cancel')"> Cancel </Button>
+        <Button v-if="showCancel !== false" type="button" variant="outline" @click="emit('cancel')"> Batal </Button>
     </div>
 </template>
