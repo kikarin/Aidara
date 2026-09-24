@@ -2,11 +2,11 @@
 import AppImage from '@/components/AppImage.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { CalendarOff, ClipboardList, LayoutDashboard, LogOut, Settings2 } from 'lucide-vue-next';
+import { Building2, CalendarOff, ClipboardList, LayoutDashboard, LogOut, Settings2 } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 defineProps<{
-    active?: 'dashboard' | 'bookings' | 'settings' | 'closures';
+    active?: 'dashboard' | 'bookings' | 'settings' | 'closures' | 'venues';
 }>();
 
 const page = usePage();
@@ -53,6 +53,7 @@ const navItems = [
     { key: 'dashboard' as const, label: 'Ringkasan', href: () => route('e-booking.admin.dashboard'), icon: LayoutDashboard },
     { key: 'bookings' as const, label: 'Pengajuan', href: () => route('e-booking.admin.bookings.index'), icon: ClipboardList },
     { key: 'closures' as const, label: 'Blok jadwal', href: () => route('e-booking.admin.closures.index'), icon: CalendarOff },
+    { key: 'venues' as const, label: 'Venue', href: () => route('e-booking.admin.venues.index'), icon: Building2 },
     { key: 'settings' as const, label: 'Pengaturan', href: () => route('e-booking.admin.settings'), icon: Settings2 },
 ];
 </script>
@@ -112,11 +113,7 @@ const navItems = [
                     </div>
 
                     <!-- Progress bar saat navigasi Inertia -->
-                    <div
-                        v-if="isNavigating"
-                        class="mt-3 h-1 overflow-hidden rounded-full bg-slate-100"
-                        aria-hidden="true"
-                    >
+                    <div v-if="isNavigating" class="mt-3 h-1 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
                         <div class="h-full w-1/3 animate-pulse rounded-full bg-sky-500" />
                     </div>
                 </div>

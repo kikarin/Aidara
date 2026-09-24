@@ -38,6 +38,7 @@ use App\Http\Controllers\Booking\Web\Admin\BookingController as EBookingAdminBoo
 use App\Http\Controllers\Booking\Web\Admin\ClosureController as EBookingAdminClosureController;
 use App\Http\Controllers\Booking\Web\Admin\DashboardController as EBookingAdminDashboardController;
 use App\Http\Controllers\Booking\Web\Admin\SettingsController as EBookingAdminSettingsController;
+use App\Http\Controllers\Booking\Web\Admin\VenueController as EBookingAdminVenueController;
 use App\Http\Controllers\Booking\Web\AuthController as EBookingAuthController;
 use App\Http\Controllers\Booking\Web\BookingController as EBookingBookingController;
 use App\Http\Controllers\Booking\Web\CatalogController as EBookingCatalogController;
@@ -181,6 +182,45 @@ Route::middleware(['booking.web:admin_upt'])->prefix('booking/admin')->group(fun
     Route::delete('/closures/{id}', [EBookingAdminClosureController::class, 'destroy'])
         ->whereNumber('id')
         ->name('e-booking.admin.closures.destroy');
+
+    Route::get('/venues', [EBookingAdminVenueController::class, 'index'])->name('e-booking.admin.venues.index');
+    Route::get('/venues/new', [EBookingAdminVenueController::class, 'create'])->name('e-booking.admin.venues.create');
+    Route::post('/venues', [EBookingAdminVenueController::class, 'store'])->name('e-booking.admin.venues.store');
+    Route::get('/venues/{id}', [EBookingAdminVenueController::class, 'show'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.show');
+    Route::get('/venues/{id}/edit', [EBookingAdminVenueController::class, 'edit'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.edit');
+    Route::put('/venues/{id}', [EBookingAdminVenueController::class, 'update'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.update');
+    Route::post('/venues/{id}/toggle', [EBookingAdminVenueController::class, 'toggle'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.toggle');
+    Route::post('/venues/{id}/cover', [EBookingAdminVenueController::class, 'uploadCover'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.cover');
+
+    Route::post('/venues/{venueId}/areas', [EBookingAdminVenueController::class, 'storeArea'])
+        ->whereNumber('venueId')
+        ->name('e-booking.admin.areas.store');
+    Route::put('/areas/{id}', [EBookingAdminVenueController::class, 'updateArea'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.areas.update');
+    Route::post('/areas/{id}/toggle', [EBookingAdminVenueController::class, 'toggleArea'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.areas.toggle');
+
+    Route::post('/venues/{venueId}/tarifs', [EBookingAdminVenueController::class, 'storeTarif'])
+        ->whereNumber('venueId')
+        ->name('e-booking.admin.tarifs.store');
+    Route::put('/tarifs/{id}', [EBookingAdminVenueController::class, 'updateTarif'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.tarifs.update');
+    Route::post('/tarifs/{id}/toggle', [EBookingAdminVenueController::class, 'toggleTarif'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.tarifs.toggle');
 });
 Route::middleware('throttle:60,1')->group(function () {
     Route::get('/api/worldcup/preview', [WorldCupController::class, 'preview'])->name('worldcup.preview');
