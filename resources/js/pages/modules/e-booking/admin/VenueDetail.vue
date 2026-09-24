@@ -2,14 +2,17 @@
 import AppImage from '@/components/AppImage.vue';
 import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
+import TimeField from '@/components/TimeField.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import SimpleSelect from '@/components/ui/select/SimpleSelect.vue';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, LoaderCircle, Plus } from 'lucide-vue-next';
+import { ArrowLeft, LoaderCircle, Plus, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 type Venue = {
@@ -29,6 +32,7 @@ type AreaRow = {
     is_active: boolean;
     sort_order: number;
 };
+type AreaOption = { id: number; code: string; name: string };
 type TarifRow = {
     id: number;
     area_id: number | null;
@@ -41,7 +45,16 @@ type TarifRow = {
     time_slot: string | null;
     event_level: string | null;
     category: string | null;
+    min_hours: number | null;
+    max_hours: number | null;
     is_active: boolean;
+};
+type RuleRow = {
+    id: number;
+    key: string;
+    value: unknown;
+    is_active: boolean;
+    description: string | null;
 };
 
 type Paginator<T> = {
@@ -55,7 +68,10 @@ type Paginator<T> = {
 const props = defineProps<{
     venue: Venue;
     areas: Paginator<AreaRow>;
+    allAreas: AreaOption[];
     tarifs: Paginator<TarifRow>;
+    rules: Record<string, unknown>;
+    ruleList: RuleRow[];
     options: { satuan: string[]; categories: string[] };
 }>();
 
@@ -79,9 +95,10 @@ const categoryLabels: Record<string, string> = {
 
 const satuanOptions = computed(() => props.options.satuan.map((v) => ({ value: v, label: satuanLabels[v] ?? v })));
 const categoryOptions = computed(() => props.options.categories.map((v) => ({ value: v, label: categoryLabels[v] ?? v })));
+const AREA_NONE = '__none__';
 const areaOptions = computed(() => [
-    { value: '', label: '— Tanpa area (level venue)' },
-    ...props.areas.data.map((a) => ({ value: String(a.id), label: a.name })),
+    { value: AREA_NONE, label: '— Semua area (level venue)' },
+    ...props.allAreas.map((a) => ({ value: String(a.id), label: a.name })),
 ]);
 
 const formatRupiah = (value: number | null) => (value === null || value === undefined ? '—' : new Intl.NumberFormat('id-ID').format(value));
@@ -119,10 +136,7 @@ const resetAreaForm = () => {
 };
 
 const submitArea = () => {
-    const options = {
-        preserveScroll: true,
-        onSuccess: () => resetAreaForm(),
-    };
+    const options = { preserveScroll: true, onSuccess: () => resetAreaForm() };
 
     if (areaEditingId.value) {
         areaForm.put(route('e-booking.admin.areas.update', areaEditingId.value), options);
@@ -147,9 +161,11 @@ const tarifForm = useForm<{
     time_slot: string;
     event_level: string;
     category: string;
+    min_hours: number | string;
+    max_hours: number | string;
     is_active: boolean;
 }>({
-    area_id: '',
+    area_id: AREA_NONE,
     code: '',
     uraian: '',
     satuan: props.options.satuan[0] ?? 'per_hour',
@@ -158,13 +174,15 @@ const tarifForm = useForm<{
     time_slot: '',
     event_level: '',
     category: 'olahraga',
+    min_hours: '',
+    max_hours: '',
     is_active: true,
 });
 
 const startEditTarif = (row: TarifRow) => {
     tarifEditingId.value = row.id;
     tarifForm.clearErrors();
-    tarifForm.area_id = row.area_id ? String(row.area_id) : '';
+    tarifForm.area_id = row.area_id ? String(row.area_id) : AREA_NONE;
     tarifForm.code = row.code ?? '';
     tarifForm.uraian = row.uraian;
     tarifForm.satuan = row.satuan;
@@ -173,6 +191,8 @@ const startEditTarif = (row: TarifRow) => {
     tarifForm.time_slot = row.time_slot ?? '';
     tarifForm.event_level = row.event_level ?? '';
     tarifForm.category = row.category ?? 'olahraga';
+    tarifForm.min_hours = row.min_hours ?? '';
+    tarifForm.max_hours = row.max_hours ?? '';
     tarifForm.is_active = row.is_active;
 };
 
@@ -185,18 +205,17 @@ const resetTarifForm = () => {
 const submitTarif = () => {
     const transform = (data: ReturnType<typeof tarifForm.data>) => ({
         ...data,
-        area_id: data.area_id ? Number(data.area_id) : null,
+        area_id: data.area_id && data.area_id !== AREA_NONE ? Number(data.area_id) : null,
         tarif_pemerintah: data.tarif_pemerintah === '' ? null : Number(data.tarif_pemerintah),
         tarif_non_pemerintah: data.tarif_non_pemerintah === '' ? null : Number(data.tarif_non_pemerintah),
+        min_hours: data.min_hours === '' ? null : Number(data.min_hours),
+        max_hours: data.max_hours === '' ? null : Number(data.max_hours),
         code: data.code || null,
         time_slot: data.time_slot || null,
         event_level: data.event_level || null,
     });
 
-    const options = {
-        preserveScroll: true,
-        onSuccess: () => resetTarifForm(),
-    };
+    const options = { preserveScroll: true, onSuccess: () => resetTarifForm() };
 
     if (tarifEditingId.value) {
         tarifForm.transform(transform).put(route('e-booking.admin.tarifs.update', tarifEditingId.value), options);
@@ -208,6 +227,131 @@ const submitTarif = () => {
 const toggleTarif = (row: TarifRow) => {
     router.post(route('e-booking.admin.tarifs.toggle', row.id), {}, { preserveScroll: true });
 };
+
+/* ---------- Aturan ---------- */
+const days = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
+
+const toggleInArray = (arr: string[], value: string, checked: boolean) => {
+    const index = arr.indexOf(value);
+    if (checked && index === -1) arr.push(value);
+    if (!checked && index > -1) arr.splice(index, 1);
+};
+
+const asStr = (value: unknown) => (value === null || value === undefined ? '' : String(value));
+const asNum = (value: unknown): number | string => (value === null || value === undefined || value === '' ? '' : Number(value));
+
+type RuleForm = {
+    operating_start: string;
+    operating_end: string;
+    operating_timezone: string;
+    operating_days: string[];
+    booking_horizon_days: number | string;
+    buffer_before_days: number | string;
+    buffer_after_days: number | string;
+    cancel_deadline: string;
+    cancel_on_day_h: string;
+    allow_same_day_reschedule: boolean;
+    allow_same_day_court_change: boolean;
+    force_majeure_rain_before_play: string;
+    force_majeure_rain_after_play_minutes: number | string;
+    force_majeure_rain_after_play_decision: string;
+    tentative_areas: string[];
+    tentative_priority: string;
+    terms_key: string;
+    prefer_booking_on_weekday: string;
+    advance_payment_required: boolean;
+    early_arrival_minutes_min: number | string;
+    early_arrival_minutes_max: number | string;
+    leave_court_after_minutes: number | string;
+    adjacent_empty_court_counts_as_rental: boolean;
+};
+
+const operatingHours = computed(() => (props.rules.operating_hours ?? {}) as { start?: string; end?: string; timezone?: string });
+
+const ruleForm = useForm<RuleForm>({
+    operating_start: asStr(operatingHours.value.start ?? '06:00'),
+    operating_end: asStr(operatingHours.value.end ?? '21:00'),
+    operating_timezone: asStr(operatingHours.value.timezone ?? 'Asia/Jakarta'),
+    operating_days: (props.rules.operating_days as string[] | undefined) ?? days,
+    booking_horizon_days: asNum(props.rules.booking_horizon_days),
+    buffer_before_days: asNum(props.rules.buffer_before_days),
+    buffer_after_days: asNum(props.rules.buffer_after_days),
+    cancel_deadline: asStr(props.rules.cancel_deadline),
+    cancel_on_day_h: asStr(props.rules.cancel_on_day_h),
+    allow_same_day_reschedule: Boolean(props.rules.allow_same_day_reschedule ?? false),
+    allow_same_day_court_change: Boolean(props.rules.allow_same_day_court_change ?? false),
+    force_majeure_rain_before_play: asStr(props.rules.force_majeure_rain_before_play),
+    force_majeure_rain_after_play_minutes: asNum(props.rules.force_majeure_rain_after_play_minutes),
+    force_majeure_rain_after_play_decision: asStr(props.rules.force_majeure_rain_after_play_decision),
+    tentative_areas: (props.rules.tentative_areas as string[] | undefined) ?? [],
+    tentative_priority: asStr(props.rules.tentative_priority),
+    terms_key: asStr(props.rules.terms_key),
+    prefer_booking_on_weekday: asStr(props.rules.prefer_booking_on_weekday),
+    advance_payment_required: Boolean(props.rules.advance_payment_required ?? true),
+    early_arrival_minutes_min: asNum(props.rules.early_arrival_minutes_min),
+    early_arrival_minutes_max: asNum(props.rules.early_arrival_minutes_max),
+    leave_court_after_minutes: asNum(props.rules.leave_court_after_minutes),
+    adjacent_empty_court_counts_as_rental: Boolean(props.rules.adjacent_empty_court_counts_as_rental ?? true),
+});
+
+const toInt = (value: number | string) => (value === '' ? null : Number(value));
+
+const submitRules = () => {
+    const rules = {
+        operating_hours: {
+            start: ruleForm.operating_start,
+            end: ruleForm.operating_end,
+            timezone: ruleForm.operating_timezone,
+        },
+        operating_days: ruleForm.operating_days,
+        booking_horizon_days: toInt(ruleForm.booking_horizon_days),
+        buffer_before_days: toInt(ruleForm.buffer_before_days),
+        buffer_after_days: toInt(ruleForm.buffer_after_days),
+        cancel_deadline: ruleForm.cancel_deadline || null,
+        cancel_on_day_h: ruleForm.cancel_on_day_h || null,
+        allow_same_day_reschedule: ruleForm.allow_same_day_reschedule,
+        allow_same_day_court_change: ruleForm.allow_same_day_court_change,
+        force_majeure_rain_before_play: ruleForm.force_majeure_rain_before_play || null,
+        force_majeure_rain_after_play_minutes: toInt(ruleForm.force_majeure_rain_after_play_minutes),
+        force_majeure_rain_after_play_decision: ruleForm.force_majeure_rain_after_play_decision || null,
+        tentative_areas: ruleForm.tentative_areas,
+        tentative_priority: ruleForm.tentative_priority || null,
+        terms_key: ruleForm.terms_key || null,
+        prefer_booking_on_weekday: ruleForm.prefer_booking_on_weekday || null,
+        advance_payment_required: ruleForm.advance_payment_required,
+        early_arrival_minutes_min: toInt(ruleForm.early_arrival_minutes_min),
+        early_arrival_minutes_max: toInt(ruleForm.early_arrival_minutes_max),
+        leave_court_after_minutes: toInt(ruleForm.leave_court_after_minutes),
+        adjacent_empty_court_counts_as_rental: ruleForm.adjacent_empty_court_counts_as_rental,
+    };
+
+    ruleForm
+        .transform(() => ({ rules }))
+        .put(route('e-booking.admin.venues.rules.update', props.venue.id), {
+            preserveScroll: true,
+            onFinish: () => ruleForm.transform((data) => data),
+        });
+};
+
+const newRuleForm = useForm<{ key: string; value: string; is_active: boolean }>({
+    key: '',
+    value: '',
+    is_active: true,
+});
+
+const addRule = () => {
+    newRuleForm.post(route('e-booking.admin.venues.rules.store', props.venue.id), {
+        preserveScroll: true,
+        onSuccess: () => newRuleForm.reset(),
+    });
+};
+
+const removeRule = (id: number) => {
+    if (!confirm('Hapus aturan ini?')) return;
+    router.delete(route('e-booking.admin.rules.destroy', id), { preserveScroll: true });
+};
+
+const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '—'));
 </script>
 
 <template>
@@ -242,6 +386,7 @@ const toggleTarif = (row: TarifRow) => {
             <TabsList>
                 <TabsTrigger value="area">Area ({{ areas.total }})</TabsTrigger>
                 <TabsTrigger value="tarif">Tarif ({{ tarifs.total }})</TabsTrigger>
+                <TabsTrigger value="aturan">Aturan</TabsTrigger>
             </TabsList>
 
             <TabsContent value="area" class="mt-4">
@@ -274,11 +419,11 @@ const toggleTarif = (row: TarifRow) => {
                     </div>
                     <div class="flex items-center gap-4">
                         <label class="flex items-center gap-2 text-sm font-medium">
-                            <input v-model="areaForm.is_tentative" type="checkbox" class="size-4" />
+                            <Checkbox v-model="areaForm.is_tentative" />
                             Tentatif
                         </label>
                         <label class="flex items-center gap-2 text-sm font-medium">
-                            <input v-model="areaForm.is_active" type="checkbox" class="size-4" />
+                            <Checkbox v-model="areaForm.is_active" />
                             Aktif
                         </label>
                     </div>
@@ -291,53 +436,47 @@ const toggleTarif = (row: TarifRow) => {
                     </div>
                 </form>
 
-                <div class="mt-4 overflow-x-auto">
-                    <table class="w-full min-w-[560px] text-left text-sm">
-                        <thead class="border-border text-muted-foreground border-b">
-                            <tr>
-                                <th class="py-2 pr-3 font-medium">Nama</th>
-                                <th class="py-2 pr-3 font-medium">Kode</th>
-                                <th class="py-2 pr-3 font-medium">Tentatif</th>
-                                <th class="py-2 pr-3 font-medium">Status</th>
-                                <th class="py-2 font-medium"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="row in areas.data" :key="row.id" class="border-border/60 border-b">
-                                <td class="py-3 pr-3 font-medium">{{ row.name }}</td>
-                                <td class="py-3 pr-3">
-                                    <code class="text-xs">{{ row.code }}</code>
-                                </td>
-                                <td class="py-3 pr-3">{{ row.is_tentative ? 'Ya' : '—' }}</td>
-                                <td class="py-3 pr-3">
-                                    <Badge :variant="row.is_active ? 'default' : 'secondary'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
-                                </td>
-                                <td class="py-3 text-right">
-                                    <div class="flex justify-end gap-2">
-                                        <button
-                                            type="button"
-                                            class="text-xs font-semibold text-slate-600 hover:underline"
-                                            @click="startEditArea(row)"
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="text-xs font-semibold hover:underline"
-                                            :class="row.is_active ? 'text-red-600' : 'text-emerald-700'"
-                                            @click="toggleArea(row)"
-                                        >
-                                            {{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr v-if="areas.data.length === 0">
-                                <td colspan="5" class="text-muted-foreground py-8 text-center">Belum ada area.</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <Table class="mt-4 min-w-[560px]">
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Nama</TableHead>
+                            <TableHead>Kode</TableHead>
+                            <TableHead>Tentatif</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow v-for="row in areas.data" :key="row.id">
+                            <TableCell class="font-medium">{{ row.name }}</TableCell>
+                            <TableCell>
+                                <code class="text-xs">{{ row.code }}</code>
+                            </TableCell>
+                            <TableCell>{{ row.is_tentative ? 'Ya' : '—' }}</TableCell>
+                            <TableCell>
+                                <Badge :variant="row.is_active ? 'default' : 'secondary'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
+                            </TableCell>
+                            <TableCell class="text-right">
+                                <div class="flex justify-end gap-2">
+                                    <button type="button" class="text-xs font-semibold text-slate-600 hover:underline" @click="startEditArea(row)">
+                                        Edit
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="text-xs font-semibold hover:underline"
+                                        :class="row.is_active ? 'text-red-600' : 'text-emerald-700'"
+                                        @click="toggleArea(row)"
+                                    >
+                                        {{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
+                                    </button>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow v-if="areas.data.length === 0">
+                            <TableCell colspan="5" class="text-muted-foreground py-8 text-center">Belum ada area.</TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
 
                 <div v-if="areas.links?.length > 3" class="mt-4 flex flex-wrap gap-2">
                     <template v-for="(link, i) in areas.links" :key="i">
@@ -387,14 +526,24 @@ const toggleTarif = (row: TarifRow) => {
                         <InputError :message="tarifForm.errors.category" />
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium">Tarif pemerintah</label>
+                        <label class="mb-1.5 block text-sm font-medium">Tarif instansi pemerintah</label>
                         <Input v-model="tarifForm.tarif_pemerintah" type="number" min="0" placeholder="0" />
                         <InputError :message="tarifForm.errors.tarif_pemerintah" />
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium">Tarif non-pemerintah</label>
+                        <label class="mb-1.5 block text-sm font-medium">Tarif umum / non-pemerintah</label>
                         <Input v-model="tarifForm.tarif_non_pemerintah" type="number" min="0" placeholder="0" />
                         <InputError :message="tarifForm.errors.tarif_non_pemerintah" />
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium">Min jam (opsional)</label>
+                        <Input v-model="tarifForm.min_hours" type="number" min="1" max="24" placeholder="—" />
+                        <InputError :message="tarifForm.errors.min_hours" />
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium">Max jam (opsional)</label>
+                        <Input v-model="tarifForm.max_hours" type="number" min="1" max="24" placeholder="—" />
+                        <InputError :message="tarifForm.errors.max_hours" />
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium">Kode (opsional)</label>
@@ -412,7 +561,7 @@ const toggleTarif = (row: TarifRow) => {
                         <InputError :message="tarifForm.errors.event_level" />
                     </div>
                     <div class="flex items-center gap-2">
-                        <input id="tarif-active" v-model="tarifForm.is_active" type="checkbox" class="size-4" />
+                        <Checkbox id="tarif-active" v-model="tarifForm.is_active" />
                         <label for="tarif-active" class="text-sm font-medium">Aktif</label>
                     </div>
                     <div class="sm:col-span-2">
@@ -424,60 +573,59 @@ const toggleTarif = (row: TarifRow) => {
                     </div>
                 </form>
 
-                <div class="mt-4 overflow-x-auto">
-                    <table class="w-full min-w-[760px] text-left text-sm">
-                        <thead class="border-border text-muted-foreground border-b">
-                            <tr>
-                                <th class="py-2 pr-3 font-medium">Uraian</th>
-                                <th class="py-2 pr-3 font-medium">Area</th>
-                                <th class="py-2 pr-3 font-medium">Satuan</th>
-                                <th class="py-2 pr-3 font-medium">Pemerintah</th>
-                                <th class="py-2 pr-3 font-medium">Non-pem.</th>
-                                <th class="py-2 pr-3 font-medium">Status</th>
-                                <th class="py-2 font-medium"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="row in tarifs.data" :key="row.id" class="border-border/60 border-b">
-                                <td class="py-3 pr-3">
-                                    <p class="font-medium">{{ row.uraian }}</p>
-                                    <p class="text-muted-foreground text-xs">
-                                        {{ row.category ? (categoryLabels[row.category] ?? row.category) : '—' }}
-                                    </p>
-                                </td>
-                                <td class="py-3 pr-3">{{ row.area_name || 'Venue' }}</td>
-                                <td class="py-3 pr-3">{{ satuanLabels[row.satuan] ?? row.satuan }}</td>
-                                <td class="py-3 pr-3 whitespace-nowrap">{{ formatRupiah(row.tarif_pemerintah) }}</td>
-                                <td class="py-3 pr-3 whitespace-nowrap">{{ formatRupiah(row.tarif_non_pemerintah) }}</td>
-                                <td class="py-3 pr-3">
-                                    <Badge :variant="row.is_active ? 'default' : 'secondary'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
-                                </td>
-                                <td class="py-3 text-right">
-                                    <div class="flex justify-end gap-2">
-                                        <button
-                                            type="button"
-                                            class="text-xs font-semibold text-slate-600 hover:underline"
-                                            @click="startEditTarif(row)"
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="text-xs font-semibold hover:underline"
-                                            :class="row.is_active ? 'text-red-600' : 'text-emerald-700'"
-                                            @click="toggleTarif(row)"
-                                        >
-                                            {{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr v-if="tarifs.data.length === 0">
-                                <td colspan="7" class="text-muted-foreground py-8 text-center">Belum ada tarif.</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <Table class="mt-4 min-w-[820px]">
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Uraian</TableHead>
+                            <TableHead>Area</TableHead>
+                            <TableHead>Satuan</TableHead>
+                            <TableHead>Durasi</TableHead>
+                            <TableHead>Instansi</TableHead>
+                            <TableHead>Umum</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow v-for="row in tarifs.data" :key="row.id">
+                            <TableCell>
+                                <p class="font-medium">{{ row.uraian }}</p>
+                                <p class="text-muted-foreground text-xs">
+                                    {{ row.category ? (categoryLabels[row.category] ?? row.category) : '—' }}
+                                </p>
+                            </TableCell>
+                            <TableCell>{{ row.area_name || 'Venue' }}</TableCell>
+                            <TableCell>{{ satuanLabels[row.satuan] ?? row.satuan }}</TableCell>
+                            <TableCell class="whitespace-nowrap">
+                                <template v-if="row.min_hours || row.max_hours"> {{ row.min_hours ?? 1 }}–{{ row.max_hours ?? '∞' }} jam </template>
+                                <template v-else>—</template>
+                            </TableCell>
+                            <TableCell class="whitespace-nowrap">{{ formatRupiah(row.tarif_pemerintah) }}</TableCell>
+                            <TableCell class="whitespace-nowrap">{{ formatRupiah(row.tarif_non_pemerintah) }}</TableCell>
+                            <TableCell>
+                                <Badge :variant="row.is_active ? 'default' : 'secondary'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
+                            </TableCell>
+                            <TableCell class="text-right">
+                                <div class="flex justify-end gap-2">
+                                    <button type="button" class="text-xs font-semibold text-slate-600 hover:underline" @click="startEditTarif(row)">
+                                        Edit
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="text-xs font-semibold hover:underline"
+                                        :class="row.is_active ? 'text-red-600' : 'text-emerald-700'"
+                                        @click="toggleTarif(row)"
+                                    >
+                                        {{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
+                                    </button>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow v-if="tarifs.data.length === 0">
+                            <TableCell colspan="8" class="text-muted-foreground py-8 text-center">Belum ada tarif.</TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
 
                 <div v-if="tarifs.links?.length > 3" class="mt-4 flex flex-wrap gap-2">
                     <template v-for="(link, i) in tarifs.links" :key="i">
@@ -490,6 +638,210 @@ const toggleTarif = (row: TarifRow) => {
                             <span v-html="link.label" />
                         </Link>
                     </template>
+                </div>
+            </TabsContent>
+
+            <TabsContent value="aturan" class="mt-4">
+                <form class="space-y-6" @submit.prevent="submitRules">
+                    <section class="border-border grid gap-3 rounded-xl border p-4 sm:grid-cols-3">
+                        <h2 class="text-sm font-semibold sm:col-span-3">Jam & hari operasional</h2>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Jam buka</label>
+                            <TimeField v-model="ruleForm.operating_start" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Jam tutup</label>
+                            <TimeField v-model="ruleForm.operating_end" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Timezone</label>
+                            <Input v-model="ruleForm.operating_timezone" type="text" maxlength="64" placeholder="Asia/Jakarta" />
+                        </div>
+                        <div class="sm:col-span-3">
+                            <label class="mb-1.5 block text-sm font-medium">Hari operasional</label>
+                            <div class="flex flex-wrap gap-3">
+                                <label v-for="day in days" :key="day" class="flex items-center gap-1.5 text-sm capitalize">
+                                    <Checkbox
+                                        :model-value="ruleForm.operating_days.includes(day)"
+                                        @update:model-value="(value) => toggleInArray(ruleForm.operating_days, day, !!value)"
+                                    />
+                                    {{ day }}
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="border-border grid gap-3 rounded-xl border p-4 sm:grid-cols-3">
+                        <h2 class="text-sm font-semibold sm:col-span-3">Batas & buffer booking</h2>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Horizon booking (hari)</label>
+                            <Input v-model="ruleForm.booking_horizon_days" type="number" min="1" placeholder="Tanpa batas" />
+                            <p class="text-muted-foreground mt-1 text-xs">Kosongkan = tanpa batas.</p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Buffer sebelum (hari)</label>
+                            <Input v-model="ruleForm.buffer_before_days" type="number" min="0" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Buffer sesudah (hari)</label>
+                            <Input v-model="ruleForm.buffer_after_days" type="number" min="0" />
+                        </div>
+                    </section>
+
+                    <section class="border-border grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
+                        <h2 class="text-sm font-semibold sm:col-span-2">Kebijakan pembatalan & hujan</h2>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Batas batal</label>
+                            <Input v-model="ruleForm.cancel_deadline" type="text" maxlength="32" placeholder="H-1" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Batal hari H</label>
+                            <Input v-model="ruleForm.cancel_on_day_h" type="text" maxlength="32" placeholder="forfeited" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Hujan sebelum main</label>
+                            <Input v-model="ruleForm.force_majeure_rain_before_play" type="text" maxlength="32" placeholder="reschedule" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Ambang hujan (menit)</label>
+                            <Input v-model="ruleForm.force_majeure_rain_after_play_minutes" type="number" min="0" placeholder="20" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Keputusan setelah ambang</label>
+                            <Input
+                                v-model="ruleForm.force_majeure_rain_after_play_decision"
+                                type="text"
+                                maxlength="32"
+                                placeholder="no_compensation"
+                            />
+                        </div>
+                        <div class="flex flex-col gap-2 pt-6">
+                            <label class="flex items-center gap-2 text-sm font-medium">
+                                <Checkbox v-model="ruleForm.allow_same_day_reschedule" />
+                                Izinkan reschedule hari H
+                            </label>
+                            <label class="flex items-center gap-2 text-sm font-medium">
+                                <Checkbox v-model="ruleForm.allow_same_day_court_change" />
+                                Izinkan ganti lapangan hari H
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="border-border grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
+                        <h2 class="text-sm font-semibold sm:col-span-2">Lainnya</h2>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Key tata tertib</label>
+                            <Input v-model="ruleForm.terms_key" type="text" maxlength="96" placeholder="terms_tennis" />
+                            <p class="text-muted-foreground mt-1 text-xs">Kelola teks di menu Tata tertib.</p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Prefer hari booking</label>
+                            <Input v-model="ruleForm.prefer_booking_on_weekday" type="text" maxlength="16" placeholder="monday" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Tentative priority</label>
+                            <Input v-model="ruleForm.tentative_priority" type="text" maxlength="64" placeholder="kegiatan_pemerintah_daerah" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Datang lebih awal (min)</label>
+                            <Input v-model="ruleForm.early_arrival_minutes_min" type="number" min="0" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Datang lebih awal (max)</label>
+                            <Input v-model="ruleForm.early_arrival_minutes_max" type="number" min="0" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Keluar lapangan (menit)</label>
+                            <Input v-model="ruleForm.leave_court_after_minutes" type="number" min="0" />
+                        </div>
+                        <div class="flex flex-col gap-2 pt-6">
+                            <label class="flex items-center gap-2 text-sm font-medium">
+                                <Checkbox v-model="ruleForm.advance_payment_required" />
+                                Wajib bayar di muka
+                            </label>
+                            <label class="flex items-center gap-2 text-sm font-medium">
+                                <Checkbox v-model="ruleForm.adjacent_empty_court_counts_as_rental" />
+                                Lapangan sebelah kosong dihitung sewa
+                            </label>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="mb-1.5 block text-sm font-medium">Area tentatif</label>
+                            <div class="flex flex-wrap gap-3">
+                                <label v-for="area in allAreas" :key="area.id" class="flex items-center gap-1.5 text-sm">
+                                    <Checkbox
+                                        :model-value="ruleForm.tentative_areas.includes(area.code)"
+                                        @update:model-value="(value) => toggleInArray(ruleForm.tentative_areas, area.code, !!value)"
+                                    />
+                                    {{ area.name }}
+                                </label>
+                                <span v-if="allAreas.length === 0" class="text-muted-foreground text-sm">Belum ada area.</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="border-border bg-background/95 sticky bottom-0 z-10 flex items-center gap-2 border-t py-3 backdrop-blur">
+                        <Button type="submit" :disabled="ruleForm.processing">
+                            <LoaderCircle v-if="ruleForm.processing" class="size-4 animate-spin" />
+                            Simpan aturan
+                        </Button>
+                    </div>
+                </form>
+
+                <div class="mt-8">
+                    <h2 class="text-sm font-semibold">Aturan lanjutan (key-value)</h2>
+                    <Table class="mt-3 min-w-[640px]">
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Key</TableHead>
+                                <TableHead>Value</TableHead>
+                                <TableHead>Aktif</TableHead>
+                                <TableHead></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow v-for="row in ruleList" :key="row.id">
+                                <TableCell>
+                                    <code class="text-xs">{{ row.key }}</code>
+                                </TableCell>
+                                <TableCell class="text-muted-foreground max-w-[320px] break-all whitespace-normal">{{
+                                    ruleValueLabel(row.value)
+                                }}</TableCell>
+                                <TableCell>{{ row.is_active ? 'Ya' : 'Tidak' }}</TableCell>
+                                <TableCell class="text-right">
+                                    <button type="button" class="text-red-600 hover:opacity-70" title="Hapus" @click="removeRule(row.id)">
+                                        <Trash2 class="size-4" />
+                                    </button>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow v-if="ruleList.length === 0">
+                                <TableCell colspan="4" class="text-muted-foreground py-6 text-center">Belum ada aturan khusus venue.</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+
+                    <form class="border-border mt-4 grid gap-3 rounded-xl border p-4 sm:grid-cols-3" @submit.prevent="addRule">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Key</label>
+                            <Input v-model="newRuleForm.key" type="text" maxlength="96" placeholder="custom_key" />
+                            <InputError :message="newRuleForm.errors.key" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Value</label>
+                            <Input v-model="newRuleForm.value" type="text" placeholder="nilai" />
+                            <InputError :message="newRuleForm.errors.value" />
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <label class="flex items-center gap-2 pb-2 text-sm font-medium">
+                                <Checkbox v-model="newRuleForm.is_active" />
+                                Aktif
+                            </label>
+                            <Button type="submit" :disabled="newRuleForm.processing">
+                                <LoaderCircle v-if="newRuleForm.processing" class="size-4 animate-spin" />
+                                <Plus v-else class="size-4" />
+                                Tambah
+                            </Button>
+                        </div>
+                    </form>
                 </div>
             </TabsContent>
         </Tabs>

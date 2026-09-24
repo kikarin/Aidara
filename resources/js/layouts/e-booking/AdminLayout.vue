@@ -2,11 +2,23 @@
 import AppImage from '@/components/AppImage.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { Building2, CalendarOff, ClipboardList, LayoutDashboard, LogOut, Settings2 } from 'lucide-vue-next';
+import {
+    Building2,
+    CalendarOff,
+    ClipboardList,
+    FileText,
+    LayoutDashboard,
+    LayoutGrid,
+    ListOrdered,
+    LogOut,
+    Package,
+    ScrollText,
+    Settings2,
+} from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 defineProps<{
-    active?: 'dashboard' | 'bookings' | 'settings' | 'closures' | 'venues';
+    active?: 'dashboard' | 'bookings' | 'settings' | 'closures' | 'venues' | 'addons' | 'document-types' | 'facilities' | 'terms' | 'priority-rules';
 }>();
 
 const page = usePage();
@@ -54,6 +66,11 @@ const navItems = [
     { key: 'bookings' as const, label: 'Pengajuan', href: () => route('e-booking.admin.bookings.index'), icon: ClipboardList },
     { key: 'closures' as const, label: 'Blok jadwal', href: () => route('e-booking.admin.closures.index'), icon: CalendarOff },
     { key: 'venues' as const, label: 'Venue', href: () => route('e-booking.admin.venues.index'), icon: Building2 },
+    { key: 'addons' as const, label: 'Layanan', href: () => route('e-booking.admin.addons.index'), icon: Package },
+    { key: 'document-types' as const, label: 'Dokumen', href: () => route('e-booking.admin.document-types.index'), icon: FileText },
+    { key: 'facilities' as const, label: 'Fasilitas', href: () => route('e-booking.admin.facilities.index'), icon: LayoutGrid },
+    { key: 'terms' as const, label: 'Tata tertib', href: () => route('e-booking.admin.terms.index'), icon: ScrollText },
+    { key: 'priority-rules' as const, label: 'Prioritas', href: () => route('e-booking.admin.priority-rules.index'), icon: ListOrdered },
     { key: 'settings' as const, label: 'Pengaturan', href: () => route('e-booking.admin.settings'), icon: Settings2 },
 ];
 </script>

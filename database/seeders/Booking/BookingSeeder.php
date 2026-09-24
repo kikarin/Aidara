@@ -19,6 +19,7 @@ class BookingSeeder extends Seeder
             BookingSewaLahanSeeder::class,
             BookingRulesSeeder::class,
             BookingMetaSeeder::class,
+            BookingFacilitySeeder::class,
             BookingRoleSeeder::class,
             BookingUserSeeder::class,
         ]);

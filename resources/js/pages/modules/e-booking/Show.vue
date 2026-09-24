@@ -60,9 +60,7 @@ const bookingAuth = computed(() => page.props.bookingAuth as { name: string; ema
 
 const fromOldAddonIds = () => {
     const raw = props.oldForm?.addon_ids ?? [];
-    return raw
-        .map((item) => (typeof item === 'number' ? item : item?.id))
-        .filter((id): id is number => typeof id === 'number');
+    return raw.map((item) => (typeof item === 'number' ? item : item?.id)).filter((id): id is number => typeof id === 'number');
 };
 
 const toDateInput = (value?: string | null) => {
@@ -75,9 +73,7 @@ const toDateInput = (value?: string | null) => {
     return value.replace(' ', 'T').slice(0, 10);
 };
 
-const selectedAreaId = ref<number | ''>(
-    props.oldForm?.area_id != null && props.oldForm.area_id !== '' ? Number(props.oldForm.area_id) : '',
-);
+const selectedAreaId = ref<number | ''>(props.oldForm?.area_id != null && props.oldForm.area_id !== '' ? Number(props.oldForm.area_id) : '');
 const selectedAddonIds = ref<number[]>(fromOldAddonIds());
 const selectedDate = ref(toDateInput(props.oldForm?.starts_at));
 const endDate = ref(toDateInput(props.oldForm?.ends_at || props.oldForm?.starts_at));
@@ -211,13 +207,9 @@ const kategoriSelectOptions = computed(() => [
 ]);
 
 const durationHourOptions = computed(() => durationOptions.value.map((h) => ({ value: h, label: `${h} jam` })));
-const durationBlockSelectOptions = computed(() =>
-    blockOptions.value.map((n) => ({ value: n, label: `${n} blok (${n * 3} jam)` })),
-);
+const durationBlockSelectOptions = computed(() => blockOptions.value.map((n) => ({ value: n, label: `${n} blok (${n * 3} jam)` })));
 const durationDaySelectOptions = computed(() => dayOptions.value.map((n) => ({ value: n, label: `${n} hari` })));
-const durationMonthSelectOptions = computed(() =>
-    monthOptions.value.map((n) => ({ value: n, label: `${n} bulan` })),
-);
+const durationMonthSelectOptions = computed(() => monthOptions.value.map((n) => ({ value: n, label: `${n} bulan` })));
 
 const scheduleTitle = computed(() => {
     switch (scheduleMode.value) {
@@ -234,9 +226,7 @@ const scheduleTitle = computed(() => {
     }
 });
 
-
-const formatRp = (n: number) =>
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
+const formatRp = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
 const jenisPemohonLabel = (value: string) => (value === 'pemerintah' ? 'Instansi pemerintah' : 'Umum / non pemerintah');
 
@@ -428,8 +418,7 @@ const loadDaySlots = async () => {
     slotsError.value = '';
     clearQuote();
 
-    const duration =
-        scheduleMode.value === 'block3' ? Math.max(1, durationBlocks.value) * 3 : Math.max(1, durationHours.value);
+    const duration = scheduleMode.value === 'block3' ? Math.max(1, durationBlocks.value) * 3 : Math.max(1, durationHours.value);
     const step = scheduleMode.value === 'block3' ? 3 : 1;
 
     try {
@@ -622,9 +611,7 @@ const submitHint = computed(() => {
         return 'Masuk dulu untuk mengirim pengajuan.';
     }
     if (!selectedSlotKey.value && !rangeReady.value) {
-        return usesHourSlots.value
-            ? 'Pilih tanggal dan jam yang masih tersedia.'
-            : 'Pilih tanggal pemakaian terlebih dahulu.';
+        return usesHourSlots.value ? 'Pilih tanggal dan jam yang masih tersedia.' : 'Pilih tanggal pemakaian terlebih dahulu.';
     }
     if (quoteLoading.value) {
         return 'Sedang menghitung harga…';
@@ -662,20 +649,18 @@ const submitBooking = () => {
         return;
     }
 
-    form
-        .transform(() => ({
-            ...form.data(),
-            starts_at: toApiDatetime(form.starts_at),
-            ends_at: toApiDatetime(form.ends_at),
-            area_id: form.area_id === '' ? null : form.area_id,
-            luas_m2: form.luas_m2 === '' ? null : form.luas_m2,
-            addon_ids: selectedAddonIds.value.map((id) => ({ id, qty: 1 })),
-            terms_accepted: 1,
-        }))
-        .post(route('e-booking.bookings.store'), {
-            preserveScroll: true,
-            onFinish: () => form.transform((data) => data),
-        });
+    form.transform(() => ({
+        ...form.data(),
+        starts_at: toApiDatetime(form.starts_at),
+        ends_at: toApiDatetime(form.ends_at),
+        area_id: form.area_id === '' ? null : form.area_id,
+        luas_m2: form.luas_m2 === '' ? null : form.luas_m2,
+        addon_ids: selectedAddonIds.value.map((id) => ({ id, qty: 1 })),
+        terms_accepted: 1,
+    })).post(route('e-booking.bookings.store'), {
+        preserveScroll: true,
+        onFinish: () => form.transform((data) => data),
+    });
 };
 
 const slotClass = (slot: DaySlot) => {
@@ -704,17 +689,10 @@ const slotClass = (slot: DaySlot) => {
 
         <section class="overflow-hidden rounded-[32px] bg-white shadow-sm">
             <div class="aspect-[16/9] bg-slate-100 sm:aspect-[21/9]">
-                <AppImage
-                    v-if="venue.cover_url"
-                    :src="venue.cover_url"
-                    :alt="venue.name"
-                    class="size-full object-cover"
-                />
+                <AppImage v-if="venue.cover_url" :src="venue.cover_url" :alt="venue.name" class="size-full object-cover" />
             </div>
             <div class="p-6 sm:p-7">
-                <Link :href="route('e-booking.catalog')" class="text-sm font-semibold text-sky-700 hover:underline">
-                    ← Lihat tempat lain
-                </Link>
+                <Link :href="route('e-booking.catalog')" class="text-sm font-semibold text-sky-700 hover:underline"> ← Lihat tempat lain </Link>
                 <h1 class="mt-3 text-3xl font-bold tracking-tight text-slate-900">{{ venue.name }}</h1>
                 <p v-if="venue.description" class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{{ venue.description }}</p>
             </div>
@@ -724,9 +702,7 @@ const slotClass = (slot: DaySlot) => {
             <div class="space-y-5">
                 <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
                     <div class="mb-5 flex items-start gap-3">
-                        <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">
-                            1
-                        </div>
+                        <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">1</div>
                         <div>
                             <h2 class="text-xl font-bold text-slate-900">Pilih jenis sewa</h2>
                             <p class="mt-1 text-sm text-slate-600">Tentukan area dan jenis pemakaian.</p>
@@ -736,29 +712,17 @@ const slotClass = (slot: DaySlot) => {
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <label class="mb-1.5 block text-sm font-medium text-slate-800">Area</label>
-                            <SimpleSelect
-                                v-model="areaSelectValue"
-                                :options="areaSelectOptions"
-                                placeholder="Pilih area"
-                            />
+                            <SimpleSelect v-model="areaSelectValue" :options="areaSelectOptions" placeholder="Pilih area" />
                         </div>
                         <div>
                             <label class="mb-1.5 block text-sm font-medium text-slate-800">Jenis sewa</label>
-                            <SimpleSelect
-                                v-model="form.tarif_id"
-                                :options="tarifSelectOptions"
-                                placeholder="Pilih jenis sewa"
-                                required
-                            />
+                            <SimpleSelect v-model="form.tarif_id" :options="tarifSelectOptions" placeholder="Pilih jenis sewa" required />
                             <InputError :message="form.errors.tarif_id" />
                         </div>
                         <div>
                             <label class="mb-1.5 block text-sm font-medium text-slate-800">Jenis pemohon</label>
-                            <SimpleSelect
-                                v-model="form.kategori_tarif"
-                                :options="kategoriSelectOptions"
-                                placeholder="Pilih jenis pemohon"
-                            />
+                            <SimpleSelect v-model="form.kategori_tarif" :options="kategoriSelectOptions" placeholder="Pilih jenis pemohon" />
+                            <p class="mt-1 text-xs text-slate-500">Harga menyesuaikan jenis pemohon.</p>
                         </div>
                         <div v-if="selectedTarif && needsQty(selectedTarif.satuan)">
                             <label class="mb-1.5 block text-sm font-medium text-slate-800">{{ qtyLabel }}</label>
@@ -786,14 +750,20 @@ const slotClass = (slot: DaySlot) => {
                     <div v-if="selectedTarif" class="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
                         <p class="font-semibold text-slate-900">{{ selectedTarif.uraian }}</p>
                         <p class="mt-1">Perhitungan: {{ satuanLabel(selectedTarif.satuan) }}</p>
+                        <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                            <span v-if="selectedTarif.tarif_pemerintah != null">
+                                Instansi pemerintah: <strong>{{ formatRp(selectedTarif.tarif_pemerintah) }}</strong>
+                            </span>
+                            <span v-if="selectedTarif.tarif_non_pemerintah != null">
+                                Umum / non-pemerintah: <strong>{{ formatRp(selectedTarif.tarif_non_pemerintah) }}</strong>
+                            </span>
+                        </div>
                     </div>
                 </section>
 
                 <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
                     <div class="mb-5 flex items-start gap-3">
-                        <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">
-                            2
-                        </div>
+                        <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">2</div>
                         <div>
                             <h2 class="text-xl font-bold text-slate-900">{{ scheduleTitle }}</h2>
                             <p class="mt-1 text-sm text-slate-600">{{ scheduleHint }}</p>
@@ -803,11 +773,7 @@ const slotClass = (slot: DaySlot) => {
                     <div class="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
                         <div>
                             <p class="mb-2 text-sm font-medium text-slate-800">Kalender ketersediaan</p>
-                            <BookingAvailabilityCalendar
-                                v-model="selectedDate"
-                                :venue-id="venue.id"
-                                :area-id="selectedAreaId"
-                            />
+                            <BookingAvailabilityCalendar v-model="selectedDate" :venue-id="venue.id" :area-id="selectedAreaId" />
                         </div>
 
                         <div class="space-y-4">
@@ -827,29 +793,17 @@ const slotClass = (slot: DaySlot) => {
 
                             <div v-else-if="scheduleMode === 'block3'">
                                 <label class="mb-1.5 block text-sm font-medium text-slate-800">Jumlah blok</label>
-                                <SimpleSelect
-                                    v-model="durationBlocks"
-                                    :options="durationBlockSelectOptions"
-                                    placeholder="Pilih blok"
-                                />
+                                <SimpleSelect v-model="durationBlocks" :options="durationBlockSelectOptions" placeholder="Pilih blok" />
                             </div>
 
                             <div v-else-if="scheduleMode === 'daily'">
                                 <label class="mb-1.5 block text-sm font-medium text-slate-800">Lama hari</label>
-                                <SimpleSelect
-                                    v-model="durationDays"
-                                    :options="durationDaySelectOptions"
-                                    placeholder="Pilih lama hari"
-                                />
+                                <SimpleSelect v-model="durationDays" :options="durationDaySelectOptions" placeholder="Pilih lama hari" />
                             </div>
 
                             <div v-else-if="scheduleMode === 'monthly'">
                                 <label class="mb-1.5 block text-sm font-medium text-slate-800">Lama bulan</label>
-                                <SimpleSelect
-                                    v-model="durationMonths"
-                                    :options="durationMonthSelectOptions"
-                                    placeholder="Pilih lama bulan"
-                                />
+                                <SimpleSelect v-model="durationMonths" :options="durationMonthSelectOptions" placeholder="Pilih lama bulan" />
                             </div>
 
                             <div v-else class="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -865,9 +819,7 @@ const slotClass = (slot: DaySlot) => {
                             Memuat jadwal…
                         </div>
                         <p v-else-if="slotsError" class="text-sm text-red-600">{{ slotsError }}</p>
-                        <p v-else-if="daySlots.length === 0" class="text-sm text-slate-500">
-                            Belum ada jam yang bisa dipilih untuk tanggal ini.
-                        </p>
+                        <p v-else-if="daySlots.length === 0" class="text-sm text-slate-500">Belum ada jam yang bisa dipilih untuk tanggal ini.</p>
                         <div v-else class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                             <button
                                 v-for="slot in daySlots"
@@ -890,10 +842,7 @@ const slotClass = (slot: DaySlot) => {
                     </div>
 
                     <!-- Ringkas periode untuk tarif harian / bulanan / kegiatan -->
-                    <div
-                        v-else
-                        class="mt-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-4 text-sm text-slate-700"
-                    >
+                    <div v-else class="mt-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-4 text-sm text-slate-700">
                         <template v-if="quoteLoading">
                             <span class="inline-flex items-center gap-2 text-slate-500">
                                 <LoaderCircle class="size-4 animate-spin" />
@@ -906,13 +855,9 @@ const slotClass = (slot: DaySlot) => {
                                 {{ selectedDate }}
                                 <template v-if="endDate && endDate !== selectedDate"> — {{ endDate }}</template>
                             </p>
-                            <p class="mt-1 text-xs text-slate-500">
-                                Jam operasional {{ operatingHours.start }}–{{ operatingHours.end }}
-                            </p>
+                            <p class="mt-1 text-xs text-slate-500">Jam operasional {{ operatingHours.start }}–{{ operatingHours.end }}</p>
                         </template>
-                        <template v-else>
-                            Pilih tanggal di atas. Harga dan ketersediaan dihitung otomatis.
-                        </template>
+                        <template v-else> Pilih tanggal di atas. Harga dan ketersediaan dihitung otomatis. </template>
                     </div>
 
                     <InputError :message="form.errors.starts_at || form.errors.ends_at" />
@@ -920,9 +865,7 @@ const slotClass = (slot: DaySlot) => {
 
                 <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
                     <div class="mb-5 flex items-start gap-3">
-                        <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">
-                            3
-                        </div>
+                        <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">3</div>
                         <div>
                             <h2 class="text-xl font-bold text-slate-900">Lengkapi pengajuan</h2>
                             <p class="mt-1 text-sm text-slate-600">Isi keperluan dan tambahan layanan bila perlu.</p>
@@ -1100,11 +1043,7 @@ const slotClass = (slot: DaySlot) => {
                 <div class="grid gap-3 text-sm text-slate-600">
                     <div class="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 shadow-sm">
                         <CalendarDays class="size-4 text-sky-700" />
-                        {{
-                            usesHourSlots
-                                ? 'Pilih jam dari daftar yang tersedia'
-                                : 'Jadwal menyesuaikan satuan tarif (hari / bulan / kegiatan)'
-                        }}
+                        {{ usesHourSlots ? 'Pilih jam dari daftar yang tersedia' : 'Jadwal menyesuaikan satuan tarif (hari / bulan / kegiatan)' }}
                     </div>
                     <div class="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 shadow-sm">
                         <Wallet class="size-4 text-emerald-700" />

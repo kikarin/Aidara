@@ -34,10 +34,15 @@ use App\Http\Controllers\MstKategoriPrestasiPelatihController;
 use App\Http\Controllers\MstJuaraController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\Booking\Web\Admin\AuthController as EBookingAdminAuthController;
+use App\Http\Controllers\Booking\Web\Admin\AddonController as EBookingAdminAddonController;
 use App\Http\Controllers\Booking\Web\Admin\BookingController as EBookingAdminBookingController;
 use App\Http\Controllers\Booking\Web\Admin\ClosureController as EBookingAdminClosureController;
 use App\Http\Controllers\Booking\Web\Admin\DashboardController as EBookingAdminDashboardController;
+use App\Http\Controllers\Booking\Web\Admin\DocumentTypeController as EBookingAdminDocumentTypeController;
+use App\Http\Controllers\Booking\Web\Admin\FacilityController as EBookingAdminFacilityController;
+use App\Http\Controllers\Booking\Web\Admin\PriorityRuleController as EBookingAdminPriorityRuleController;
 use App\Http\Controllers\Booking\Web\Admin\SettingsController as EBookingAdminSettingsController;
+use App\Http\Controllers\Booking\Web\Admin\TermsController as EBookingAdminTermsController;
 use App\Http\Controllers\Booking\Web\Admin\VenueController as EBookingAdminVenueController;
 use App\Http\Controllers\Booking\Web\AuthController as EBookingAuthController;
 use App\Http\Controllers\Booking\Web\BookingController as EBookingBookingController;
@@ -221,6 +226,58 @@ Route::middleware(['booking.web:admin_upt'])->prefix('booking/admin')->group(fun
     Route::post('/tarifs/{id}/toggle', [EBookingAdminVenueController::class, 'toggleTarif'])
         ->whereNumber('id')
         ->name('e-booking.admin.tarifs.toggle');
+
+    Route::put('/venues/{id}/rules', [EBookingAdminVenueController::class, 'updateRules'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.rules.update');
+    Route::post('/venues/{id}/rules', [EBookingAdminVenueController::class, 'storeRule'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.rules.store');
+    Route::delete('/rules/{id}', [EBookingAdminVenueController::class, 'destroyRule'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.rules.destroy');
+
+    Route::get('/addons', [EBookingAdminAddonController::class, 'index'])->name('e-booking.admin.addons.index');
+    Route::post('/addons', [EBookingAdminAddonController::class, 'store'])->name('e-booking.admin.addons.store');
+    Route::put('/addons/{id}', [EBookingAdminAddonController::class, 'update'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.addons.update');
+    Route::post('/addons/{id}/toggle', [EBookingAdminAddonController::class, 'toggle'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.addons.toggle');
+
+    Route::get('/document-types', [EBookingAdminDocumentTypeController::class, 'index'])->name('e-booking.admin.document-types.index');
+    Route::post('/document-types', [EBookingAdminDocumentTypeController::class, 'store'])->name('e-booking.admin.document-types.store');
+    Route::put('/document-types/{id}', [EBookingAdminDocumentTypeController::class, 'update'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.document-types.update');
+    Route::post('/document-types/{id}/toggle', [EBookingAdminDocumentTypeController::class, 'toggle'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.document-types.toggle');
+
+    Route::get('/facilities', [EBookingAdminFacilityController::class, 'index'])->name('e-booking.admin.facilities.index');
+    Route::post('/facilities', [EBookingAdminFacilityController::class, 'store'])->name('e-booking.admin.facilities.store');
+    Route::put('/facilities/{id}', [EBookingAdminFacilityController::class, 'update'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.facilities.update');
+    Route::post('/facilities/{id}/toggle', [EBookingAdminFacilityController::class, 'toggle'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.facilities.toggle');
+
+    Route::get('/terms', [EBookingAdminTermsController::class, 'index'])->name('e-booking.admin.terms.index');
+    Route::post('/terms', [EBookingAdminTermsController::class, 'store'])->name('e-booking.admin.terms.store');
+    Route::put('/terms/{key}', [EBookingAdminTermsController::class, 'update'])
+        ->where('key', '[A-Za-z0-9_]+')
+        ->name('e-booking.admin.terms.update');
+
+    Route::get('/priority-rules', [EBookingAdminPriorityRuleController::class, 'index'])->name('e-booking.admin.priority-rules.index');
+    Route::post('/priority-rules', [EBookingAdminPriorityRuleController::class, 'store'])->name('e-booking.admin.priority-rules.store');
+    Route::put('/priority-rules/{id}', [EBookingAdminPriorityRuleController::class, 'update'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.priority-rules.update');
+    Route::post('/priority-rules/{id}/toggle', [EBookingAdminPriorityRuleController::class, 'toggle'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.priority-rules.toggle');
 });
 Route::middleware('throttle:60,1')->group(function () {
     Route::get('/api/worldcup/preview', [WorldCupController::class, 'preview'])->name('worldcup.preview');

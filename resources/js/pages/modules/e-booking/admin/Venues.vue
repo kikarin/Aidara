@@ -3,9 +3,10 @@ import AppImage from '@/components/AppImage.vue';
 import SeoHead from '@/components/SeoHead.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
-import { Pencil, Plus } from 'lucide-vue-next';
+import { Building2, Pencil, Plus } from 'lucide-vue-next';
 
 type VenueRow = {
     id: number;
@@ -59,69 +60,81 @@ const toggle = (row: VenueRow) => {
             Menampilkan {{ props.venues.from ?? 0 }}–{{ props.venues.to ?? 0 }} dari {{ props.venues.total }} venue
         </p>
 
-        <div class="mt-2 overflow-x-auto">
-            <table class="w-full min-w-[720px] text-left text-sm">
-                <thead class="border-border text-muted-foreground border-b">
-                    <tr>
-                        <th class="py-2 pr-3 font-medium">Venue</th>
-                        <th class="py-2 pr-3 font-medium">Kode</th>
-                        <th class="py-2 pr-3 font-medium">Area</th>
-                        <th class="py-2 pr-3 font-medium">Tarif</th>
-                        <th class="py-2 pr-3 font-medium">Status</th>
-                        <th class="py-2 font-medium"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="row in venues.data" :key="row.id" class="border-border/60 border-b">
-                        <td class="py-3 pr-3">
-                            <div class="flex items-center gap-3">
-                                <AppImage v-if="row.cover_url" :src="row.cover_url" :alt="row.name" class="size-10 rounded-lg object-cover" />
-                                <div v-else class="size-10 rounded-lg bg-slate-100"></div>
-                                <div>
-                                    <p class="font-medium">{{ row.name }}</p>
-                                    <p class="text-muted-foreground text-xs">{{ row.description || '—' }}</p>
-                                </div>
+        <Table class="mt-2 min-w-[720px]">
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Venue</TableHead>
+                    <TableHead>Kode</TableHead>
+                    <TableHead>Area</TableHead>
+                    <TableHead>Tarif</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead></TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                <TableRow v-for="row in venues.data" :key="row.id">
+                    <TableCell>
+                        <div class="flex items-center gap-3">
+                            <AppImage v-if="row.cover_url" :src="row.cover_url" :alt="row.name" class="size-10 rounded-lg object-cover" />
+                            <div v-else class="size-10 rounded-lg bg-slate-100"></div>
+                            <div>
+                                <p class="font-medium">{{ row.name }}</p>
+                                <p class="text-muted-foreground text-xs">{{ row.description || '—' }}</p>
                             </div>
-                        </td>
-                        <td class="py-3 pr-3">
-                            <code class="text-xs">{{ row.code }}</code>
-                        </td>
-                        <td class="py-3 pr-3">{{ row.areas_count }}</td>
-                        <td class="py-3 pr-3">{{ row.tarifs_count }}</td>
-                        <td class="py-3 pr-3">
-                            <Badge :variant="row.is_active ? 'default' : 'secondary'">
-                                {{ row.is_active ? 'Aktif' : 'Nonaktif' }}
-                            </Badge>
-                        </td>
-                        <td class="py-3">
-                            <div class="flex flex-wrap items-center justify-end gap-2">
-                                <Link :href="route('e-booking.admin.venues.show', row.id)" class="text-xs font-semibold text-sky-700 hover:underline">
-                                    Kelola
-                                </Link>
-                                <Link
-                                    :href="route('e-booking.admin.venues.edit', row.id)"
-                                    class="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:underline"
-                                >
-                                    <Pencil class="size-3" />
-                                    Edit
-                                </Link>
-                                <button
-                                    type="button"
-                                    class="text-xs font-semibold hover:underline"
-                                    :class="row.is_active ? 'text-red-600' : 'text-emerald-700'"
-                                    @click="toggle(row)"
-                                >
-                                    {{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                                </button>
+                        </div>
+                    </TableCell>
+                    <TableCell>
+                        <code class="text-xs">{{ row.code }}</code>
+                    </TableCell>
+                    <TableCell>{{ row.areas_count }}</TableCell>
+                    <TableCell>{{ row.tarifs_count }}</TableCell>
+                    <TableCell>
+                        <Badge :variant="row.is_active ? 'default' : 'secondary'">
+                            {{ row.is_active ? 'Aktif' : 'Nonaktif' }}
+                        </Badge>
+                    </TableCell>
+                    <TableCell>
+                        <div class="flex flex-wrap items-center justify-end gap-2">
+                            <Link :href="route('e-booking.admin.venues.show', row.id)" class="text-xs font-semibold text-sky-700 hover:underline">
+                                Kelola
+                            </Link>
+                            <Link
+                                :href="route('e-booking.admin.venues.edit', row.id)"
+                                class="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:underline"
+                            >
+                                <Pencil class="size-3" />
+                                Edit
+                            </Link>
+                            <button
+                                type="button"
+                                class="text-xs font-semibold hover:underline"
+                                :class="row.is_active ? 'text-red-600' : 'text-emerald-700'"
+                                @click="toggle(row)"
+                            >
+                                {{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
+                            </button>
+                        </div>
+                    </TableCell>
+                </TableRow>
+                <TableRow v-if="venues.data.length === 0">
+                    <TableCell colspan="6">
+                        <div class="flex flex-col items-center gap-3 py-10 text-center">
+                            <Building2 class="text-muted-foreground size-9" />
+                            <div>
+                                <p class="text-sm font-medium">Belum ada venue</p>
+                                <p class="text-muted-foreground text-xs">Tambahkan venue, area, dan harga sewanya.</p>
                             </div>
-                        </td>
-                    </tr>
-                    <tr v-if="venues.data.length === 0">
-                        <td colspan="6" class="text-muted-foreground py-8 text-center">Belum ada venue.</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+                            <Button as-child size="sm">
+                                <Link :href="route('e-booking.admin.venues.create')">
+                                    <Plus class="size-4" />
+                                    Tambah venue
+                                </Link>
+                            </Button>
+                        </div>
+                    </TableCell>
+                </TableRow>
+            </TableBody>
+        </Table>
 
         <div v-if="venues.links?.length > 3" class="mt-4 flex flex-wrap gap-2">
             <template v-for="(link, i) in venues.links" :key="i">
