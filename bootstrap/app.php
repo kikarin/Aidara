@@ -66,6 +66,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'check.registration.status'  => CheckRegistrationStatus::class,
             'ensure.email.verified'       => \App\Http\Middleware\EnsureEmailVerified::class,
             'booking.role'               => EnsureBookingRole::class,
+            'booking.web'                => \App\Http\Middleware\EnsureBookingWebRole::class,
         ]);
 
         // Sanctum middleware untuk stateful API (Remove)

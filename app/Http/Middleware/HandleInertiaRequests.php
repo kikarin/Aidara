@@ -60,6 +60,20 @@ class HandleInertiaRequests extends Middleware
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
             ],
+            'bookingAuth' => function () use ($request) {
+                $user = $request->user();
+                if (! $user) {
+                    return null;
+                }
+
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'is_penyewa' => $user->hasRole('penyewa'),
+                    'is_admin_upt' => $user->hasRole('admin_upt'),
+                ];
+            },
         ];
     }
 }

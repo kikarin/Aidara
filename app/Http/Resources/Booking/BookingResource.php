@@ -34,12 +34,22 @@ class BookingResource extends JsonResource
             'submitted_at' => optional($this->submitted_at)->toDateTimeString(),
             'venue' => $this->whenLoaded('venue'),
             'area' => $this->whenLoaded('area'),
+            'user' => $this->whenLoaded('user', fn () => $this->user ? [
+                'id' => $this->user->id,
+                'name' => $this->user->name,
+                'email' => $this->user->email,
+            ] : null),
+            'penyewa_profile' => $this->whenLoaded('penyewaProfile', fn () => $this->penyewaProfile ? [
+                'id' => $this->penyewaProfile->id,
+                'nama' => $this->penyewaProfile->nama,
+                'no_hp' => $this->penyewaProfile->no_hp,
+                'instansi' => $this->penyewaProfile->instansi,
+            ] : null),
             'items' => $this->whenLoaded('items'),
             'addons' => $this->whenLoaded('addonSelected'),
             'payments' => $this->whenLoaded('payments'),
             'status_logs' => $this->whenLoaded('statusLogs'),
             'incidents' => $this->whenLoaded('incidents'),
-            'penyewa_profile' => $this->whenLoaded('penyewaProfile'),
             'created_at' => optional($this->created_at)->toDateTimeString(),
         ];
     }

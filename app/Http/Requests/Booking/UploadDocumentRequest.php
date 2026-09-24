@@ -4,7 +4,7 @@ namespace App\Http\Requests\Booking;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class UploadKtpRequest extends FormRequest
+class UploadDocumentRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -15,7 +15,8 @@ class UploadKtpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'ktp' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'file' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'document_type_code' => ['nullable', 'string', 'max:64', 'exists:booking_document_types,code'],
         ];
     }
 }

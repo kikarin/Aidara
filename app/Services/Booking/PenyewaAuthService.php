@@ -105,7 +105,7 @@ class PenyewaAuthService
         );
     }
 
-    public function uploadKtp(User $user, UploadedFile $file): BookingPenyewaDocument
+    public function uploadDocument(User $user, UploadedFile $file, ?string $documentTypeCode = null): BookingPenyewaDocument
     {
         $profile = BookingPenyewaProfile::query()->where('user_id', $user->id)->first();
         if (! $profile) {
@@ -114,8 +114,19 @@ class PenyewaAuthService
             ]);
         }
 
-        $docType = BookingDocumentType::query()->where('code', 'ktp')->where('is_active', true)->firstOrFail();
-        $path = $file->store('booking/ktp/'.$user->id, 'public');
+        $code = $documentTypeCode ?: 'dokumen';
+        $docType = BookingDocumentType::query()
+            ->where('code', $code)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $docType) {
+            throw ValidationException::withMessages([
+                'document_type_code' => ["Jenis dokumen \"{$code}\" tidak ditemukan atau tidak aktif."],
+            ]);
+        }
+
+        $path = $file->store('booking/documents/'.$user->id, 'public');
 
         return BookingPenyewaDocument::query()->updateOrCreate(
             [

@@ -28,6 +28,7 @@ class BookingVenueSeeder extends Seeder
                     'description' => null,
                     'is_active' => true,
                     'sort_order' => $row['sort_order'],
+                    'cover_path' => $this->coverPathFor($row['code']),
                 ]
             );
         }
@@ -38,6 +39,30 @@ class BookingVenueSeeder extends Seeder
         $this->seedRoadRaceAreas();
         $this->seedAquaticAreas();
         $this->seedSaranaLainnyaAreas();
+    }
+
+    /**
+     * File di storage/app/public/booking/venues — akses publik via /storage/...
+     * Atribusi: foto lokal UPT/Dispora (dev). SVG sarana_lainnya dibuat khusus (placeholder brand).
+     */
+    private function coverPathFor(string $code): ?string
+    {
+        $map = [
+            'pakansari' => 'booking/venues/pakansari.png',
+            'laga_tangkas' => 'booking/venues/laga-tangkas.png',
+            'laga_satria' => 'booking/venues/laga-satria.png',
+            'tennis_kapten_muslihat' => 'booking/venues/kapten-muslihat.png',
+            'sirkuit_road_race' => 'booking/venues/sirkuitroadrace.png',
+            'aquatic' => 'booking/venues/aquatic.png',
+            'sarana_lainnya' => 'booking/venues/sarana-lainnya.svg',
+        ];
+
+        $path = $map[$code] ?? null;
+        if ($path === null) {
+            return null;
+        }
+
+        return is_file(storage_path('app/public/'.$path)) ? $path : null;
     }
 
     private function seedPakansariAreas(): void
@@ -127,6 +152,9 @@ class BookingVenueSeeder extends Seeder
         $venue = $this->venue('sarana_lainnya');
 
         $areas = [
+            ['code' => 'stadion_mini_cibinong', 'name' => 'Stadion Mini Cibinong (Persikabo)'],
+            ['code' => 'gelanggang_kecamatan', 'name' => 'Gelanggang Olahraga Masyarakat di Kecamatan'],
+            ['code' => 'prasarana_kecamatan', 'name' => 'Prasarana Publik & Olahraga di Kecamatan'],
             ['code' => 'ruang_stadion_mini_cibinong', 'name' => 'Ruangan sekitar Stadion Mini Cibinong (Persikabo)'],
             ['code' => 'ruang_gelanggang_kecamatan', 'name' => 'Ruangan Gelanggang Olahraga Masyarakat di Kecamatan'],
             ['code' => 'pemanfaatan_non_olahraga', 'name' => 'Pemanfaatan Kegiatan Non Olahraga'],

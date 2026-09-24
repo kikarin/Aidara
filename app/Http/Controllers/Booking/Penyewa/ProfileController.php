@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Booking\Penyewa;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Booking\UpdatePenyewaProfileRequest;
-use App\Http\Requests\Booking\UploadKtpRequest;
+use App\Http\Requests\Booking\UploadDocumentRequest;
 use App\Models\Booking\BookingPenyewaProfile;
 use App\Services\Booking\PenyewaAuthService;
 use Illuminate\Http\JsonResponse;
@@ -41,13 +41,20 @@ class ProfileController extends Controller
         ]);
     }
 
-    public function uploadKtp(UploadKtpRequest $request): JsonResponse
+    /**
+     * Upload dokumen pendukung (opsional — jenis dokumen TBD oleh UPT).
+     */
+    public function uploadDocument(UploadDocumentRequest $request): JsonResponse
     {
-        $doc = $this->auth->uploadKtp($request->user(), $request->file('ktp'));
+        $doc = $this->auth->uploadDocument(
+            $request->user(),
+            $request->file('file'),
+            $request->validated('document_type_code')
+        );
 
         return response()->json([
             'success' => true,
-            'message' => 'KTP berhasil diunggah',
+            'message' => 'Dokumen berhasil diunggah',
             'data' => [
                 'id' => $doc->id,
                 'file_path' => $doc->file_path,

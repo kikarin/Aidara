@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { library } from '@fortawesome/fontawesome-svg-core';
 import {
+    faCalendarCheck,
     faChartBar,
     faClipboardList,
     faDatabase,
@@ -37,6 +38,7 @@ library.add(
     faUsers,
     faShieldAlt,
     faTrophy,
+    faCalendarCheck,
     faMapMarkerAlt,
     faPhone,
     faEnvelope,
@@ -115,6 +117,12 @@ const fitur = [
         text: 'Informasi kegiatan olahraga dapat diakses masyarakat melalui halaman event.',
         link: 'event',
     },
+    {
+        icon: 'calendar-check',
+        title: 'E-Booking Fasilitas',
+        text: 'Sewa lapangan dan fasilitas olahraga UPT secara online — jadwal, approval, dan pembayaran.',
+        link: 'ebooking',
+    },
 ];
 
 const faq = [
@@ -124,7 +132,7 @@ const faq = [
     },
     {
         question: 'Siapa yang dapat menggunakan AIDARA?',
-        answer: 'AIDARA digunakan oleh admin Dispora, pelatih, tenaga pendukung, dan pihak terkait yang telah terdaftar dan terverifikasi. Masyarakat dapat mengakses informasi event publik tanpa login.',
+        answer: 'AIDARA digunakan oleh admin Dispora, pelatih, tenaga pendukung, dan pihak terkait yang telah terdaftar dan terverifikasi. Masyarakat dapat mengakses informasi event publik dan E-Booking fasilitas tanpa masuk dashboard Dispora.',
     },
     {
         question: 'Bagaimana cara mendaftar?',
@@ -166,7 +174,10 @@ defineProps<{
     worldcupPreview?: WorldCupPreview;
 }>();
 
-const page = usePage<{ worldcup?: WorldCupSettings; auth?: { user?: unknown } }>();
+const page = usePage<{
+    worldcup?: WorldCupSettings;
+    auth?: { user?: unknown };
+}>();
 
 const homeUrl = computed(() => route('home', undefined, true));
 const siteBaseUrl = computed(() => {
@@ -212,6 +223,7 @@ const colorMap: Record<string, { wrap: string; icon: string }> = {
     stethoscope: { wrap: 'bg-purple-100 dark:bg-purple-950/50', icon: 'text-purple-600 dark:text-purple-400' },
     'chart-bar': { wrap: 'bg-yellow-100 dark:bg-yellow-950/50', icon: 'text-yellow-600 dark:text-yellow-400' },
     trophy: { wrap: 'bg-orange-100 dark:bg-orange-950/50', icon: 'text-orange-600 dark:text-orange-400' },
+    'calendar-check': { wrap: 'bg-teal-100 dark:bg-teal-950/50', icon: 'text-teal-600 dark:text-teal-400' },
 };
 
 const iconStyle = (icon: string) => colorMap[icon] ?? { wrap: 'bg-muted', icon: 'text-muted-foreground' };
@@ -423,6 +435,13 @@ const iconStyle = (icon: string) => colorMap[icon] ?? { wrap: 'bg-muted', icon: 
                                 class="text-[var(--brand-green,#2e7d32)] mt-3 inline-block text-sm font-semibold hover:underline"
                             >
                                 Lihat Event →
+                            </Link>
+                            <Link
+                                v-else-if="item.link === 'ebooking'"
+                                :href="route('e-booking.catalog')"
+                                class="text-[var(--brand-green,#2e7d32)] mt-3 inline-block text-sm font-semibold hover:underline"
+                            >
+                                Buka E-Booking →
                             </Link>
                         </article>
                     </div>

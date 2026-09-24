@@ -76,6 +76,7 @@ class PricingService
         }
 
         $duration = $this->resolveDuration($tarif->satuan, $startsAt, $endsAt, $input['duration_value'] ?? null);
+        $this->assertMetaHourConstraints($tarif->meta, $duration['hours']);
         $lineTotal = $this->calculateLineTotal($tarif->satuan, (int) $unitPrice, $qty, $luas, $duration['value']);
 
         $line = [
@@ -181,6 +182,36 @@ class PricingService
             BookingSatuan::PER_M2_DAY, BookingSatuan::PER_M2_MONTH => (int) round($unitPrice * (float) $luas * $durationValue),
             default => $unitPrice * $qty * $durationValue,
         };
+    }
+
+    /**
+     * Enforce meta.min_hours / meta.max_hours (Perda sarana lainnya).
+     *
+     * @param  array<string, mixed>|null  $meta
+     */
+    private function assertMetaHourConstraints(?array $meta, float $hours): void
+    {
+        if ($meta === null || $meta === []) {
+            return;
+        }
+
+        if (isset($meta['min_hours']) && is_numeric($meta['min_hours'])) {
+            $min = (float) $meta['min_hours'];
+            if ($hours + 1e-6 < $min) {
+                throw new InvalidArgumentException(
+                    "Durasi minimal untuk tarif ini adalah {$min} jam."
+                );
+            }
+        }
+
+        if (isset($meta['max_hours']) && is_numeric($meta['max_hours'])) {
+            $max = (float) $meta['max_hours'];
+            if ($hours - 1e-6 > $max) {
+                throw new InvalidArgumentException(
+                    "Durasi maksimal untuk tarif ini adalah {$max} jam."
+                );
+            }
+        }
     }
 
     /**

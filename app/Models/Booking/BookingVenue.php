@@ -18,8 +18,13 @@ class BookingVenue extends Model
         'code',
         'name',
         'description',
+        'cover_path',
         'is_active',
         'sort_order',
+    ];
+
+    protected $appends = [
+        'cover_url',
     ];
 
     protected function casts(): array
@@ -28,6 +33,15 @@ class BookingVenue extends Model
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
+    }
+
+    public function getCoverUrlAttribute(): ?string
+    {
+        if (! $this->cover_path) {
+            return null;
+        }
+
+        return asset('storage/'.$this->cover_path);
     }
 
     public function areas(): HasMany
@@ -48,5 +62,10 @@ class BookingVenue extends Model
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class, 'venue_id');
+    }
+
+    public function closures(): HasMany
+    {
+        return $this->hasMany(BookingVenueClosure::class, 'venue_id');
     }
 }

@@ -33,6 +33,15 @@ use App\Http\Controllers\MstKategoriPesertaController;
 use App\Http\Controllers\MstKategoriPrestasiPelatihController;
 use App\Http\Controllers\MstJuaraController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\Booking\Web\Admin\AuthController as EBookingAdminAuthController;
+use App\Http\Controllers\Booking\Web\Admin\BookingController as EBookingAdminBookingController;
+use App\Http\Controllers\Booking\Web\Admin\ClosureController as EBookingAdminClosureController;
+use App\Http\Controllers\Booking\Web\Admin\DashboardController as EBookingAdminDashboardController;
+use App\Http\Controllers\Booking\Web\Admin\SettingsController as EBookingAdminSettingsController;
+use App\Http\Controllers\Booking\Web\AuthController as EBookingAuthController;
+use App\Http\Controllers\Booking\Web\BookingController as EBookingBookingController;
+use App\Http\Controllers\Booking\Web\CatalogController as EBookingCatalogController;
+use App\Http\Controllers\Booking\Web\VenueController as EBookingVenueController;
 use App\Http\Controllers\PublicEventController;
 use App\Http\Controllers\PelatihController;
 use App\Http\Controllers\PelatihDokumenController;
@@ -105,6 +114,74 @@ Route::get('/legal/{slug}', [LegalController::class, 'show'])
 Route::get('/piala-dunia', [WorldCupController::class, 'index'])->name('worldcup.index');
 Route::get('/event-publik', [PublicEventController::class, 'index'])->name('event.public.index');
 Route::get('/event-publik/{id}', [PublicEventController::class, 'show'])->whereNumber('id')->name('event.public.show');
+
+Route::get('/booking', EBookingCatalogController::class)->name('e-booking.catalog');
+Route::get('/booking/venues/{id}', [EBookingVenueController::class, 'show'])
+    ->whereNumber('id')
+    ->name('e-booking.venues.show');
+Route::get('/booking/venues/{id}/day-slots', [EBookingVenueController::class, 'daySlots'])
+    ->whereNumber('id')
+    ->name('e-booking.venues.day-slots');
+Route::get('/booking/venues/{id}/month-overview', [EBookingVenueController::class, 'monthOverview'])
+    ->whereNumber('id')
+    ->name('e-booking.venues.month-overview');
+
+Route::prefix('booking')->group(function () {
+    Route::get('/login', [EBookingAuthController::class, 'showLogin'])->name('e-booking.login');
+    Route::post('/login', [EBookingAuthController::class, 'login'])->name('e-booking.login.store');
+    Route::get('/register', [EBookingAuthController::class, 'showRegister'])->name('e-booking.register');
+    Route::post('/register', [EBookingAuthController::class, 'register'])->name('e-booking.register.store');
+});
+
+Route::post('/booking/quote', [EBookingBookingController::class, 'quote'])->name('e-booking.quote');
+
+Route::middleware(['booking.web:penyewa,admin_upt'])->prefix('booking')->group(function () {
+    Route::post('/logout', [EBookingAuthController::class, 'logout'])->name('e-booking.logout');
+    Route::get('/bookings', [EBookingBookingController::class, 'index'])->name('e-booking.bookings.index');
+    Route::post('/bookings', [EBookingBookingController::class, 'store'])->name('e-booking.bookings.store');
+    Route::get('/bookings/{id}', [EBookingBookingController::class, 'show'])
+        ->whereNumber('id')
+        ->name('e-booking.bookings.show');
+    Route::post('/bookings/{id}/payment/bukti', [EBookingBookingController::class, 'uploadBukti'])
+        ->whereNumber('id')
+        ->name('e-booking.bookings.bukti');
+});
+
+Route::prefix('booking/admin')->group(function () {
+    Route::get('/login', [EBookingAdminAuthController::class, 'showLogin'])->name('e-booking.admin.login');
+    Route::post('/login', [EBookingAdminAuthController::class, 'login'])->name('e-booking.admin.login.store');
+});
+
+Route::middleware(['booking.web:admin_upt'])->prefix('booking/admin')->group(function () {
+    Route::post('/logout', [EBookingAdminAuthController::class, 'logout'])->name('e-booking.admin.logout');
+    Route::get('/', EBookingAdminDashboardController::class)->name('e-booking.admin.dashboard');
+    Route::get('/bookings', [EBookingAdminBookingController::class, 'index'])->name('e-booking.admin.bookings.index');
+    Route::get('/bookings/{id}', [EBookingAdminBookingController::class, 'show'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.bookings.show');
+    Route::post('/bookings/{id}/approve', [EBookingAdminBookingController::class, 'approve'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.bookings.approve');
+    Route::post('/bookings/{id}/reject', [EBookingAdminBookingController::class, 'reject'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.bookings.reject');
+    Route::post('/bookings/{id}/klarifikasi', [EBookingAdminBookingController::class, 'klarifikasi'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.bookings.klarifikasi');
+    Route::post('/payments/{paymentId}/verify', [EBookingAdminBookingController::class, 'verifyPayment'])
+        ->whereNumber('paymentId')
+        ->name('e-booking.admin.payments.verify');
+    Route::post('/payments/{paymentId}/reject', [EBookingAdminBookingController::class, 'rejectPayment'])
+        ->whereNumber('paymentId')
+        ->name('e-booking.admin.payments.reject');
+    Route::get('/settings', [EBookingAdminSettingsController::class, 'edit'])->name('e-booking.admin.settings');
+    Route::put('/settings', [EBookingAdminSettingsController::class, 'update'])->name('e-booking.admin.settings.update');
+    Route::get('/closures', [EBookingAdminClosureController::class, 'index'])->name('e-booking.admin.closures.index');
+    Route::post('/closures', [EBookingAdminClosureController::class, 'store'])->name('e-booking.admin.closures.store');
+    Route::delete('/closures/{id}', [EBookingAdminClosureController::class, 'destroy'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.closures.destroy');
+});
 Route::middleware('throttle:60,1')->group(function () {
     Route::get('/api/worldcup/preview', [WorldCupController::class, 'preview'])->name('worldcup.preview');
     Route::get('/api/worldcup/live', [WorldCupController::class, 'live'])->name('worldcup.live');

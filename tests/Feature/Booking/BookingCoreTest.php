@@ -7,13 +7,13 @@ use App\Models\Booking\BookingAddon;
 use App\Models\Booking\BookingArea;
 use App\Models\Booking\BookingDocumentType;
 use App\Models\Booking\BookingPayment;
-use App\Models\Booking\BookingPenyewaDocument;
 use App\Models\Booking\BookingPenyewaProfile;
 use App\Models\Booking\BookingPriorityRule;
 use App\Models\Booking\BookingRule;
 use App\Models\Booking\BookingSetting;
 use App\Models\Booking\BookingTarif;
 use App\Models\Booking\BookingVenue;
+use App\Models\Booking\BookingVenueClosure;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Booking\AdminApprovalService;
@@ -84,14 +84,12 @@ class BookingCoreTest extends TestCase
     }
 
     #[Test]
-    public function submit_requires_ktp(): void
+    public function submit_requires_contact_phone(): void
     {
-        BookingPenyewaDocument::query()
-            ->where('penyewa_profile_id', $this->profile->id)
-            ->delete();
+        $this->profile->forceFill(['no_hp' => null])->save();
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('KTP');
+        $this->expectExceptionMessage('nomor HP dan email');
 
         app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload());
     }
@@ -113,6 +111,111 @@ class BookingCoreTest extends TestCase
             'starts_at' => now()->addDays(10)->setTime(8, 0)->toDateTimeString(),
             'ends_at' => now()->addDays(10)->setTime(9, 0)->toDateTimeString(),
         ]);
+    }
+
+    #[Test]
+    public function venue_closure_marks_slot_merah_and_rejects_bookable(): void
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('booking_venue_closures')) {
+            $this->markTestSkipped('Tabel booking_venue_closures belum ada — jalankan migrate dulu.');
+        }
+
+        $start = now()->addDay()->setTime(8, 0);
+        $end = now()->addDay()->setTime(10, 0);
+
+        BookingVenueClosure::query()->create([
+            'venue_id' => $this->venue->id,
+            'area_id' => null,
+            'starts_at' => $start->copy()->subHour(),
+            'ends_at' => $end->copy()->addHour(),
+            'reason' => 'Maintenance',
+            'is_active' => true,
+        ]);
+
+        $check = app(AvailabilityService::class)->check([
+            'venue_id' => $this->venue->id,
+            'area_id' => $this->area->id,
+            'starts_at' => $start->toDateTimeString(),
+            'ends_at' => $end->toDateTimeString(),
+        ]);
+
+        $this->assertSame('merah', $check['status']);
+        $this->assertTrue($check['closed']);
+        $this->assertFalse($check['bookable']);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Maintenance');
+
+        app(AvailabilityService::class)->assertBookable([
+            'venue_id' => $this->venue->id,
+            'area_id' => $this->area->id,
+            'starts_at' => $start->toDateTimeString(),
+            'ends_at' => $end->toDateTimeString(),
+        ]);
+    }
+
+    #[Test]
+    public function quote_enforces_meta_min_and_max_hours(): void
+    {
+        $this->tarif->forceFill(['meta' => ['min_hours' => 3]])->save();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('minimal');
+
+        app(PricingService::class)->quote([
+            'tarif_id' => $this->tarif->id,
+            'kategori_tarif' => 'non_pemerintah',
+            'starts_at' => now()->addDay()->setTime(8, 0)->toDateTimeString(),
+            'ends_at' => now()->addDay()->setTime(10, 0)->toDateTimeString(),
+        ]);
+    }
+
+    #[Test]
+    public function quote_enforces_meta_max_hours(): void
+    {
+        $this->tarif->forceFill(['meta' => ['max_hours' => 2]])->save();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('maksimal');
+
+        app(PricingService::class)->quote([
+            'tarif_id' => $this->tarif->id,
+            'kategori_tarif' => 'non_pemerintah',
+            'starts_at' => now()->addDay()->setTime(8, 0)->toDateTimeString(),
+            'ends_at' => now()->addDay()->setTime(11, 0)->toDateTimeString(),
+        ]);
+    }
+
+    #[Test]
+    public function day_slots_marks_past_and_closed_hours(): void
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('booking_venue_closures')) {
+            $this->markTestSkipped('Tabel booking_venue_closures belum ada — jalankan migrate dulu.');
+        }
+
+        $date = now()->addDay()->toDateString();
+
+        BookingVenueClosure::query()->create([
+            'venue_id' => $this->venue->id,
+            'area_id' => null,
+            'starts_at' => $date.' 10:00:00',
+            'ends_at' => $date.' 12:00:00',
+            'reason' => 'Maintenance',
+            'is_active' => true,
+        ]);
+
+        $result = app(AvailabilityService::class)->daySlots([
+            'venue_id' => $this->venue->id,
+            'area_id' => $this->area->id,
+            'date' => $date,
+            'duration_hours' => 1,
+        ]);
+
+        $this->assertNotEmpty($result['slots']);
+        $closed = collect($result['slots'])->firstWhere('starts_at', $date.' 10:00:00');
+        $this->assertNotNull($closed);
+        $this->assertFalse($closed['bookable']);
+        $this->assertSame('merah', $closed['status']);
     }
 
     #[Test]
@@ -218,13 +321,6 @@ class BookingCoreTest extends TestCase
     {
         $payload = $this->validSubmitPayload();
         $userId = $attrs['user_id'] ?? $this->penyewa->id;
-        $profileId = $attrs['penyewa_profile_id'] ?? $this->profile->id;
-
-        if ($userId !== $this->penyewa->id) {
-            // ensure ktp for other user
-            $profile = BookingPenyewaProfile::query()->findOrFail($profileId);
-            $this->attachKtp($profile);
-        }
 
         $booking = app(BookingSubmitService::class)->submit(
             User::query()->findOrFail($userId),
@@ -315,8 +411,8 @@ class BookingCoreTest extends TestCase
         BookingSetting::setValue('kontak_klarifikasi', '085777183633');
 
         $docType = BookingDocumentType::query()->firstOrCreate(
-            ['code' => 'ktp'],
-            ['name' => 'KTP', 'is_required' => true, 'is_active' => true, 'sort_order' => 1]
+            ['code' => 'dokumen'],
+            ['name' => 'Dokumen pendukung', 'is_required' => false, 'is_active' => true, 'sort_order' => 1]
         );
 
         $this->admin = User::query()->create([
@@ -331,7 +427,6 @@ class BookingCoreTest extends TestCase
 
         $this->penyewa = $this->makePenyewa('penyewa.'.$suffix.'@test.local', $penyewaRole);
         $this->profile = BookingPenyewaProfile::query()->where('user_id', $this->penyewa->id)->firstOrFail();
-        $this->attachKtp($this->profile, $docType->id);
     }
 
     private function makePenyewa(string $email, ?Role $role = null): User
@@ -358,23 +453,5 @@ class BookingCoreTest extends TestCase
         ]);
 
         return $user;
-    }
-
-    private function attachKtp(BookingPenyewaProfile $profile, ?int $docTypeId = null): void
-    {
-        $docTypeId ??= BookingDocumentType::query()->where('code', 'ktp')->value('id');
-        $path = 'booking/ktp/'.$profile->user_id.'/demo.txt';
-        Storage::disk('public')->put($path, 'demo');
-
-        BookingPenyewaDocument::query()->updateOrCreate(
-            [
-                'penyewa_profile_id' => $profile->id,
-                'document_type_id' => $docTypeId,
-            ],
-            [
-                'file_path' => $path,
-                'original_name' => 'demo.txt',
-            ]
-        );
     }
 }

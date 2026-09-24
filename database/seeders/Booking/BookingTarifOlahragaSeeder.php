@@ -18,6 +18,7 @@ class BookingTarifOlahragaSeeder extends Seeder
         $this->seedTennis();
         $this->seedRoadRace();
         $this->seedAquatic();
+        $this->seedSaranaLainnya();
     }
 
     private function seedPakansari(): void
@@ -207,6 +208,104 @@ class BookingTarifOlahragaSeeder extends Seeder
         ]);
     }
 
+    /**
+     * Perda §6 — satu kolom tarif: seed pemerintah = non_pemerintah.
+     * Constraint jam disimpan di meta (enforce engine menyusul).
+     */
+    private function seedSaranaLainnya(): void
+    {
+        $v = $this->venueId('sarana_lainnya');
+
+        // A. Stadion Mini Cibinong (Persikabo)
+        $this->tarifFlat($v, 'stadion_mini_cibinong', 'sl_smc_kompetisi_siang', 'Pertandingan (Kompetisi, Turnamen, Komersil) – Siang', BookingSatuan::PER_HOUR, 1500000, [
+            'time_slot' => 'siang',
+        ]);
+        $this->tarifFlat($v, 'stadion_mini_cibinong', 'sl_smc_kompetisi_malam', 'Pertandingan (Kompetisi, Turnamen, Komersil) – Malam', BookingSatuan::PER_HOUR, 2500000, [
+            'time_slot' => 'malam',
+        ]);
+        $this->tarifFlat($v, 'stadion_mini_cibinong', 'sl_smc_latihan_siang', 'Pertandingan (Latihan, Persahabatan, Non Komersil) – Siang', BookingSatuan::PER_HOUR, 1000000, [
+            'time_slot' => 'siang',
+            'meta' => ['min_hours' => 3],
+        ]);
+        $this->tarifFlat($v, 'stadion_mini_cibinong', 'sl_smc_latihan_malam', 'Pertandingan (Latihan, Persahabatan, Non Komersil) – Malam', BookingSatuan::PER_HOUR, 2000000, [
+            'time_slot' => 'malam',
+            'meta' => ['min_hours' => 3],
+        ]);
+
+        // B. Gelanggang Olahraga Masyarakat di Kecamatan
+        $this->tarifFlat($v, 'gelanggang_kecamatan', 'sl_gk_kompetisi_siang', 'Pertandingan (Kompetisi, Turnamen) – Siang', BookingSatuan::PER_HOUR, 100000, [
+            'time_slot' => 'siang',
+        ]);
+        $this->tarifFlat($v, 'gelanggang_kecamatan', 'sl_gk_kompetisi_malam', 'Pertandingan (Kompetisi, Turnamen) – Malam', BookingSatuan::PER_HOUR, 150000, [
+            'time_slot' => 'malam',
+        ]);
+        $this->tarifFlat($v, 'gelanggang_kecamatan', 'sl_gk_latihan_siang', 'Latihan Cabang Olahraga – Siang', BookingSatuan::PER_HOUR, 50000, [
+            'time_slot' => 'siang',
+        ]);
+        $this->tarifFlat($v, 'gelanggang_kecamatan', 'sl_gk_latihan_malam', 'Latihan Cabang Olahraga – Malam', BookingSatuan::PER_HOUR, 84000, [
+            'time_slot' => 'malam',
+        ]);
+        $this->tarifFlat($v, 'gelanggang_kecamatan', 'sl_gk_uji_siang', 'Pertandingan (Uji Coba/Persahabatan) – Siang', BookingSatuan::PER_HOUR, 50000, [
+            'time_slot' => 'siang',
+        ]);
+        $this->tarifFlat($v, 'gelanggang_kecamatan', 'sl_gk_uji_malam', 'Pertandingan (Uji Coba/Persahabatan) – Malam', BookingSatuan::PER_HOUR, 84000, [
+            'time_slot' => 'malam',
+        ]);
+        $this->tarifFlat($v, 'gelanggang_kecamatan', 'sl_gk_masyarakat_siang', 'Latihan Untuk Masyarakat – Siang', BookingSatuan::PER_HOUR, 0, [
+            'time_slot' => 'siang',
+            'meta' => ['max_hours' => 2],
+        ]);
+        $this->tarifFlat($v, 'gelanggang_kecamatan', 'sl_gk_masyarakat_malam', 'Latihan Untuk Masyarakat – Malam', BookingSatuan::PER_HOUR, 0, [
+            'time_slot' => 'malam',
+            'meta' => ['max_hours' => 2],
+        ]);
+
+        // C. Prasarana Publik dan Olahraga di Kecamatan
+        $this->tarifFlat($v, 'prasarana_kecamatan', 'sl_pk_kompetisi_siang', 'Pertandingan (Kompetisi, Turnamen) – Siang', BookingSatuan::PER_HOUR, 150000, [
+            'time_slot' => 'siang',
+        ]);
+        $this->tarifFlat($v, 'prasarana_kecamatan', 'sl_pk_kompetisi_malam', 'Pertandingan (Kompetisi, Turnamen) – Malam', BookingSatuan::PER_HOUR, 300000, [
+            'time_slot' => 'malam',
+        ]);
+        $this->tarifFlat($v, 'prasarana_kecamatan', 'sl_pk_latihan_siang', 'Latihan Cabang Olahraga – Siang', BookingSatuan::PER_HOUR, 50000, [
+            'time_slot' => 'siang',
+        ]);
+        $this->tarifFlat($v, 'prasarana_kecamatan', 'sl_pk_latihan_malam', 'Latihan Cabang Olahraga – Malam', BookingSatuan::PER_HOUR, 150000, [
+            'time_slot' => 'malam',
+        ]);
+        $this->tarifFlat($v, 'prasarana_kecamatan', 'sl_pk_uji_siang', 'Pertandingan (Uji Coba/Persahabatan) – Siang', BookingSatuan::PER_MATCH, 200000, [
+            'time_slot' => 'siang',
+        ]);
+        $this->tarifFlat($v, 'prasarana_kecamatan', 'sl_pk_uji_malam', 'Pertandingan (Uji Coba/Persahabatan) – Malam', BookingSatuan::PER_MATCH, 750000, [
+            'time_slot' => 'malam',
+        ]);
+        $this->tarifFlat($v, 'prasarana_kecamatan', 'sl_pk_masyarakat_siang', 'Latihan Untuk Masyarakat – Siang', BookingSatuan::PER_HOUR, 0, [
+            'time_slot' => 'siang',
+            'meta' => ['max_hours' => 2],
+        ]);
+        $this->tarifFlat($v, 'prasarana_kecamatan', 'sl_pk_masyarakat_malam', 'Latihan Untuk Masyarakat – Malam', BookingSatuan::PER_HOUR, 0, [
+            'time_slot' => 'malam',
+            'meta' => ['max_hours' => 2],
+        ]);
+    }
+
+    /**
+     * Tarif tunggal Perda → isi kedua kolom dengan nilai yang sama.
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    private function tarifFlat(
+        int $venueId,
+        ?string $areaCode,
+        string $code,
+        string $uraian,
+        string $satuan,
+        int $harga,
+        array $extra = []
+    ): void {
+        $this->tarif($venueId, $areaCode, $code, $uraian, $satuan, $harga, $harga, $extra);
+    }
+
     private function venueId(string $code): int
     {
         return (int) BookingVenue::query()->where('code', $code)->value('id');
@@ -248,6 +347,7 @@ class BookingTarifOlahragaSeeder extends Seeder
                 'vehicle_class' => $extra['vehicle_class'] ?? null,
                 'event_level' => $extra['event_level'] ?? null,
                 'category' => $extra['category'] ?? 'olahraga',
+                'meta' => $extra['meta'] ?? null,
                 'is_active' => true,
             ]
         );

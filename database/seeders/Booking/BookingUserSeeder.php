@@ -2,19 +2,17 @@
 
 namespace Database\Seeders\Booking;
 
-use App\Models\Booking\BookingDocumentType;
-use App\Models\Booking\BookingPenyewaDocument;
 use App\Models\Booking\BookingPenyewaProfile;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * User demo E-Booking (admin UPT + penyewa).
  *
  * Password default: password123
+ * Kelengkapan wajib: email + no_hp. Upload dokumen bersifat opsional.
  */
 class BookingUserSeeder extends Seeder
 {
@@ -57,7 +55,7 @@ class BookingUserSeeder extends Seeder
         }
         $penyewa->forceFill(['current_role_id' => $penyewaRole->id])->save();
 
-        $profile = BookingPenyewaProfile::query()->updateOrCreate(
+        BookingPenyewaProfile::query()->updateOrCreate(
             ['user_id' => $penyewa->id],
             [
                 'nama' => 'Penyewa Demo',
@@ -69,34 +67,8 @@ class BookingUserSeeder extends Seeder
             ]
         );
 
-        $this->seedDemoKtp($profile);
-
         $this->command?->info('Booking users seeded:');
         $this->command?->info('  admin.upt@test.local / password123 (admin_upt)');
-        $this->command?->info('  penyewa.demo@test.local / password123 (penyewa + KTP dummy)');
-    }
-
-    private function seedDemoKtp(BookingPenyewaProfile $profile): void
-    {
-        $docType = BookingDocumentType::query()->where('code', 'ktp')->where('is_active', true)->first();
-        if (! $docType) {
-            return;
-        }
-
-        $relative = 'booking/ktp/'.$profile->user_id.'/demo-ktp.txt';
-        Storage::disk('public')->put($relative, "DEMO KTP\nNIK: {$profile->nik}\nNama: {$profile->nama}\n");
-
-        BookingPenyewaDocument::query()->updateOrCreate(
-            [
-                'penyewa_profile_id' => $profile->id,
-                'document_type_id' => $docType->id,
-            ],
-            [
-                'file_path' => $relative,
-                'original_name' => 'demo-ktp.txt',
-                'verified_at' => now(),
-                'verified_by' => null,
-            ]
-        );
+        $this->command?->info('  penyewa.demo@test.local / password123 (penyewa — kontak email+HP siap)');
     }
 }

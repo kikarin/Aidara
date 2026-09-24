@@ -12,6 +12,7 @@ use App\Models\Booking\BookingTarif;
 use App\Models\Booking\BookingVenue;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * CRUD master minimal untuk admin UPT.
@@ -25,6 +26,7 @@ class MasterAdminController extends Controller
                 'code' => ['required', 'string', 'max:64', 'unique:booking_venues,code'],
                 'name' => ['required', 'string', 'max:150'],
                 'description' => ['nullable', 'string'],
+                'cover_path' => ['nullable', 'string', 'max:255'],
                 'is_active' => ['boolean'],
                 'sort_order' => ['nullable', 'integer'],
             ]);
@@ -45,12 +47,37 @@ class MasterAdminController extends Controller
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:150'],
             'description' => ['nullable', 'string'],
+            'cover_path' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
             'sort_order' => ['nullable', 'integer'],
         ]);
         $venue->update($data);
 
-        return response()->json(['success' => true, 'data' => $venue]);
+        return response()->json(['success' => true, 'data' => $venue->fresh()]);
+    }
+
+    public function uploadCover(Request $request, int $id): JsonResponse
+    {
+        $venue = BookingVenue::query()->findOrFail($id);
+        $request->validate([
+            'cover' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'],
+        ]);
+
+        $file = $request->file('cover');
+        $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
+        $path = $file->storeAs('booking/venues', $venue->code.'.'.$ext, 'public');
+
+        if ($venue->cover_path && $venue->cover_path !== $path) {
+            Storage::disk('public')->delete($venue->cover_path);
+        }
+
+        $venue->update(['cover_path' => $path]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cover venue diperbarui',
+            'data' => $venue->fresh(),
+        ]);
     }
 
     public function areas(Request $request): JsonResponse

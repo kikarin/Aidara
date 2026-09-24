@@ -48,7 +48,7 @@ Route::middleware(['auth:sanctum', 'booking.role:penyewa,admin_upt'])->group(fun
     Route::prefix('penyewa')->group(function () {
         Route::get('/profile', [PenyewaProfileController::class, 'show']);
         Route::put('/profile', [PenyewaProfileController::class, 'update']);
-        Route::post('/documents/ktp', [PenyewaProfileController::class, 'uploadKtp']);
+        Route::post('/documents', [PenyewaProfileController::class, 'uploadDocument']);
 
         Route::post('/quote', [PenyewaBookingController::class, 'quote']);
         Route::get('/bookings', [PenyewaBookingController::class, 'index']);
@@ -80,6 +80,7 @@ Route::middleware(['auth:sanctum', 'booking.role:admin_upt'])->prefix('admin')->
 
     Route::match(['get', 'post'], '/venues', [MasterAdminController::class, 'venues']);
     Route::put('/venues/{id}', [MasterAdminController::class, 'updateVenue'])->whereNumber('id');
+    Route::post('/venues/{id}/cover', [MasterAdminController::class, 'uploadCover'])->whereNumber('id');
     Route::match(['get', 'post'], '/areas', [MasterAdminController::class, 'areas']);
     Route::put('/areas/{id}', [MasterAdminController::class, 'updateArea'])->whereNumber('id');
     Route::match(['get', 'post'], '/tarifs', [MasterAdminController::class, 'tarifs']);
@@ -90,4 +91,9 @@ Route::middleware(['auth:sanctum', 'booking.role:admin_upt'])->prefix('admin')->
     Route::put('/rules/{id}', [MasterAdminController::class, 'updateRule'])->whereNumber('id');
     Route::match(['get', 'post', 'put'], '/settings', [MasterAdminController::class, 'settings']);
     Route::get('/priority-rules', [MasterAdminController::class, 'priorityRules']);
+
+    Route::get('/closures', [\App\Http\Controllers\Booking\Admin\ClosureAdminController::class, 'index']);
+    Route::post('/closures', [\App\Http\Controllers\Booking\Admin\ClosureAdminController::class, 'store']);
+    Route::put('/closures/{id}', [\App\Http\Controllers\Booking\Admin\ClosureAdminController::class, 'update'])->whereNumber('id');
+    Route::delete('/closures/{id}', [\App\Http\Controllers\Booking\Admin\ClosureAdminController::class, 'destroy'])->whereNumber('id');
 });

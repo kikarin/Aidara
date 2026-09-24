@@ -32,11 +32,20 @@ class AvailabilityController extends Controller
             ->with(['areas' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')])
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get(['id', 'code', 'name', 'description', 'sort_order']);
+            ->get(['id', 'code', 'name', 'description', 'cover_path', 'sort_order']);
 
         return response()->json([
             'success' => true,
-            'data' => $venues,
+            'data' => $venues->map(fn (BookingVenue $v) => [
+                'id' => $v->id,
+                'code' => $v->code,
+                'name' => $v->name,
+                'description' => $v->description,
+                'cover_path' => $v->cover_path,
+                'cover_url' => $v->cover_url,
+                'sort_order' => $v->sort_order,
+                'areas' => $v->areas,
+            ]),
         ]);
     }
 

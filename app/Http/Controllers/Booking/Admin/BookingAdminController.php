@@ -22,7 +22,14 @@ class BookingAdminController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Booking::query()
-            ->with(['venue:id,code,name', 'area:id,code,name', 'user:id,name,email', 'priorityRule', 'payments'])
+            ->with([
+                'venue:id,code,name',
+                'area:id,code,name',
+                'user:id,name,email',
+                'penyewaProfile:id,nama,no_hp,instansi',
+                'priorityRule',
+                'payments',
+            ])
             ->latest();
 
         if ($request->filled('status')) {

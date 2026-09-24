@@ -5,11 +5,11 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
+    'allowed_origins' => array_values(array_filter([
         env('FRONTEND_URL'),
         env('FRONTEND_URL_ALT'),
         env('FRONTEND_URL_PROD'),
-    ],
+    ])),
 
     'allowed_origins_patterns' => [],
 

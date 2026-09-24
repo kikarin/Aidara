@@ -17,7 +17,7 @@ class UpdatePenyewaProfileRequest extends FormRequest
         return [
             'nama' => ['required', 'string', 'max:150'],
             'nik' => ['nullable', 'string', 'max:32'],
-            'no_hp' => ['nullable', 'string', 'max:32'],
+            'no_hp' => ['required', 'string', 'max:32'],
             'alamat' => ['nullable', 'string'],
             'instansi' => ['nullable', 'string', 'max:150'],
             'kategori_default' => ['nullable', 'in:pemerintah,non_pemerintah'],

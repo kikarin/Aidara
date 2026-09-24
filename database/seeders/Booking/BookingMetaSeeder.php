@@ -80,15 +80,25 @@ class BookingMetaSeeder extends Seeder
 
     private function seedDocumentTypes(): void
     {
+        // Jenis dokumen generik — opsional sampai UPT tentukan daftar wajib.
         BookingDocumentType::query()->updateOrCreate(
-            ['code' => 'ktp'],
+            ['code' => 'dokumen'],
             [
-                'name' => 'KTP',
-                'is_required' => true,
+                'name' => 'Dokumen pendukung',
+                'is_required' => false,
                 'is_active' => true,
                 'sort_order' => 1,
             ]
         );
+
+        // Legacy code `ktp` dinonaktifkan (bukan lagi syarat submit).
+        BookingDocumentType::query()
+            ->where('code', 'ktp')
+            ->update([
+                'is_required' => false,
+                'is_active' => false,
+                'name' => 'KTP (nonaktif — diganti dokumen generik)',
+            ]);
     }
 
     private function seedAddons(): void

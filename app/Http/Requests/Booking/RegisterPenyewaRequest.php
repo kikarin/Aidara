@@ -18,7 +18,7 @@ class RegisterPenyewaRequest extends FormRequest
             'nama' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'no_hp' => ['nullable', 'string', 'max:32'],
+            'no_hp' => ['required', 'string', 'max:32'],
             'nik' => ['nullable', 'string', 'max:32'],
             'alamat' => ['nullable', 'string'],
             'instansi' => ['nullable', 'string', 'max:150'],
