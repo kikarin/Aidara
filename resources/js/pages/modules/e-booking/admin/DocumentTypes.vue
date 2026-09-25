@@ -104,6 +104,14 @@ const rowActions = (row: DocumentTypeRow) => [
         label: row.is_active ? 'Nonaktifkan' : 'Aktifkan',
         icon: Power,
         variant: row.is_active ? ('destructive' as const) : ('default' as const),
+        confirm: row.is_active
+            ? {
+                  title: 'Nonaktifkan dokumen ini?',
+                  description: 'Dokumen tidak lagi diminta saat pengajuan.',
+                  confirmText: 'Nonaktifkan',
+                  variant: 'destructive' as const,
+              }
+            : undefined,
         onClick: () => toggle(row),
     },
 ];

@@ -104,6 +104,14 @@ const rowActions = (row: RuleRow) => [
         label: row.is_active ? 'Nonaktifkan' : 'Aktifkan',
         icon: Power,
         variant: row.is_active ? ('destructive' as const) : ('default' as const),
+        confirm: row.is_active
+            ? {
+                  title: 'Nonaktifkan prioritas ini?',
+                  description: 'Aturan prioritas tidak lagi dipakai saat konflik jadwal.',
+                  confirmText: 'Nonaktifkan',
+                  variant: 'destructive' as const,
+              }
+            : undefined,
         onClick: () => toggle(row),
     },
 ];

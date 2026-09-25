@@ -45,6 +45,14 @@ const rowActions = (row: VenueRow) => [
         label: row.is_active ? 'Nonaktifkan' : 'Aktifkan',
         icon: Power,
         variant: row.is_active ? ('destructive' as const) : ('default' as const),
+        confirm: row.is_active
+            ? {
+                  title: 'Nonaktifkan venue ini?',
+                  description: 'Venue akan disembunyikan dari katalog.',
+                  confirmText: 'Nonaktifkan',
+                  variant: 'destructive' as const,
+              }
+            : undefined,
         onClick: () => toggle(row),
     },
 ];

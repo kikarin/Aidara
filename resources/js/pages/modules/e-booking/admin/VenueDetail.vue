@@ -158,6 +158,14 @@ const areaRowActions = (row: AreaRow) => [
         label: row.is_active ? 'Nonaktifkan' : 'Aktifkan',
         icon: Power,
         variant: row.is_active ? ('destructive' as const) : ('default' as const),
+        confirm: row.is_active
+            ? {
+                  title: 'Nonaktifkan area ini?',
+                  description: 'Area akan disembunyikan dari pilihan penyewa.',
+                  confirmText: 'Nonaktifkan',
+                  variant: 'destructive' as const,
+              }
+            : undefined,
         onClick: () => toggleArea(row),
     },
 ];
@@ -247,6 +255,14 @@ const tarifRowActions = (row: TarifRow) => [
         label: row.is_active ? 'Nonaktifkan' : 'Aktifkan',
         icon: Power,
         variant: row.is_active ? ('destructive' as const) : ('default' as const),
+        confirm: row.is_active
+            ? {
+                  title: 'Nonaktifkan tarif ini?',
+                  description: 'Tarif akan disembunyikan dari pilihan penyewa.',
+                  confirmText: 'Nonaktifkan',
+                  variant: 'destructive' as const,
+              }
+            : undefined,
         onClick: () => toggleTarif(row),
     },
 ];
@@ -370,11 +386,23 @@ const addRule = () => {
 };
 
 const removeRule = (id: number) => {
-    if (!confirm('Hapus aturan ini?')) return;
     router.delete(route('e-booking.admin.rules.destroy', id), { preserveScroll: true });
 };
 
-const ruleRowActions = (row: RuleRow) => [{ label: 'Hapus', icon: Trash2, variant: 'destructive' as const, onClick: () => removeRule(row.id) }];
+const ruleRowActions = (row: RuleRow) => [
+    {
+        label: 'Hapus',
+        icon: Trash2,
+        variant: 'destructive' as const,
+        confirm: {
+            title: 'Hapus aturan ini?',
+            description: 'Aturan akan dihapus permanen.',
+            confirmText: 'Hapus',
+            variant: 'destructive' as const,
+        },
+        onClick: () => removeRule(row.id),
+    },
+];
 
 const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '—'));
 </script>

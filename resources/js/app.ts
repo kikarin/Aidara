@@ -1,14 +1,15 @@
 import '../css/app.css';
 
 import { createInertiaApp, router } from '@inertiajs/vue3';
+import axios from 'axios';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
+import ConfirmDialog from './components/e-booking/ConfirmDialog.vue';
 import { initializeTheme } from './composables/useAppearance';
 import PersistentAppShell from './layouts/PersistentAppShell.vue';
 import { shouldUsePersistentShell } from './lib/inertiaLayout';
-import axios from 'axios';
 
 // Configure axios to send credentials (cookies) with requests for session-based auth
 axios.defaults.withCredentials = true;
@@ -50,7 +51,7 @@ createInertiaApp({
         return page;
     },
     setup({ el, App, props, plugin }) {
-        createApp({ render: () => h(App, props) })
+        createApp({ render: () => [h(App, props), h(ConfirmDialog)] })
             .use(plugin)
             .use(ZiggyVue)
             .mount(el);

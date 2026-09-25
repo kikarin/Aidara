@@ -28,6 +28,7 @@ class VenueController extends Controller
             ->where('is_active', true)
             ->with([
                 'areas' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order'),
+                'facilities' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order'),
             ])
             ->findOrFail($id);
 
@@ -73,6 +74,11 @@ class VenueController extends Controller
                     'code' => $a->code,
                     'name' => $a->name,
                     'is_tentative' => (bool) $a->is_tentative,
+                ]),
+                'facilities' => $venue->facilities->map(fn ($f) => [
+                    'id' => $f->id,
+                    'name' => $f->name,
+                    'icon' => $f->icon,
                 ]),
             ],
             'tarifs' => $tarifs,

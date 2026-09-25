@@ -1,4 +1,5 @@
 <script lang="ts">
+import type { ConfirmOptions } from '@/composables/useConfirm';
 import type { Component } from 'vue';
 
 export type RowAction = {
@@ -7,18 +8,33 @@ export type RowAction = {
     href?: string;
     onClick?: () => void;
     variant?: 'default' | 'destructive';
+    confirm?: ConfirmOptions;
 };
 </script>
 
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useConfirm } from '@/composables/useConfirm';
 import { Link } from '@inertiajs/vue3';
 import { MoreVertical } from 'lucide-vue-next';
 
 defineProps<{
     items: RowAction[];
 }>();
+
+const { confirm } = useConfirm();
+
+const run = async (item: RowAction) => {
+    if (!item.onClick) return;
+
+    if (item.confirm) {
+        const ok = await confirm(item.confirm);
+        if (!ok) return;
+    }
+
+    item.onClick();
+};
 
 const itemClass = (item: RowAction) =>
     item.variant === 'destructive'
@@ -47,7 +63,7 @@ const itemClass = (item: RowAction) =>
                         {{ item.label }}
                     </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem v-else :class="itemClass(item)" @click="item.onClick?.()">
+                <DropdownMenuItem v-else :class="itemClass(item)" @click="run(item)">
                     <component
                         :is="item.icon"
                         v-if="item.icon"

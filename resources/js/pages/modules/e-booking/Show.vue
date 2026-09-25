@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppImage from '@/components/AppImage.vue';
 import BookingAvailabilityCalendar from '@/components/e-booking/BookingAvailabilityCalendar.vue';
+import FacilityIcon from '@/components/e-booking/FacilityIcon.vue';
 import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
 import SimpleSelect from '@/components/ui/select/SimpleSelect.vue';
@@ -17,6 +18,7 @@ type VenueDetail = {
     description: string | null;
     cover_url: string | null;
     areas: Array<{ id: number; code: string; name: string; is_tentative: boolean }>;
+    facilities: Array<{ id: number; name: string; icon: string | null }>;
 };
 
 type DaySlot = {
@@ -711,7 +713,38 @@ const slotClass = (slot: DaySlot) => {
             <div class="p-6 sm:p-7">
                 <Link :href="route('e-booking.catalog')" class="text-sm font-semibold text-sky-700 hover:underline"> ← Lihat tempat lain </Link>
                 <h1 class="mt-3 text-3xl font-bold tracking-tight text-slate-900">{{ venue.name }}</h1>
-                <p v-if="venue.description" class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{{ venue.description }}</p>
+
+                <div class="mt-4 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+                    <div>
+                        <p v-if="venue.description" class="text-sm leading-6 text-slate-600">{{ venue.description }}</p>
+
+                        <div v-if="venue.facilities && venue.facilities.length" class="mt-4">
+                            <p class="text-sm font-semibold text-slate-900">Fasilitas</p>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <span
+                                    v-for="facility in venue.facilities"
+                                    :key="facility.id"
+                                    class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700"
+                                >
+                                    <FacilityIcon :icon="facility.icon" class="size-4 text-sky-700" />
+                                    {{ facility.name }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="termsPoints.length" class="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                        <div class="flex items-start gap-2">
+                            <ShieldCheck class="mt-0.5 size-5 shrink-0 text-amber-700" />
+                            <div>
+                                <p class="font-semibold text-slate-900">{{ termsTitle || 'Tata tertib' }}</p>
+                                <ul class="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-700">
+                                    <li v-for="(point, index) in termsPoints" :key="index">{{ point }}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -919,13 +952,6 @@ const slotClass = (slot: DaySlot) => {
                                 </span>
                             </label>
                         </div>
-                    </div>
-
-                    <div v-if="termsPoints.length" class="mt-5">
-                        <p class="text-sm font-medium text-slate-800">{{ termsTitle || 'Tata tertib' }}</p>
-                        <ul class="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-600">
-                            <li v-for="(point, index) in termsPoints" :key="index">{{ point }}</li>
-                        </ul>
                     </div>
                 </section>
             </div>

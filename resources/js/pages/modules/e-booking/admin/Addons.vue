@@ -109,6 +109,14 @@ const rowActions = (row: AddonRow) => [
         label: row.is_active ? 'Nonaktifkan' : 'Aktifkan',
         icon: Power,
         variant: row.is_active ? ('destructive' as const) : ('default' as const),
+        confirm: row.is_active
+            ? {
+                  title: 'Nonaktifkan layanan ini?',
+                  description: 'Layanan akan disembunyikan dari pilihan penyewa.',
+                  confirmText: 'Nonaktifkan',
+                  variant: 'destructive' as const,
+              }
+            : undefined,
         onClick: () => toggle(row),
     },
 ];
