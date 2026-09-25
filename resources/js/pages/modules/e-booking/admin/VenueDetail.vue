@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import AppImage from '@/components/AppImage.vue';
+import RowActionsMenu from '@/components/e-booking/RowActionsMenu.vue';
+import TablePagination from '@/components/e-booking/TablePagination.vue';
 import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
 import TimeField from '@/components/TimeField.vue';
@@ -12,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, LoaderCircle, Plus, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, LoaderCircle, Pencil, Plus, Power, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 type Venue = {
@@ -71,8 +73,9 @@ const props = defineProps<{
     allAreas: AreaOption[];
     tarifs: Paginator<TarifRow>;
     rules: Record<string, unknown>;
-    ruleList: RuleRow[];
+    ruleList: Paginator<RuleRow>;
     options: { satuan: string[]; categories: string[] };
+    terms: { value: string; label: string }[];
 }>();
 
 const satuanLabels: Record<string, string> = {
@@ -148,6 +151,16 @@ const submitArea = () => {
 const toggleArea = (row: AreaRow) => {
     router.post(route('e-booking.admin.areas.toggle', row.id), {}, { preserveScroll: true });
 };
+
+const areaRowActions = (row: AreaRow) => [
+    { label: 'Edit', icon: Pencil, onClick: () => startEditArea(row) },
+    {
+        label: row.is_active ? 'Nonaktifkan' : 'Aktifkan',
+        icon: Power,
+        variant: row.is_active ? ('destructive' as const) : ('default' as const),
+        onClick: () => toggleArea(row),
+    },
+];
 
 /* ---------- Tarif ---------- */
 const tarifEditingId = ref<number | null>(null);
@@ -227,6 +240,16 @@ const submitTarif = () => {
 const toggleTarif = (row: TarifRow) => {
     router.post(route('e-booking.admin.tarifs.toggle', row.id), {}, { preserveScroll: true });
 };
+
+const tarifRowActions = (row: TarifRow) => [
+    { label: 'Edit', icon: Pencil, onClick: () => startEditTarif(row) },
+    {
+        label: row.is_active ? 'Nonaktifkan' : 'Aktifkan',
+        icon: Power,
+        variant: row.is_active ? ('destructive' as const) : ('default' as const),
+        onClick: () => toggleTarif(row),
+    },
+];
 
 /* ---------- Aturan ---------- */
 const days = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
@@ -351,6 +374,8 @@ const removeRule = (id: number) => {
     router.delete(route('e-booking.admin.rules.destroy', id), { preserveScroll: true });
 };
 
+const ruleRowActions = (row: RuleRow) => [{ label: 'Hapus', icon: Trash2, variant: 'destructive' as const, onClick: () => removeRule(row.id) }];
+
 const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '—'));
 </script>
 
@@ -457,19 +482,7 @@ const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !
                                 <Badge :variant="row.is_active ? 'default' : 'secondary'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
                             </TableCell>
                             <TableCell class="text-right">
-                                <div class="flex justify-end gap-2">
-                                    <button type="button" class="text-xs font-semibold text-slate-600 hover:underline" @click="startEditArea(row)">
-                                        Edit
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="text-xs font-semibold hover:underline"
-                                        :class="row.is_active ? 'text-red-600' : 'text-emerald-700'"
-                                        @click="toggleArea(row)"
-                                    >
-                                        {{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                                    </button>
-                                </div>
+                                <RowActionsMenu :items="areaRowActions(row)" />
                             </TableCell>
                         </TableRow>
                         <TableRow v-if="areas.data.length === 0">
@@ -478,18 +491,7 @@ const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !
                     </TableBody>
                 </Table>
 
-                <div v-if="areas.links?.length > 3" class="mt-4 flex flex-wrap gap-2">
-                    <template v-for="(link, i) in areas.links" :key="i">
-                        <Link
-                            v-if="link.url"
-                            :href="link.url"
-                            class="border-border rounded-md border px-3 py-1 text-xs"
-                            :class="link.active ? 'bg-muted font-semibold' : ''"
-                        >
-                            <span v-html="link.label" />
-                        </Link>
-                    </template>
-                </div>
+                <TablePagination :links="areas.links" :from="areas.from" :to="areas.to" :total="areas.total" label="area" />
             </TabsContent>
 
             <TabsContent value="tarif" class="mt-4">
@@ -606,19 +608,7 @@ const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !
                                 <Badge :variant="row.is_active ? 'default' : 'secondary'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
                             </TableCell>
                             <TableCell class="text-right">
-                                <div class="flex justify-end gap-2">
-                                    <button type="button" class="text-xs font-semibold text-slate-600 hover:underline" @click="startEditTarif(row)">
-                                        Edit
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="text-xs font-semibold hover:underline"
-                                        :class="row.is_active ? 'text-red-600' : 'text-emerald-700'"
-                                        @click="toggleTarif(row)"
-                                    >
-                                        {{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                                    </button>
-                                </div>
+                                <RowActionsMenu :items="tarifRowActions(row)" />
                             </TableCell>
                         </TableRow>
                         <TableRow v-if="tarifs.data.length === 0">
@@ -627,18 +617,7 @@ const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !
                     </TableBody>
                 </Table>
 
-                <div v-if="tarifs.links?.length > 3" class="mt-4 flex flex-wrap gap-2">
-                    <template v-for="(link, i) in tarifs.links" :key="i">
-                        <Link
-                            v-if="link.url"
-                            :href="link.url"
-                            class="border-border rounded-md border px-3 py-1 text-xs"
-                            :class="link.active ? 'bg-muted font-semibold' : ''"
-                        >
-                            <span v-html="link.label" />
-                        </Link>
-                    </template>
-                </div>
+                <TablePagination :links="tarifs.links" :from="tarifs.from" :to="tarifs.to" :total="tarifs.total" label="tarif" />
             </TabsContent>
 
             <TabsContent value="aturan" class="mt-4">
@@ -730,9 +709,14 @@ const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !
                     <section class="border-border grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
                         <h2 class="text-sm font-semibold sm:col-span-2">Lainnya</h2>
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium">Key tata tertib</label>
-                            <Input v-model="ruleForm.terms_key" type="text" maxlength="96" placeholder="terms_tennis" />
-                            <p class="text-muted-foreground mt-1 text-xs">Kelola teks di menu Tata tertib.</p>
+                            <label class="mb-1.5 block text-sm font-medium">Tata tertib</label>
+                            <SimpleSelect v-model="ruleForm.terms_key" :options="terms" placeholder="— Tanpa tata tertib —" />
+                            <p class="text-muted-foreground mt-1 text-xs">
+                                Kelola isi di menu
+                                <Link :href="route('e-booking.admin.terms.index')" class="font-semibold text-sky-700 hover:underline"
+                                    >Tata tertib</Link
+                                >.
+                            </p>
                         </div>
                         <div>
                             <label class="mb-1.5 block text-sm font-medium">Prefer hari booking</label>
@@ -799,7 +783,7 @@ const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            <TableRow v-for="row in ruleList" :key="row.id">
+                            <TableRow v-for="row in ruleList.data" :key="row.id">
                                 <TableCell>
                                     <code class="text-xs">{{ row.key }}</code>
                                 </TableCell>
@@ -808,16 +792,16 @@ const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !
                                 }}</TableCell>
                                 <TableCell>{{ row.is_active ? 'Ya' : 'Tidak' }}</TableCell>
                                 <TableCell class="text-right">
-                                    <button type="button" class="text-red-600 hover:opacity-70" title="Hapus" @click="removeRule(row.id)">
-                                        <Trash2 class="size-4" />
-                                    </button>
+                                    <RowActionsMenu :items="ruleRowActions(row)" />
                                 </TableCell>
                             </TableRow>
-                            <TableRow v-if="ruleList.length === 0">
+                            <TableRow v-if="ruleList.data.length === 0">
                                 <TableCell colspan="4" class="text-muted-foreground py-6 text-center">Belum ada aturan khusus venue.</TableCell>
                             </TableRow>
                         </TableBody>
                     </Table>
+
+                    <TablePagination :links="ruleList.links" :from="ruleList.from" :to="ruleList.to" :total="ruleList.total" label="aturan" />
 
                     <form class="border-border mt-4 grid gap-3 rounded-xl border p-4 sm:grid-cols-3" @submit.prevent="addRule">
                         <div>

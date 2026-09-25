@@ -2,10 +2,11 @@
 import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
 import { useForm } from '@inertiajs/vue3';
-import { LoaderCircle, Plus, Trash2 } from 'lucide-vue-next';
+import { LoaderCircle, Pencil, Plus, ScrollText, Trash2 } from 'lucide-vue-next';
 import { ref } from 'vue';
 
 type TermRow = {
@@ -19,55 +20,65 @@ defineProps<{
     terms: TermRow[];
 }>();
 
-const activeKey = ref<string | null>(null);
+const dialogOpen = ref(false);
+const editingKey = ref<string | null>(null);
 
 const form = useForm<{
+    slug: string;
     title: string;
     points: string[];
 }>({
+    slug: '',
     title: '',
     points: [''],
 });
 
-const startEdit = (term: TermRow) => {
-    activeKey.value = term.key;
-    form.clearErrors();
-    form.title = term.title ?? '';
-    form.points = term.points.length ? [...term.points] : [''];
-};
-
-const cancelEdit = () => {
-    activeKey.value = null;
+const resetForm = () => {
+    editingKey.value = null;
     form.reset();
     form.clearErrors();
 };
 
-const addPoint = () => {
-    form.points.push('');
+const openCreate = () => {
+    resetForm();
+    dialogOpen.value = true;
 };
 
+const openEdit = (term: TermRow) => {
+    editingKey.value = term.key;
+    form.clearErrors();
+    form.slug = term.key.replace(/^terms_/, '');
+    form.title = term.title ?? '';
+    form.points = term.points.length ? [...term.points] : [''];
+    dialogOpen.value = true;
+};
+
+const addPoint = () => form.points.push('');
 const removePoint = (index: number) => {
     form.points.splice(index, 1);
-    if (form.points.length === 0) {
-        form.points.push('');
+    if (form.points.length === 0) form.points.push('');
+};
+
+const submit = () => {
+    const options = {
+        preserveScroll: true,
+        onSuccess: () => {
+            resetForm();
+            dialogOpen.value = false;
+        },
+    };
+
+    if (editingKey.value) {
+        form.transform((data) => ({ title: data.title, points: data.points })).put(route('e-booking.admin.terms.update', editingKey.value), options);
+
+        return;
     }
-};
 
-const save = () => {
-    if (!activeKey.value) return;
-    form.put(route('e-booking.admin.terms.update', activeKey.value), {
-        preserveScroll: true,
-        onSuccess: () => cancelEdit(),
-    });
-};
-
-const newForm = useForm<{ key: string; title: string }>({ key: '', title: '' });
-
-const createNew = () => {
-    newForm.post(route('e-booking.admin.terms.store'), {
-        preserveScroll: true,
-        onSuccess: () => newForm.reset(),
-    });
+    form.transform((data) => ({
+        key: `terms_${data.slug}`.replace(/[^A-Za-z0-9_]/g, '_'),
+        title: data.title,
+        points: data.points,
+    })).post(route('e-booking.admin.terms.store'), options);
 };
 </script>
 
@@ -75,29 +86,80 @@ const createNew = () => {
     <SeoHead title="Tata Tertib E-Booking" />
 
     <AdminLayout active="terms">
-        <h1 class="text-foreground text-2xl font-bold">Tata tertib</h1>
-        <p class="text-muted-foreground mt-1 text-sm">
-            Teks aturan yang dicentang penyewa sebelum mengirim pengajuan. Venue memilih key ini lewat tab Aturan.
-        </p>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <h1 class="text-foreground text-2xl font-bold">Tata tertib</h1>
+                <p class="text-muted-foreground mt-1 text-sm">
+                    Teks aturan yang dicentang penyewa. Pilih tata tertib ini di form venue agar tampil di halaman sewa.
+                </p>
+            </div>
+            <Button @click="openCreate">
+                <Plus class="size-4" />
+                Tambah tata tertib
+            </Button>
+        </div>
 
         <div class="mt-6 space-y-4">
-            <div v-for="term in terms" :key="term.key" class="border-border rounded-xl border p-4">
+            <div v-for="term in terms" :key="term.key" class="border-border rounded-2xl border bg-white p-5 shadow-sm">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <p class="font-semibold">{{ term.title || term.key }}</p>
                         <code class="text-muted-foreground text-xs">{{ term.key }}</code>
                     </div>
-                    <Button v-if="activeKey !== term.key" type="button" variant="outline" size="sm" @click="startEdit(term)">Edit</Button>
+                    <Button type="button" variant="outline" size="sm" @click="openEdit(term)">
+                        <Pencil class="size-3.5" />
+                        Edit
+                    </Button>
                 </div>
 
-                <template v-if="activeKey === term.key">
-                    <div class="mt-4">
-                        <label class="mb-1.5 block text-sm font-medium">Judul</label>
-                        <Input v-model="form.title" type="text" maxlength="200" />
-                        <InputError :message="form.errors.title" />
+                <ul class="text-muted-foreground mt-3 list-disc space-y-1 pl-5 text-sm">
+                    <li v-for="(point, i) in term.points" :key="i">{{ point }}</li>
+                    <li v-if="term.points.length === 0" class="list-none italic">Belum ada poin.</li>
+                </ul>
+            </div>
+
+            <div
+                v-if="terms.length === 0"
+                class="text-muted-foreground flex flex-col items-center gap-2 rounded-2xl border border-dashed py-12 text-center"
+            >
+                <ScrollText class="size-9" />
+                <p class="text-sm">Belum ada tata tertib. Klik "Tambah tata tertib" untuk mulai.</p>
+            </div>
+        </div>
+
+        <Dialog v-model:open="dialogOpen">
+            <DialogContent class="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>{{ editingKey ? 'Ubah tata tertib' : 'Tambah tata tertib' }}</DialogTitle>
+                    <DialogDescription>Aturan yang akan disetujui penyewa saat mengajukan booking.</DialogDescription>
+                </DialogHeader>
+
+                <form class="space-y-4" @submit.prevent="submit">
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Kunci</label>
+                            <div class="border-border bg-background flex items-center rounded-lg border pl-3">
+                                <span class="text-muted-foreground text-sm">terms_</span>
+                                <input
+                                    v-model="form.slug"
+                                    type="text"
+                                    maxlength="88"
+                                    :disabled="editingKey !== null"
+                                    placeholder="tennis"
+                                    class="h-10 w-full rounded-r-lg bg-transparent px-1 text-sm outline-none disabled:opacity-60"
+                                />
+                            </div>
+                            <InputError :message="form.errors.key" />
+                            <InputError :message="form.errors.slug" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium">Judul</label>
+                            <Input v-model="form.title" type="text" maxlength="200" placeholder="Tata Tertib ..." />
+                            <InputError :message="form.errors.title" />
+                        </div>
                     </div>
 
-                    <div class="mt-4 space-y-2">
+                    <div class="space-y-2">
                         <label class="block text-sm font-medium">Poin aturan</label>
                         <div v-for="(_, index) in form.points" :key="index" class="flex items-start gap-2">
                             <textarea
@@ -113,44 +175,16 @@ const createNew = () => {
                         <InputError :message="form.errors.points" />
                         <button type="button" class="text-xs font-semibold text-sky-700 hover:underline" @click="addPoint">+ Tambah poin</button>
                     </div>
+                </form>
 
-                    <div class="mt-4 flex gap-2">
-                        <Button type="button" :disabled="form.processing" @click="save">
-                            <LoaderCircle v-if="form.processing" class="size-4 animate-spin" />
-                            Simpan
-                        </Button>
-                        <Button type="button" variant="ghost" @click="cancelEdit">Batal</Button>
-                    </div>
-                </template>
-
-                <ul v-else class="text-muted-foreground mt-3 list-disc space-y-1 pl-5 text-sm">
-                    <li v-for="(point, i) in term.points" :key="i">{{ point }}</li>
-                    <li v-if="term.points.length === 0" class="list-none italic">Belum ada poin.</li>
-                </ul>
-            </div>
-
-            <p v-if="terms.length === 0" class="text-muted-foreground py-6 text-center text-sm">Belum ada tata tertib.</p>
-        </div>
-
-        <form class="border-border mt-8 grid max-w-xl gap-3 rounded-xl border p-4 sm:grid-cols-2" @submit.prevent="createNew">
-            <h2 class="text-sm font-semibold sm:col-span-2">Tambah tata tertib baru</h2>
-            <div>
-                <label class="mb-1.5 block text-sm font-medium">Key</label>
-                <Input v-model="newForm.key" type="text" maxlength="96" placeholder="terms_venue_baru" />
-                <InputError :message="newForm.errors.key" />
-            </div>
-            <div>
-                <label class="mb-1.5 block text-sm font-medium">Judul</label>
-                <Input v-model="newForm.title" type="text" maxlength="200" placeholder="Tata Tertib ..." />
-                <InputError :message="newForm.errors.title" />
-            </div>
-            <div class="sm:col-span-2">
-                <Button type="submit" :disabled="newForm.processing">
-                    <LoaderCircle v-if="newForm.processing" class="size-4 animate-spin" />
-                    <Plus v-else class="size-4" />
-                    Buat tata tertib
-                </Button>
-            </div>
-        </form>
+                <DialogFooter>
+                    <Button variant="ghost" type="button" @click="dialogOpen = false">Batal</Button>
+                    <Button type="button" :disabled="form.processing" @click="submit">
+                        <LoaderCircle v-if="form.processing" class="size-4 animate-spin" />
+                        Simpan
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </AdminLayout>
 </template>

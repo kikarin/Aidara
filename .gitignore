@@ -31,3 +31,8 @@ API_PROGRAM_LATIHAN.md
 docs/figma-mobile-pwa/
 task-program-latihan_rill.md
 task-worlcup.md
+
+scripts/patch-php85-deprecations.php
+config/database.php
+composer.json
+package-lock.json

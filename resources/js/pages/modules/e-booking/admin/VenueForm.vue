@@ -31,6 +31,7 @@ import {
     Monitor,
     Plus,
     Ruler,
+    ScrollText,
     Shield,
     ShowerHead,
     Sparkles,
@@ -58,6 +59,7 @@ type Venue = {
     operating_end: string;
     operating_days: string[];
     facility_ids: number[];
+    terms_key: string | null;
 };
 
 type FacilityOption = {
@@ -65,6 +67,11 @@ type FacilityOption = {
     code: string;
     name: string;
     icon: string | null;
+};
+
+type TermOption = {
+    value: string;
+    label: string;
 };
 
 type AreaInput = {
@@ -97,6 +104,7 @@ const props = defineProps<{
     venue: Venue | null;
     defaults: { operating_start: string; operating_end: string };
     facilities: FacilityOption[];
+    terms: TermOption[];
     options: { satuan: string[]; categories: string[] };
 }>();
 
@@ -192,6 +200,7 @@ const form = useForm<{
     operating_end: string;
     operating_days: string[];
     facility_ids: number[];
+    terms_key: string;
     cover: File | null;
     areas: AreaInput[];
     tarifs: TarifInput[];
@@ -205,6 +214,7 @@ const form = useForm<{
     operating_end: props.venue?.operating_end ?? props.defaults.operating_end,
     operating_days: props.venue?.operating_days ?? [...days],
     facility_ids: props.venue?.facility_ids ?? [],
+    terms_key: props.venue?.terms_key ?? props.terms[0]?.value ?? '',
     cover: null,
     areas: isEdit.value ? [] : [newArea(0)],
     tarifs: isEdit.value ? [] : [newTarif()],
@@ -267,12 +277,14 @@ const steps = computed(() =>
               { key: 'info', label: 'Info venue', icon: Building2 },
               { key: 'hours', label: 'Jam operasional', icon: Clock },
               { key: 'facilities', label: 'Fasilitas', icon: LayoutGrid },
+              { key: 'terms', label: 'Tata tertib', icon: ScrollText },
           ]
         : [
               { key: 'info', label: 'Info venue', icon: Building2 },
               { key: 'hours', label: 'Jam operasional', icon: Clock },
               { key: 'areas', label: 'Area', icon: MapPin },
               { key: 'facilities', label: 'Fasilitas', icon: LayoutGrid },
+              { key: 'terms', label: 'Tata tertib', icon: ScrollText },
               { key: 'tarifs', label: 'Harga sewa', icon: Tag },
               { key: 'review', label: 'Ringkasan', icon: Sparkles },
           ],
@@ -339,6 +351,7 @@ const errorsForStep = (all: Record<string, string>, key: string): Record<string,
         if (key === 'areas') return k === 'areas' || k.startsWith('areas.');
         if (key === 'tarifs') return k === 'tarifs' || k.startsWith('tarifs.');
         if (key === 'facilities') return k.startsWith('facility_ids');
+        if (key === 'terms') return k === 'terms_key';
 
         return false;
     };
@@ -369,6 +382,7 @@ const goToFirstError = () => {
     if (key.startsWith('tarifs')) return goToKey('tarifs');
     if (key.startsWith('areas')) return goToKey('areas');
     if (key.startsWith('facility_ids')) return goToKey('facilities');
+    if (key === 'terms_key') return goToKey('terms');
     if (['operating_start', 'operating_end', 'operating_days'].includes(key)) return goToKey('hours');
     goToKey('info');
 };
@@ -388,6 +402,7 @@ const submit = () => {
         ...data,
         sort_order: data.sort_order === '' ? 0 : Number(data.sort_order),
         facility_ids: data.facility_ids.map(Number),
+        terms_key: data.terms_key || null,
         areas: data.areas.map((area, index) => ({
             ...area,
             sort_order: area.sort_order === '' ? index + 1 : Number(area.sort_order),
@@ -414,7 +429,7 @@ const submit = () => {
     const options = { forceFormData: true, onError: goToFirstError };
 
     if (props.venue) {
-        form.transform(transform).put(route('e-booking.admin.venues.update', props.venue.id), options);
+        form.transform((data) => ({ ...transform(data), _method: 'put' })).post(route('e-booking.admin.venues.update', props.venue.id), options);
     } else {
         form.transform(transform).post(route('e-booking.admin.venues.store'), options);
     }
@@ -665,6 +680,32 @@ const submit = () => {
                 <InputError :message="form.errors.facility_ids" />
             </section>
 
+            <!-- Step: Tata tertib -->
+            <section v-else-if="currentKey === 'terms'" class="space-y-4">
+                <div>
+                    <h2 class="text-lg font-semibold">Tata tertib</h2>
+                    <p class="text-muted-foreground text-sm">
+                        Pilih tata tertib yang berlaku di venue ini. Isinya akan tampil ke penyewa saat mengajukan booking.
+                    </p>
+                </div>
+
+                <div class="border-border space-y-2 rounded-2xl border bg-white p-5 shadow-sm">
+                    <label class="block text-sm font-medium">Tata tertib</label>
+                    <SimpleSelect
+                        v-model="form.terms_key"
+                        :options="terms"
+                        placeholder="— Tanpa tata tertib —"
+                        trigger-class="border-border bg-background h-10 w-full rounded-lg px-3 text-sm shadow-none"
+                    />
+                    <InputError :message="form.errors.terms_key" />
+                    <p v-if="terms.length" class="text-muted-foreground text-xs">
+                        Kelola isi tata tertib di menu
+                        <Link :href="route('e-booking.admin.terms.index')" class="font-semibold text-sky-700 hover:underline">Tata tertib</Link>.
+                    </p>
+                    <p v-else class="text-muted-foreground text-sm">Belum ada tata tertib. Buat dulu di menu Tata tertib.</p>
+                </div>
+            </section>
+
             <!-- Step: Harga -->
             <section v-else-if="currentKey === 'tarifs'" class="space-y-4">
                 <div class="flex items-start justify-between gap-3">
@@ -839,6 +880,10 @@ const submit = () => {
                             <LayoutGrid class="text-muted-foreground size-4" />
                             {{ form.facility_ids.length }} fasilitas
                         </div>
+                        <div class="flex items-center gap-2">
+                            <ScrollText class="text-muted-foreground size-4" />
+                            {{ terms.find((t) => t.value === form.terms_key)?.label ?? 'Tanpa tata tertib' }}
+                        </div>
                     </div>
                 </div>
 
@@ -905,11 +950,11 @@ const submit = () => {
                     <ArrowLeft class="size-4" />
                     Kembali
                 </Button>
-                <Button v-if="step < lastStep" type="button" @click="nextStep">
+                <Button v-if="step < lastStep" type="button" variant="outline" @click="nextStep">
                     Lanjut
                     <ArrowRight class="size-4" />
                 </Button>
-                <Button v-else type="submit" :disabled="form.processing">
+                <Button type="submit" :disabled="form.processing">
                     <LoaderCircle v-if="form.processing" class="size-4 animate-spin" />
                     <Check v-else class="size-4" />
                     {{ isEdit ? 'Simpan perubahan' : 'Simpan venue' }}

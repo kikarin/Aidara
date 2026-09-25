@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking\BookingArea;
 use App\Models\Booking\BookingFacility;
 use App\Models\Booking\BookingRule;
+use App\Models\Booking\BookingSetting;
 use App\Models\Booking\BookingTarif;
 use App\Models\Booking\BookingVenue;
 use App\Support\Booking\BookingSatuan;
@@ -92,6 +93,7 @@ class VenueController extends Controller
                 'operating_end' => '21:00',
             ],
             'facilities' => $this->facilityOptions(),
+            'terms' => $this->termsOptions(),
             'options' => [
                 'satuan' => BookingSatuan::all(),
                 'categories' => self::CATEGORIES,
@@ -113,6 +115,11 @@ class VenueController extends Controller
             ->where('key', 'operating_days')
             ->first()?->value;
 
+        $termsKey = BookingRule::query()
+            ->where('venue_id', $venue->id)
+            ->where('key', 'terms_key')
+            ->first()?->value;
+
         return Inertia::render('modules/e-booking/admin/VenueForm', [
             'venue' => [
                 'id' => $venue->id,
@@ -126,12 +133,14 @@ class VenueController extends Controller
                 'operating_end' => is_array($hours) ? ($hours['end'] ?? '21:00') : '21:00',
                 'operating_days' => is_array($days) ? array_values($days) : self::DAYS,
                 'facility_ids' => $venue->facilities()->pluck('booking_facilities.id')->all(),
+                'terms_key' => is_string($termsKey) ? $termsKey : null,
             ],
             'defaults' => [
                 'operating_start' => '06:00',
                 'operating_end' => '21:00',
             ],
             'facilities' => $this->facilityOptions(),
+            'terms' => $this->termsOptions(),
             'options' => [
                 'satuan' => BookingSatuan::all(),
                 'categories' => self::CATEGORIES,
@@ -187,6 +196,19 @@ class VenueController extends Controller
             ->orderBy('key')
             ->get();
 
+        $ruleList = BookingRule::query()
+            ->where('venue_id', $venue->id)
+            ->orderBy('key')
+            ->paginate(10, ['*'], 'rules_page')
+            ->withQueryString()
+            ->through(fn (BookingRule $r) => [
+                'id' => $r->id,
+                'key' => $r->key,
+                'value' => $r->value,
+                'is_active' => (bool) $r->is_active,
+                'description' => $r->description,
+            ]);
+
         return Inertia::render('modules/e-booking/admin/VenueDetail', [
             'venue' => [
                 'id' => $venue->id,
@@ -205,13 +227,8 @@ class VenueController extends Controller
                 ->get(['id', 'code', 'name']),
             'tarifs' => $tarifs,
             'rules' => $ruleRows->mapWithKeys(fn (BookingRule $r) => [$r->key => $r->value])->all(),
-            'ruleList' => $ruleRows->map(fn (BookingRule $r) => [
-                'id' => $r->id,
-                'key' => $r->key,
-                'value' => $r->value,
-                'is_active' => (bool) $r->is_active,
-                'description' => $r->description,
-            ])->values(),
+            'ruleList' => $ruleList,
+            'terms' => $this->termsOptions(),
             'options' => [
                 'satuan' => BookingSatuan::all(),
                 'categories' => self::CATEGORIES,
@@ -249,6 +266,7 @@ class VenueController extends Controller
 
             $this->syncOperatingHours($venue, $data['operating_start'] ?? null, $data['operating_end'] ?? null);
             $this->syncOperatingDays($venue, $data['operating_days'] ?? null);
+            $this->syncTermsKey($venue, $data['terms_key'] ?? null);
             $venue->facilities()->sync($data['facility_ids'] ?? []);
 
             $areaIds = [];
@@ -312,6 +330,7 @@ class VenueController extends Controller
 
         $this->syncOperatingHours($venue, $data['operating_start'] ?? null, $data['operating_end'] ?? null);
         $this->syncOperatingDays($venue, $data['operating_days'] ?? null);
+        $this->syncTermsKey($venue, $data['terms_key'] ?? null);
 
         if (array_key_exists('facility_ids', $data)) {
             $venue->facilities()->sync($data['facility_ids'] ?? []);
@@ -489,6 +508,7 @@ class VenueController extends Controller
             'operating_days.*' => ['string', Rule::in(self::DAYS)],
             'facility_ids' => ['nullable', 'array'],
             'facility_ids.*' => ['integer', Rule::exists('booking_facilities', 'id')],
+            'terms_key' => ['nullable', 'string', 'max:96', Rule::exists('booking_settings', 'key')->where(fn ($q) => $q->where('key', 'like', 'terms_%'))],
         ]);
     }
 
@@ -575,6 +595,18 @@ class VenueController extends Controller
         BookingRule::query()->updateOrCreate(
             ['venue_id' => $venue->id, 'key' => 'operating_days'],
             ['value' => array_values($days), 'is_active' => true]
+        );
+    }
+
+    private function syncTermsKey(BookingVenue $venue, ?string $key): void
+    {
+        if (! $key) {
+            return;
+        }
+
+        BookingRule::query()->updateOrCreate(
+            ['venue_id' => $venue->id, 'key' => 'terms_key'],
+            ['value' => $key, 'is_active' => true]
         );
     }
 
@@ -667,5 +699,21 @@ class VenueController extends Controller
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['id', 'code', 'name', 'icon']);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, array{value: string, label: string}>
+     */
+    private function termsOptions()
+    {
+        return BookingSetting::query()
+            ->where('key', 'like', 'terms_%')
+            ->orderBy('key')
+            ->get()
+            ->map(fn (BookingSetting $s) => [
+                'value' => $s->key,
+                'label' => is_array($s->value) ? ($s->value['title'] ?? $s->key) : $s->key,
+            ])
+            ->values();
     }
 }

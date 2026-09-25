@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import RowActionsMenu from '@/components/e-booking/RowActionsMenu.vue';
+import TablePagination from '@/components/e-booking/TablePagination.vue';
 import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
 import { Badge } from '@/components/ui/badge';
@@ -8,8 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
-import { Link, router, useForm } from '@inertiajs/vue3';
-import { FileText, LoaderCircle, Plus } from 'lucide-vue-next';
+import { router, useForm } from '@inertiajs/vue3';
+import { FileText, LoaderCircle, Pencil, Plus, Power } from 'lucide-vue-next';
 import { ref } from 'vue';
 
 type DocumentTypeRow = {
@@ -29,7 +31,7 @@ type Paginator<T> = {
     to: number | null;
 };
 
-const props = defineProps<{
+defineProps<{
     documentTypes: Paginator<DocumentTypeRow>;
 }>();
 
@@ -95,6 +97,16 @@ const submit = () => {
 const toggle = (row: DocumentTypeRow) => {
     router.post(route('e-booking.admin.document-types.toggle', row.id), {}, { preserveScroll: true });
 };
+
+const rowActions = (row: DocumentTypeRow) => [
+    { label: 'Edit', icon: Pencil, onClick: () => openEdit(row) },
+    {
+        label: row.is_active ? 'Nonaktifkan' : 'Aktifkan',
+        icon: Power,
+        variant: row.is_active ? ('destructive' as const) : ('default' as const),
+        onClick: () => toggle(row),
+    },
+];
 </script>
 
 <template>
@@ -112,11 +124,7 @@ const toggle = (row: DocumentTypeRow) => {
             </Button>
         </div>
 
-        <p class="text-muted-foreground mt-6 text-sm">
-            Menampilkan {{ props.documentTypes.from ?? 0 }}–{{ props.documentTypes.to ?? 0 }} dari {{ props.documentTypes.total }} dokumen
-        </p>
-
-        <Table class="mt-2 min-w-[640px]">
+        <Table class="mt-6 min-w-[640px]">
             <TableHeader>
                 <TableRow>
                     <TableHead>Nama</TableHead>
@@ -137,17 +145,7 @@ const toggle = (row: DocumentTypeRow) => {
                         <Badge :variant="row.is_active ? 'default' : 'secondary'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
                     </TableCell>
                     <TableCell class="text-right">
-                        <div class="flex justify-end gap-2">
-                            <button type="button" class="text-xs font-semibold text-slate-600 hover:underline" @click="openEdit(row)">Edit</button>
-                            <button
-                                type="button"
-                                class="text-xs font-semibold hover:underline"
-                                :class="row.is_active ? 'text-red-600' : 'text-emerald-700'"
-                                @click="toggle(row)"
-                            >
-                                {{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                            </button>
-                        </div>
+                        <RowActionsMenu :items="rowActions(row)" />
                     </TableCell>
                 </TableRow>
                 <TableRow v-if="documentTypes.data.length === 0">
@@ -161,18 +159,13 @@ const toggle = (row: DocumentTypeRow) => {
             </TableBody>
         </Table>
 
-        <div v-if="documentTypes.links?.length > 3" class="mt-4 flex flex-wrap gap-2">
-            <template v-for="(link, i) in documentTypes.links" :key="i">
-                <Link
-                    v-if="link.url"
-                    :href="link.url"
-                    class="border-border rounded-md border px-3 py-1 text-xs"
-                    :class="link.active ? 'bg-muted font-semibold' : ''"
-                >
-                    <span v-html="link.label" />
-                </Link>
-            </template>
-        </div>
+        <TablePagination
+            :links="documentTypes.links"
+            :from="documentTypes.from"
+            :to="documentTypes.to"
+            :total="documentTypes.total"
+            label="dokumen"
+        />
 
         <Dialog v-model:open="dialogOpen">
             <DialogContent class="sm:max-w-lg">

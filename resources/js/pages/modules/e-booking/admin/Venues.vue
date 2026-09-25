@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import AppImage from '@/components/AppImage.vue';
+import RowActionsMenu from '@/components/e-booking/RowActionsMenu.vue';
+import TablePagination from '@/components/e-booking/TablePagination.vue';
 import SeoHead from '@/components/SeoHead.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
-import { Building2, Pencil, Plus } from 'lucide-vue-next';
+import { Building2, Eye, Pencil, Plus, Power } from 'lucide-vue-next';
 
 type VenueRow = {
     id: number;
@@ -28,13 +30,24 @@ type Paginator<T> = {
     to: number | null;
 };
 
-const props = defineProps<{
+defineProps<{
     venues: Paginator<VenueRow>;
 }>();
 
 const toggle = (row: VenueRow) => {
     router.post(route('e-booking.admin.venues.toggle', row.id), {}, { preserveScroll: true });
 };
+
+const rowActions = (row: VenueRow) => [
+    { label: 'Kelola', icon: Eye, href: route('e-booking.admin.venues.show', row.id) },
+    { label: 'Edit', icon: Pencil, href: route('e-booking.admin.venues.edit', row.id) },
+    {
+        label: row.is_active ? 'Nonaktifkan' : 'Aktifkan',
+        icon: Power,
+        variant: row.is_active ? ('destructive' as const) : ('default' as const),
+        onClick: () => toggle(row),
+    },
+];
 </script>
 
 <template>
@@ -56,10 +69,6 @@ const toggle = (row: VenueRow) => {
             </Button>
         </div>
 
-        <p class="text-muted-foreground mt-6 text-sm">
-            Menampilkan {{ props.venues.from ?? 0 }}–{{ props.venues.to ?? 0 }} dari {{ props.venues.total }} venue
-        </p>
-
         <Table class="mt-2 min-w-[720px]">
             <TableHeader>
                 <TableRow>
@@ -68,7 +77,7 @@ const toggle = (row: VenueRow) => {
                     <TableHead>Area</TableHead>
                     <TableHead>Tarif</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead></TableHead>
+                    <TableHead class="w-12"></TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -93,27 +102,8 @@ const toggle = (row: VenueRow) => {
                             {{ row.is_active ? 'Aktif' : 'Nonaktif' }}
                         </Badge>
                     </TableCell>
-                    <TableCell>
-                        <div class="flex flex-wrap items-center justify-end gap-2">
-                            <Link :href="route('e-booking.admin.venues.show', row.id)" class="text-xs font-semibold text-sky-700 hover:underline">
-                                Kelola
-                            </Link>
-                            <Link
-                                :href="route('e-booking.admin.venues.edit', row.id)"
-                                class="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:underline"
-                            >
-                                <Pencil class="size-3" />
-                                Edit
-                            </Link>
-                            <button
-                                type="button"
-                                class="text-xs font-semibold hover:underline"
-                                :class="row.is_active ? 'text-red-600' : 'text-emerald-700'"
-                                @click="toggle(row)"
-                            >
-                                {{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                            </button>
-                        </div>
+                    <TableCell class="text-right">
+                        <RowActionsMenu :items="rowActions(row)" />
                     </TableCell>
                 </TableRow>
                 <TableRow v-if="venues.data.length === 0">
@@ -136,17 +126,6 @@ const toggle = (row: VenueRow) => {
             </TableBody>
         </Table>
 
-        <div v-if="venues.links?.length > 3" class="mt-4 flex flex-wrap gap-2">
-            <template v-for="(link, i) in venues.links" :key="i">
-                <Link
-                    v-if="link.url"
-                    :href="link.url"
-                    class="border-border rounded-md border px-3 py-1 text-xs"
-                    :class="link.active ? 'bg-muted font-semibold' : ''"
-                >
-                    <span v-html="link.label" />
-                </Link>
-            </template>
-        </div>
+        <TablePagination :links="venues.links" :from="venues.from" :to="venues.to" :total="venues.total" label="venue" />
     </AdminLayout>
 </template>

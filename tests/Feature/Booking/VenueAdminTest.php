@@ -5,6 +5,7 @@ namespace Tests\Feature\Booking;
 use App\Models\Booking\BookingArea;
 use App\Models\Booking\BookingFacility;
 use App\Models\Booking\BookingRule;
+use App\Models\Booking\BookingSetting;
 use App\Models\Booking\BookingTarif;
 use App\Models\Booking\BookingVenue;
 use App\Models\Role;
@@ -70,6 +71,9 @@ class VenueAdminTest extends TestCase
             'is_active' => true,
         ]);
 
+        $termsKey = 'terms_uji_'.substr(uniqid(), -6);
+        BookingSetting::setValue($termsKey, ['title' => 'Tata Tertib Uji', 'points' => ['Poin A']]);
+
         $response = $this->actingAs($this->admin)->post(route('e-booking.admin.venues.store'), [
             'code' => $code,
             'name' => 'Venue Baru',
@@ -80,6 +84,7 @@ class VenueAdminTest extends TestCase
             'operating_end' => '22:00',
             'operating_days' => ['senin', 'selasa', 'rabu', 'kamis', 'jumat'],
             'facility_ids' => [$facility->id],
+            'terms_key' => $termsKey,
             'cover' => UploadedFile::fake()->image('cover.png', 400, 300),
             'areas' => [
                 ['code' => 'lapangan_utama', 'name' => 'Lapangan Utama', 'is_active' => true, 'sort_order' => 1],
@@ -128,6 +133,10 @@ class VenueAdminTest extends TestCase
         $this->assertSame('weekend', $tarif->day_type);
 
         $this->assertTrue($venue->facilities()->whereKey($facility->id)->exists());
+
+        $termsRule = BookingRule::query()->where('venue_id', $venue->id)->where('key', 'terms_key')->first();
+        $this->assertNotNull($termsRule);
+        $this->assertSame($termsKey, $termsRule->value);
     }
 
     #[Test]

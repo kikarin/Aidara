@@ -632,6 +632,23 @@ const submitHint = computed(() => {
     return '';
 });
 
+const termsData = computed(() => {
+    const t = props.terms?.terms;
+    if (t && typeof t === 'object') {
+        const obj = t as { title?: string; points?: string[] };
+
+        return {
+            title: obj.title ?? null,
+            points: Array.isArray(obj.points) ? obj.points.filter((p) => typeof p === 'string' && p.trim() !== '') : [],
+        };
+    }
+
+    return { title: null, points: [] as string[] };
+});
+
+const termsTitle = computed(() => termsData.value.title);
+const termsPoints = computed(() => termsData.value.points);
+
 const termsText = computed(() => {
     const t = props.terms?.terms;
     if (typeof t === 'string') {
@@ -902,6 +919,13 @@ const slotClass = (slot: DaySlot) => {
                                 </span>
                             </label>
                         </div>
+                    </div>
+
+                    <div v-if="termsPoints.length" class="mt-5">
+                        <p class="text-sm font-medium text-slate-800">{{ termsTitle || 'Tata tertib' }}</p>
+                        <ul class="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-600">
+                            <li v-for="(point, index) in termsPoints" :key="index">{{ point }}</li>
+                        </ul>
                     </div>
                 </section>
             </div>

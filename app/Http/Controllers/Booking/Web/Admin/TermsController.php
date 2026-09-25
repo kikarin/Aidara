@@ -33,10 +33,13 @@ class TermsController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'key' => ['required', 'string', 'max:96', 'regex:/^[A-Za-z0-9_]+$/', 'unique:booking_settings,key'],
+            'key' => ['required', 'string', 'max:96', 'regex:/^terms_[A-Za-z0-9_]+$/', 'unique:booking_settings,key'],
             'title' => ['nullable', 'string', 'max:200'],
             'points' => ['nullable', 'array'],
             'points.*' => ['nullable', 'string', 'max:500'],
+        ], [
+            'key.regex' => 'Kunci harus diawali "terms_" dan hanya huruf/angka/garis bawah.',
+            'key.unique' => 'Kunci ini sudah dipakai.',
         ]);
 
         BookingSetting::setValue($data['key'], [

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import RowActionsMenu from '@/components/e-booking/RowActionsMenu.vue';
+import TablePagination from '@/components/e-booking/TablePagination.vue';
 import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
 import { Badge } from '@/components/ui/badge';
@@ -8,8 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
-import { Link, router, useForm } from '@inertiajs/vue3';
-import { LoaderCircle, Package, Plus } from 'lucide-vue-next';
+import { router, useForm } from '@inertiajs/vue3';
+import { LoaderCircle, Package, Pencil, Plus, Power } from 'lucide-vue-next';
 import { ref } from 'vue';
 
 type AddonRow = {
@@ -30,7 +32,7 @@ type Paginator<T> = {
     to: number | null;
 };
 
-const props = defineProps<{
+defineProps<{
     addons: Paginator<AddonRow>;
 }>();
 
@@ -101,6 +103,16 @@ const toggle = (row: AddonRow) => {
     router.post(route('e-booking.admin.addons.toggle', row.id), {}, { preserveScroll: true });
 };
 
+const rowActions = (row: AddonRow) => [
+    { label: 'Edit', icon: Pencil, onClick: () => openEdit(row) },
+    {
+        label: row.is_active ? 'Nonaktifkan' : 'Aktifkan',
+        icon: Power,
+        variant: row.is_active ? ('destructive' as const) : ('default' as const),
+        onClick: () => toggle(row),
+    },
+];
+
 const formatRupiah = (value: number | null) => (value === null || value === undefined ? '—' : new Intl.NumberFormat('id-ID').format(value));
 </script>
 
@@ -121,11 +133,7 @@ const formatRupiah = (value: number | null) => (value === null || value === unde
             </Button>
         </div>
 
-        <p class="text-muted-foreground mt-6 text-sm">
-            Menampilkan {{ props.addons.from ?? 0 }}–{{ props.addons.to ?? 0 }} dari {{ props.addons.total }} layanan
-        </p>
-
-        <Table class="mt-2 min-w-[640px]">
+        <Table class="mt-6 min-w-[640px]">
             <TableHeader>
                 <TableRow>
                     <TableHead>Nama</TableHead>
@@ -149,17 +157,7 @@ const formatRupiah = (value: number | null) => (value === null || value === unde
                         <Badge :variant="row.is_active ? 'default' : 'secondary'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
                     </TableCell>
                     <TableCell class="text-right">
-                        <div class="flex justify-end gap-2">
-                            <button type="button" class="text-xs font-semibold text-slate-600 hover:underline" @click="openEdit(row)">Edit</button>
-                            <button
-                                type="button"
-                                class="text-xs font-semibold hover:underline"
-                                :class="row.is_active ? 'text-red-600' : 'text-emerald-700'"
-                                @click="toggle(row)"
-                            >
-                                {{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                            </button>
-                        </div>
+                        <RowActionsMenu :items="rowActions(row)" />
                     </TableCell>
                 </TableRow>
                 <TableRow v-if="addons.data.length === 0">
@@ -173,18 +171,7 @@ const formatRupiah = (value: number | null) => (value === null || value === unde
             </TableBody>
         </Table>
 
-        <div v-if="addons.links?.length > 3" class="mt-4 flex flex-wrap gap-2">
-            <template v-for="(link, i) in addons.links" :key="i">
-                <Link
-                    v-if="link.url"
-                    :href="link.url"
-                    class="border-border rounded-md border px-3 py-1 text-xs"
-                    :class="link.active ? 'bg-muted font-semibold' : ''"
-                >
-                    <span v-html="link.label" />
-                </Link>
-            </template>
-        </div>
+        <TablePagination :links="addons.links" :from="addons.from" :to="addons.to" :total="addons.total" label="layanan" />
 
         <Dialog v-model:open="dialogOpen">
             <DialogContent class="sm:max-w-lg">

@@ -17,16 +17,16 @@ class PriorityRuleController extends Controller
         $rules = BookingPriorityRule::query()
             ->orderBy('priority_order')
             ->orderBy('name')
-            ->get()
-            ->map(fn (BookingPriorityRule $r) => [
+            ->paginate(10)
+            ->withQueryString()
+            ->through(fn (BookingPriorityRule $r) => [
                 'id' => $r->id,
                 'code' => $r->code,
                 'name' => $r->name,
                 'priority_order' => (int) $r->priority_order,
                 'description' => $r->description,
                 'is_active' => (bool) $r->is_active,
-            ])
-            ->values();
+            ]);
 
         return Inertia::render('modules/e-booking/admin/PriorityRules', [
             'rules' => $rules,
