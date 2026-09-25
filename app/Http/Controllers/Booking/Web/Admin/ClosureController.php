@@ -39,6 +39,20 @@ class ClosureController extends Controller
             ->orderBy('sort_order')
             ->get(['id', 'venue_id', 'code', 'name']);
 
+        $batchCounts = collect($paginator->items())
+            ->pluck('batch_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $batchCounts = $batchCounts->isEmpty()
+            ? collect()
+            : BookingVenueClosure::query()
+                ->whereIn('batch_id', $batchCounts)
+                ->selectRaw('batch_id, COUNT(*) as aggregate')
+                ->groupBy('batch_id')
+                ->pluck('aggregate', 'batch_id');
+
         return Inertia::render('modules/e-booking/admin/Closures', [
             'closures' => $paginator->through(fn (BookingVenueClosure $c) => [
                 'id' => $c->id,
@@ -51,6 +65,9 @@ class ClosureController extends Controller
                 'starts_at_label' => optional($c->starts_at)->format('d/m/Y H:i'),
                 'ends_at_label' => optional($c->ends_at)->format('d/m/Y H:i'),
                 'reason' => $c->reason,
+                'batch_id' => $c->batch_id,
+                'batch_size' => $c->batch_id ? (int) ($batchCounts[$c->batch_id] ?? 1) : null,
+                'is_full_day' => (bool) $c->is_full_day,
                 'is_active' => $c->is_active,
             ]),
             'venues' => $venues,
@@ -64,16 +81,52 @@ class ClosureController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
+        $mode = $request->input('mode', 'once') === 'weekly' ? 'weekly' : 'once';
+        $fullDay = $request->boolean('full_day');
+
+        $rules = [
+            'mode' => ['nullable', 'in:once,weekly'],
+            'full_day' => ['nullable', 'boolean'],
             'venue_id' => ['required', 'integer', 'exists:booking_venues,id'],
             'area_id' => ['nullable', 'integer', 'exists:booking_areas,id'],
-            'starts_at' => ['required', 'date'],
-            'ends_at' => ['required', 'date', 'after:starts_at'],
             'reason' => ['nullable', 'string', 'max:255'],
-        ]);
+        ];
+
+        if ($mode === 'weekly') {
+            $rules += [
+                'weekdays' => ['required', 'array', 'min:1'],
+                'weekdays.*' => ['integer', 'between:0,6'],
+                'start_date' => ['required', 'date'],
+                'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            ];
+
+            if (! $fullDay) {
+                $rules += [
+                    'start_time' => ['required', 'date_format:H:i'],
+                    'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+                ];
+            }
+        } elseif ($fullDay) {
+            $rules += ['date' => ['required', 'date']];
+        } else {
+            $rules += [
+                'starts_at' => ['required', 'date'],
+                'ends_at' => ['required', 'date', 'after:starts_at'],
+            ];
+        }
+
+        $data = $request->validate($rules);
+        $data['full_day'] = $fullDay;
+        $message = '';
 
         try {
-            $this->closures->create($data);
+            if ($mode === 'weekly') {
+                $result = $this->closures->createRecurring($data);
+                $message = "Blok berulang ditambahkan ({$result['created']} tanggal).";
+            } else {
+                $this->closures->create($data);
+                $message = 'Blok jadwal ditambahkan.';
+            }
         } catch (InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -82,7 +135,18 @@ class ClosureController extends Controller
             ->route('e-booking.admin.closures.index', array_filter([
                 'venue_id' => $data['venue_id'] ?? null,
             ]))
-            ->with('success', 'Blok jadwal ditambahkan.');
+            ->with('success', $message);
+    }
+
+    public function destroyBatch(string $batchId): RedirectResponse
+    {
+        $closure = BookingVenueClosure::query()->where('batch_id', $batchId)->firstOrFail();
+        $venueId = $closure->venue_id;
+        $deleted = $this->closures->deleteBatch($batchId);
+
+        return redirect()
+            ->route('e-booking.admin.closures.index', ['venue_id' => $venueId])
+            ->with('success', "Blok berulang dihapus ({$deleted} tanggal).");
     }
 
     public function destroy(int $id): RedirectResponse

@@ -103,7 +103,7 @@ class PricingService
             ],
         ];
 
-        $addons = $this->quoteAddons($input['addon_ids'] ?? []);
+        $addons = $this->quoteAddons($input['addon_ids'] ?? [], $tarif->venue_id);
         $addonTotal = array_sum(array_column($addons, 'line_total'));
         $subtotal = $lineTotal;
         $grandTotal = $subtotal + $addonTotal;
@@ -218,7 +218,7 @@ class PricingService
      * @param  array<int, int>|array<int, array{id: int, qty?: int}>  $addonIds
      * @return array<int, array<string, mixed>>
      */
-    private function quoteAddons(array $addonIds): array
+    private function quoteAddons(array $addonIds, ?int $venueId = null): array
     {
         if ($addonIds === []) {
             return [];
@@ -237,17 +237,22 @@ class PricingService
         }
 
         $ids = array_values(array_unique(array_column($normalized, 'id')));
-        $addons = BookingAddon::query()
+
+        $query = BookingAddon::query()
             ->whereIn('id', $ids)
-            ->where('is_active', true)
-            ->get()
-            ->keyBy('id');
+            ->where('is_active', true);
+
+        if ($venueId) {
+            $query->whereHas('venues', fn ($q) => $q->where('booking_venues.id', $venueId));
+        }
+
+        $addons = $query->get()->keyBy('id');
 
         $lines = [];
         foreach ($normalized as $row) {
             $addon = $addons->get($row['id']);
             if (! $addon) {
-                throw new InvalidArgumentException("Add-on #{$row['id']} tidak ditemukan atau tidak aktif.");
+                throw new InvalidArgumentException("Add-on #{$row['id']} tidak tersedia untuk venue ini.");
             }
             if ($addon->harga === null) {
                 throw new InvalidArgumentException("Harga add-on {$addon->name} belum ditentukan admin.");

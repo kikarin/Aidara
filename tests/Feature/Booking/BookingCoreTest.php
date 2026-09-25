@@ -69,6 +69,7 @@ class BookingCoreTest extends TestCase
             ['code' => 'loading_test_'.uniqid()],
             ['name' => 'Loading Test', 'harga' => 100_000, 'is_active' => true, 'sort_order' => 99]
         );
+        $this->venue->addons()->syncWithoutDetaching([$addon->id]);
 
         $quote = app(PricingService::class)->quote([
             'tarif_id' => $this->tarif->id,

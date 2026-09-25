@@ -6,9 +6,10 @@ import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
 import SimpleSelect from '@/components/ui/select/SimpleSelect.vue';
 import EBookingLayout from '@/layouts/e-booking/EBookingLayout.vue';
+import { formatJamIndo, formatTanggalIndo, formatTanggalJamIndo } from '@/lib/format-tanggal';
 import type { BookingAddon, BookingAvailability, BookingQuote, BookingTarif } from '@/types/booking';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
-import { CalendarDays, CircleAlert, LoaderCircle, ShieldCheck, Wallet } from 'lucide-vue-next';
+import { CalendarDays, Check, CircleAlert, LoaderCircle, ShieldCheck, Wallet } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 
 type VenueDetail = {
@@ -77,6 +78,11 @@ const toDateInput = (value?: string | null) => {
 
 const selectedAreaId = ref<number | ''>(props.oldForm?.area_id != null && props.oldForm.area_id !== '' ? Number(props.oldForm.area_id) : '');
 const selectedAddonIds = ref<number[]>(fromOldAddonIds());
+const toggleAddon = (id: number) => {
+    const index = selectedAddonIds.value.indexOf(id);
+    if (index > -1) selectedAddonIds.value.splice(index, 1);
+    else selectedAddonIds.value.push(id);
+};
 const selectedDate = ref(toDateInput(props.oldForm?.starts_at));
 const endDate = ref(toDateInput(props.oldForm?.ends_at || props.oldForm?.starts_at));
 const durationHours = ref(1);
@@ -84,6 +90,9 @@ const durationDays = ref(1);
 const durationMonths = ref(1);
 const durationBlocks = ref(1);
 const daySlots = ref<DaySlot[]>([]);
+const dayFullDay = ref(false);
+const dayFullDayReason = ref<string | null>(null);
+const dayPartialNotes = ref<string[]>([]);
 const slotsLoading = ref(false);
 const slotsError = ref('');
 const selectedSlotKey = ref('');
@@ -441,8 +450,14 @@ const loadDaySlots = async () => {
             throw new Error(json.message || 'Gagal memuat jadwal.');
         }
         daySlots.value = json.data.slots ?? [];
+        dayFullDay.value = Boolean(json.data.full_day);
+        dayFullDayReason.value = json.data.full_day_reason ?? null;
+        dayPartialNotes.value = json.data.partial_notes ?? [];
     } catch (e) {
         daySlots.value = [];
+        dayFullDay.value = false;
+        dayFullDayReason.value = null;
+        dayPartialNotes.value = [];
         slotsError.value = e instanceof Error ? e.message : 'Gagal memuat jadwal.';
     } finally {
         slotsLoading.value = false;
@@ -464,6 +479,9 @@ const refreshSchedule = async () => {
         await loadDaySlots();
     } else {
         daySlots.value = [];
+        dayFullDay.value = false;
+        dayFullDayReason.value = null;
+        dayPartialNotes.value = [];
         slotsError.value = '';
         await applyDateBasedSchedule();
     }
@@ -832,7 +850,7 @@ const slotClass = (slot: DaySlot) => {
                                     {{ scheduleMode === 'monthly' ? 'Mulai dari tanggal' : 'Tanggal terpilih' }}
                                 </label>
                                 <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900">
-                                    {{ selectedDate || 'Belum dipilih' }}
+                                    {{ selectedDate ? formatTanggalIndo(selectedDate) : 'Belum dipilih' }}
                                 </div>
                             </div>
 
@@ -869,26 +887,38 @@ const slotClass = (slot: DaySlot) => {
                             Memuat jadwal…
                         </div>
                         <p v-else-if="slotsError" class="text-sm text-red-600">{{ slotsError }}</p>
-                        <p v-else-if="daySlots.length === 0" class="text-sm text-slate-500">Belum ada jam yang bisa dipilih untuk tanggal ini.</p>
-                        <div v-else class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                            <button
-                                v-for="slot in daySlots"
-                                :key="slotKey(slot)"
-                                type="button"
-                                class="rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition"
-                                :class="slotClass(slot)"
-                                :disabled="!slot.bookable"
-                                :title="slot.reason || slot.label"
-                                @click="selectSlot(slot)"
-                            >
-                                <span class="block">{{ slot.label }}</span>
-                                <span class="mt-1 block text-[11px] font-medium opacity-80">
-                                    <template v-if="slot.bookable && slot.status === 'hijau'">Tersedia</template>
-                                    <template v-else-if="slot.bookable && slot.status === 'kuning'">Ada antrean</template>
-                                    <template v-else>{{ slot.reason || 'Penuh' }}</template>
-                                </span>
-                            </button>
+                        <div v-else-if="dayFullDay" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-800">
+                            <p class="font-semibold">Tanggal penuh</p>
+                            <p class="mt-1">{{ dayFullDayReason || 'Ditutup pengelola' }} — tanggal ini tidak bisa dipesan.</p>
                         </div>
+                        <template v-else>
+                            <p
+                                v-if="dayPartialNotes.length"
+                                class="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                            >
+                                Sebagian jam ditutup: {{ dayPartialNotes.join(', ') }}
+                            </p>
+                            <p v-if="daySlots.length === 0" class="text-sm text-slate-500">Belum ada jam yang bisa dipilih untuk tanggal ini.</p>
+                            <div v-else class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                                <button
+                                    v-for="slot in daySlots"
+                                    :key="slotKey(slot)"
+                                    type="button"
+                                    class="rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition"
+                                    :class="slotClass(slot)"
+                                    :disabled="!slot.bookable"
+                                    :title="slot.reason || slot.label"
+                                    @click="selectSlot(slot)"
+                                >
+                                    <span class="block">{{ slot.label }}</span>
+                                    <span class="mt-1 block text-[11px] font-medium opacity-80">
+                                        <template v-if="slot.bookable && slot.status === 'hijau'">Tersedia</template>
+                                        <template v-else-if="slot.bookable && slot.status === 'kuning'">Ada antrean</template>
+                                        <template v-else>{{ slot.reason || 'Penuh' }}</template>
+                                    </span>
+                                </button>
+                            </div>
+                        </template>
                     </div>
 
                     <!-- Ringkas periode untuk tarif harian / bulanan / kegiatan -->
@@ -902,8 +932,8 @@ const slotClass = (slot: DaySlot) => {
                         <template v-else-if="form.starts_at && form.ends_at">
                             <p class="font-semibold text-slate-900">Periode terpilih</p>
                             <p class="mt-1">
-                                {{ selectedDate }}
-                                <template v-if="endDate && endDate !== selectedDate"> — {{ endDate }}</template>
+                                {{ selectedDate ? formatTanggalIndo(selectedDate) : '' }}
+                                <template v-if="endDate && endDate !== selectedDate"> — {{ formatTanggalIndo(endDate) }}</template>
                             </p>
                             <p class="mt-1 text-xs text-slate-500">Jam operasional {{ operatingHours.start }}–{{ operatingHours.end }}</p>
                         </template>
@@ -938,19 +968,28 @@ const slotClass = (slot: DaySlot) => {
                     <div v-if="addons.length" class="mt-5 space-y-3">
                         <p class="text-sm font-medium text-slate-800">Tambahan layanan (opsional)</p>
                         <div class="grid gap-3 sm:grid-cols-2">
-                            <label
+                            <button
                                 v-for="addon in addons"
                                 :key="addon.id"
-                                class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm"
+                                type="button"
+                                class="flex items-start justify-between gap-3 rounded-2xl border p-4 text-left text-sm transition"
+                                :class="
+                                    selectedAddonIds.includes(addon.id)
+                                        ? 'border-sky-500 bg-sky-50'
+                                        : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                                "
+                                @click="toggleAddon(addon.id)"
                             >
-                                <input v-model="selectedAddonIds" type="checkbox" :value="addon.id" class="mt-1" />
                                 <span>
-                                    <span class="block font-medium text-slate-900">{{ addon.name }}</span>
+                                    <span class="block font-medium" :class="selectedAddonIds.includes(addon.id) ? 'text-sky-800' : 'text-slate-900'">
+                                        {{ addon.name }}
+                                    </span>
                                     <span v-if="addon.harga != null" class="mt-1 block text-xs font-semibold text-slate-700">
                                         {{ formatRp(addon.harga) }}
                                     </span>
                                 </span>
-                            </label>
+                                <Check v-if="selectedAddonIds.includes(addon.id)" class="mt-0.5 size-4 shrink-0 text-sky-600" />
+                            </button>
                         </div>
                     </div>
                 </section>
@@ -986,11 +1025,11 @@ const slotClass = (slot: DaySlot) => {
                             <span class="text-right text-slate-900">
                                 <template v-if="form.starts_at && form.ends_at">
                                     <template v-if="usesHourSlots">
-                                        {{ form.starts_at.replace('T', ' ') }} — {{ form.ends_at.replace('T', ' ').slice(11, 16) }}
+                                        {{ formatTanggalJamIndo(form.starts_at) }} — {{ formatJamIndo(form.ends_at) }}
                                     </template>
                                     <template v-else>
-                                        {{ selectedDate }}
-                                        <template v-if="endDate && endDate !== selectedDate"> — {{ endDate }}</template>
+                                        {{ selectedDate ? formatTanggalIndo(selectedDate) : '' }}
+                                        <template v-if="endDate && endDate !== selectedDate"> — {{ formatTanggalIndo(endDate) }}</template>
                                     </template>
                                 </template>
                                 <template v-else>Belum dipilih</template>

@@ -1,17 +1,30 @@
 <script setup lang="ts">
 import AppImage from '@/components/AppImage.vue';
 import { Skeleton } from '@/components/ui/skeleton';
+import ToastContainer from '@/components/ui/toast/ToastContainer.vue';
+import { useToast } from '@/components/ui/toast/useToast';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-defineProps<{
+const props = defineProps<{
     active?: 'catalog' | 'admin' | 'auth' | 'history';
 }>();
 
 const page = usePage();
 const bookingAuth = computed(() => page.props.bookingAuth as { name: string; email: string } | null);
-const flashSuccess = computed(() => (page.props.flash as { success?: string } | undefined)?.success);
-const flashError = computed(() => (page.props.flash as { error?: string } | undefined)?.error);
+const { toast } = useToast();
+
+watch(
+    () => page.props.flash,
+    (flash) => {
+        const messages = flash as { success?: string; error?: string } | undefined;
+        const message = messages?.success ?? messages?.error;
+        if (!message) return;
+        if (!messages?.success && props.active === 'catalog') return;
+        toast({ title: message, variant: messages?.error ? 'destructive' : 'success' });
+    },
+    { immediate: true },
+);
 
 const isNavigating = ref(false);
 let removeStart: (() => void) | undefined;
@@ -54,7 +67,9 @@ const logout = () => logoutForm.post(route('e-booking.logout'));
 
         <header class="sticky top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
             <div class="mx-auto max-w-7xl">
-                <div class="rounded-[28px] border border-white/70 bg-white/90 px-4 py-4 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur-md sm:px-6">
+                <div
+                    class="rounded-[28px] border border-white/70 bg-white/90 px-4 py-4 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur-md sm:px-6"
+                >
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <Link :href="route('e-booking.catalog')" class="flex items-center gap-3" aria-label="E-Booking fasilitas olahraga">
                             <div class="flex items-center gap-2">
@@ -135,29 +150,12 @@ const logout = () => logoutForm.post(route('e-booking.logout'));
                         </div>
                     </div>
 
-                    <div
-                        v-if="isNavigating"
-                        class="mt-3 h-1 overflow-hidden rounded-full bg-slate-100"
-                        aria-hidden="true"
-                    >
+                    <div v-if="isNavigating" class="mt-3 h-1 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
                         <div class="h-full w-1/3 animate-pulse rounded-full bg-sky-500" />
                     </div>
                 </div>
             </div>
         </header>
-
-        <div class="px-4 pt-4 sm:px-6 lg:px-8">
-            <div v-if="flashSuccess" class="mx-auto max-w-7xl">
-                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-sm">
-                    {{ flashSuccess }}
-                </div>
-            </div>
-            <div v-if="flashError && active !== 'catalog'" class="mx-auto mt-3 max-w-7xl">
-                <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm">
-                    {{ flashError }}
-                </div>
-            </div>
-        </div>
 
         <main id="konten-utama" class="relative mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
             <div
@@ -181,9 +179,9 @@ const logout = () => logoutForm.post(route('e-booking.logout'));
         </main>
 
         <footer class="border-t border-slate-200 bg-white/80 px-4 py-6 text-center text-sm text-slate-500 sm:px-6 lg:px-8">
-            <div class="mx-auto max-w-7xl">
-                Layanan pemesanan fasilitas olahraga UPT Dispora Kabupaten Bogor.
-            </div>
+            <div class="mx-auto max-w-7xl">Layanan pemesanan fasilitas olahraga UPT Dispora Kabupaten Bogor.</div>
         </footer>
+
+        <ToastContainer />
     </div>
 </template>

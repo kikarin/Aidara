@@ -55,10 +55,16 @@ class VenueController extends Controller
                 'meta' => $t->meta,
             ]);
 
-        $addons = BookingAddon::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->get(['id', 'code', 'name', 'description', 'harga']);
+        $addons = $venue->addons()
+            ->where('booking_addons.is_active', true)
+            ->orderBy('booking_addons.sort_order')
+            ->get([
+                'booking_addons.id',
+                'booking_addons.code',
+                'booking_addons.name',
+                'booking_addons.description',
+                'booking_addons.harga',
+            ]);
 
         $terms = $this->policies->termsForVenue($venue->code, $venue->id);
 

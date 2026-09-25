@@ -4,6 +4,7 @@ namespace App\Models\Booking;
 
 use App\Blameable;
 use App\Models\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BookingAddon extends Model
@@ -29,5 +30,10 @@ class BookingAddon extends Model
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
+    }
+
+    public function venues(): BelongsToMany
+    {
+        return $this->belongsToMany(BookingVenue::class, 'booking_addon_venue', 'addon_id', 'venue_id');
     }
 }

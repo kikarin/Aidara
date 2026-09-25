@@ -21,6 +21,8 @@ class BookingVenueClosure extends Model
         'starts_at',
         'ends_at',
         'reason',
+        'batch_id',
+        'is_full_day',
         'is_active',
     ];
 
@@ -29,6 +31,7 @@ class BookingVenueClosure extends Model
         return [
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
+            'is_full_day' => 'boolean',
             'is_active' => 'boolean',
         ];
     }

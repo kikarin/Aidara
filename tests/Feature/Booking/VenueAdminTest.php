@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Booking;
 
+use App\Models\Booking\BookingAddon;
 use App\Models\Booking\BookingArea;
 use App\Models\Booking\BookingFacility;
 use App\Models\Booking\BookingRule;
@@ -74,6 +75,13 @@ class VenueAdminTest extends TestCase
         $termsKey = 'terms_uji_'.substr(uniqid(), -6);
         BookingSetting::setValue($termsKey, ['title' => 'Tata Tertib Uji', 'points' => ['Poin A']]);
 
+        $addon = BookingAddon::query()->create([
+            'code' => 'addon_'.substr(uniqid(), -6),
+            'name' => 'Layanan Uji',
+            'harga' => 100_000,
+            'is_active' => true,
+        ]);
+
         $response = $this->actingAs($this->admin)->post(route('e-booking.admin.venues.store'), [
             'code' => $code,
             'name' => 'Venue Baru',
@@ -84,6 +92,7 @@ class VenueAdminTest extends TestCase
             'operating_end' => '22:00',
             'operating_days' => ['senin', 'selasa', 'rabu', 'kamis', 'jumat'],
             'facility_ids' => [$facility->id],
+            'addon_ids' => [$addon->id],
             'terms_key' => $termsKey,
             'cover' => UploadedFile::fake()->image('cover.png', 400, 300),
             'areas' => [
@@ -133,6 +142,7 @@ class VenueAdminTest extends TestCase
         $this->assertSame('weekend', $tarif->day_type);
 
         $this->assertTrue($venue->facilities()->whereKey($facility->id)->exists());
+        $this->assertTrue($venue->addons()->whereKey($addon->id)->exists());
 
         $termsRule = BookingRule::query()->where('venue_id', $venue->id)->where('key', 'terms_key')->first();
         $this->assertNotNull($termsRule);

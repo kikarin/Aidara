@@ -55,6 +55,11 @@ class BookingVenue extends Model
         return $this->belongsToMany(BookingFacility::class, 'booking_facility_venue', 'venue_id', 'facility_id');
     }
 
+    public function addons(): BelongsToMany
+    {
+        return $this->belongsToMany(BookingAddon::class, 'booking_addon_venue', 'venue_id', 'addon_id');
+    }
+
     public function tarifs(): HasMany
     {
         return $this->hasMany(BookingTarif::class, 'venue_id');

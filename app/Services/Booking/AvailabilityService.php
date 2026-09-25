@@ -63,7 +63,9 @@ class AvailabilityService
             $withinHorizon = $startsAt->lte($latest) && $startsAt->gte(now()->startOfDay());
         }
 
-        $closureRows = $this->closures->overlappingClosures($venueId, $startsAt, $endsAt, $areaId);
+        $closureRows = ($input['ignore_closures'] ?? false)
+            ? []
+            : $this->closures->overlappingClosures($venueId, $startsAt, $endsAt, $areaId);
         $closed = $closureRows !== [];
 
         $windowStart = $startsAt->copy()->subDays($bufferBefore)->startOfDay();
@@ -231,6 +233,17 @@ class AvailabilityService
         $horizonDays = $this->rules->get('booking_horizon_days', $venueId, null);
         $horizonDays = is_numeric($horizonDays) ? (int) $horizonDays : null;
 
+        $windowClosures = $this->closures->overlappingClosures($venueId, $open, $close, $areaId);
+        $coversWholeDay = fn (array $closure): bool => ($closure['is_full_day'] ?? false)
+            || (Carbon::parse($closure['starts_at'])->lte($open) && Carbon::parse($closure['ends_at'])->gte($close));
+        $fullDayClosure = collect($windowClosures)->first($coversWholeDay);
+        $partialNotes = collect($windowClosures)
+            ->reject($coversWholeDay)
+            ->map(fn ($closure) => Carbon::parse($closure['starts_at'])->format('H:i').'–'.Carbon::parse($closure['ends_at'])->format('H:i'))
+            ->unique()
+            ->values()
+            ->all();
+
         $slots = [];
         $cursor = $open->copy();
         while ($cursor->copy()->addHours($durationHours)->lte($close)) {
@@ -291,6 +304,9 @@ class AvailabilityService
                 'end' => $closeStr,
             ],
             'horizon_days' => $horizonDays,
+            'full_day' => $fullDayClosure !== null,
+            'full_day_reason' => $fullDayClosure['reason'] ?? null,
+            'partial_notes' => $partialNotes,
             'slots' => $slots,
         ];
     }
@@ -365,17 +381,39 @@ class AvailabilityService
                 'ends_at' => $endsAt,
             ]);
 
+            $closures = $check['closures'];
+            $coveringClosure = collect($closures)->first(
+                fn ($closure) => ($closure['is_full_day'] ?? false)
+                    || (Carbon::parse($closure['starts_at'])->lte($startsAt) && Carbon::parse($closure['ends_at'])->gte($endsAt))
+            );
+            $hasPartialClosure = $closures !== [] && $coveringClosure === null;
+
+            if ($hasPartialClosure) {
+                $check = $this->check([
+                    'venue_id' => $venueId,
+                    'area_id' => $areaId,
+                    'starts_at' => $startsAt,
+                    'ends_at' => $endsAt,
+                    'ignore_closures' => true,
+                ]);
+            }
+
             $reason = null;
-            if (! $check['within_horizon']) {
+            if ($coveringClosure !== null) {
+                $check['status'] = 'merah';
+                $check['bookable'] = false;
+                $label = $coveringClosure['reason'] ?? null;
+                $reason = $label ? "Penuh — {$label}" : 'Penuh (ditutup admin)';
+            } elseif (! $check['within_horizon']) {
                 $reason = $check['horizon_days']
                     ? "Hanya bisa dipesan sampai {$check['horizon_days']} hari ke depan"
                     : 'Di luar batas pemesanan';
-            } elseif (! empty($check['closed'])) {
-                $reason = $check['closures'][0]['reason'] ?? 'Ditutup pengelola';
             } elseif ($check['status'] === 'merah') {
                 $reason = 'Sudah dipesan / penuh';
             } elseif ($check['status'] === 'kuning') {
                 $reason = 'Ada pengajuan lain';
+            } elseif ($hasPartialClosure) {
+                $reason = 'Sebagian jam ditutup';
             }
 
             $days[] = [

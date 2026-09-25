@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Booking\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking\BookingAddon;
 use App\Models\Booking\BookingArea;
 use App\Models\Booking\BookingFacility;
 use App\Models\Booking\BookingRule;
@@ -93,6 +94,7 @@ class VenueController extends Controller
                 'operating_end' => '21:00',
             ],
             'facilities' => $this->facilityOptions(),
+            'addons' => $this->addonOptions(),
             'terms' => $this->termsOptions(),
             'options' => [
                 'satuan' => BookingSatuan::all(),
@@ -133,6 +135,7 @@ class VenueController extends Controller
                 'operating_end' => is_array($hours) ? ($hours['end'] ?? '21:00') : '21:00',
                 'operating_days' => is_array($days) ? array_values($days) : self::DAYS,
                 'facility_ids' => $venue->facilities()->pluck('booking_facilities.id')->all(),
+                'addon_ids' => $venue->addons()->pluck('booking_addons.id')->all(),
                 'terms_key' => is_string($termsKey) ? $termsKey : null,
             ],
             'defaults' => [
@@ -140,6 +143,7 @@ class VenueController extends Controller
                 'operating_end' => '21:00',
             ],
             'facilities' => $this->facilityOptions(),
+            'addons' => $this->addonOptions(),
             'terms' => $this->termsOptions(),
             'options' => [
                 'satuan' => BookingSatuan::all(),
@@ -268,6 +272,7 @@ class VenueController extends Controller
             $this->syncOperatingDays($venue, $data['operating_days'] ?? null);
             $this->syncTermsKey($venue, $data['terms_key'] ?? null);
             $venue->facilities()->sync($data['facility_ids'] ?? []);
+            $venue->addons()->sync($data['addon_ids'] ?? []);
 
             $areaIds = [];
             foreach ($areas as $i => $row) {
@@ -334,6 +339,10 @@ class VenueController extends Controller
 
         if (array_key_exists('facility_ids', $data)) {
             $venue->facilities()->sync($data['facility_ids'] ?? []);
+        }
+
+        if (array_key_exists('addon_ids', $data)) {
+            $venue->addons()->sync($data['addon_ids'] ?? []);
         }
 
         return redirect()
@@ -508,6 +517,8 @@ class VenueController extends Controller
             'operating_days.*' => ['string', Rule::in(self::DAYS)],
             'facility_ids' => ['nullable', 'array'],
             'facility_ids.*' => ['integer', Rule::exists('booking_facilities', 'id')],
+            'addon_ids' => ['nullable', 'array'],
+            'addon_ids.*' => ['integer', Rule::exists('booking_addons', 'id')],
             'terms_key' => ['nullable', 'string', 'max:96', Rule::exists('booking_settings', 'key')->where(fn ($q) => $q->where('key', 'like', 'terms_%'))],
         ]);
     }
@@ -699,6 +710,18 @@ class VenueController extends Controller
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['id', 'code', 'name', 'icon']);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function addonOptions()
+    {
+        return BookingAddon::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'code', 'name', 'harga']);
     }
 
     /**

@@ -29,6 +29,7 @@ import {
     MapPin,
     Megaphone,
     Monitor,
+    Package,
     Plus,
     Ruler,
     ScrollText,
@@ -59,6 +60,7 @@ type Venue = {
     operating_end: string;
     operating_days: string[];
     facility_ids: number[];
+    addon_ids: number[];
     terms_key: string | null;
 };
 
@@ -67,6 +69,12 @@ type FacilityOption = {
     code: string;
     name: string;
     icon: string | null;
+};
+
+type AddonOption = {
+    id: number;
+    name: string;
+    harga: number | null;
 };
 
 type TermOption = {
@@ -104,6 +112,7 @@ const props = defineProps<{
     venue: Venue | null;
     defaults: { operating_start: string; operating_end: string };
     facilities: FacilityOption[];
+    addons: AddonOption[];
     terms: TermOption[];
     options: { satuan: string[]; categories: string[] };
 }>();
@@ -200,6 +209,7 @@ const form = useForm<{
     operating_end: string;
     operating_days: string[];
     facility_ids: number[];
+    addon_ids: number[];
     terms_key: string;
     cover: File | null;
     areas: AreaInput[];
@@ -214,6 +224,7 @@ const form = useForm<{
     operating_end: props.venue?.operating_end ?? props.defaults.operating_end,
     operating_days: props.venue?.operating_days ?? [...days],
     facility_ids: props.venue?.facility_ids ?? [],
+    addon_ids: props.venue?.addon_ids ?? props.addons.map((a) => a.id),
     terms_key: props.venue?.terms_key ?? props.terms[0]?.value ?? '',
     cover: null,
     areas: isEdit.value ? [] : [newArea(0)],
@@ -224,6 +235,12 @@ const toggleFacility = (id: number, checked: boolean) => {
     const index = form.facility_ids.indexOf(id);
     if (checked && index === -1) form.facility_ids.push(id);
     if (!checked && index > -1) form.facility_ids.splice(index, 1);
+};
+
+const toggleAddon = (id: number, checked: boolean) => {
+    const index = form.addon_ids.indexOf(id);
+    if (checked && index === -1) form.addon_ids.push(id);
+    if (!checked && index > -1) form.addon_ids.splice(index, 1);
 };
 
 const coverPreview = ref<string | null>(props.venue?.cover_url ?? null);
@@ -277,6 +294,7 @@ const steps = computed(() =>
               { key: 'info', label: 'Info venue', icon: Building2 },
               { key: 'hours', label: 'Jam operasional', icon: Clock },
               { key: 'facilities', label: 'Fasilitas', icon: LayoutGrid },
+              { key: 'addons', label: 'Layanan', icon: Package },
               { key: 'terms', label: 'Tata tertib', icon: ScrollText },
           ]
         : [
@@ -284,6 +302,7 @@ const steps = computed(() =>
               { key: 'hours', label: 'Jam operasional', icon: Clock },
               { key: 'areas', label: 'Area', icon: MapPin },
               { key: 'facilities', label: 'Fasilitas', icon: LayoutGrid },
+              { key: 'addons', label: 'Layanan', icon: Package },
               { key: 'terms', label: 'Tata tertib', icon: ScrollText },
               { key: 'tarifs', label: 'Harga sewa', icon: Tag },
               { key: 'review', label: 'Ringkasan', icon: Sparkles },
@@ -351,6 +370,7 @@ const errorsForStep = (all: Record<string, string>, key: string): Record<string,
         if (key === 'areas') return k === 'areas' || k.startsWith('areas.');
         if (key === 'tarifs') return k === 'tarifs' || k.startsWith('tarifs.');
         if (key === 'facilities') return k.startsWith('facility_ids');
+        if (key === 'addons') return k.startsWith('addon_ids');
         if (key === 'terms') return k === 'terms_key';
 
         return false;
@@ -382,6 +402,7 @@ const goToFirstError = () => {
     if (key.startsWith('tarifs')) return goToKey('tarifs');
     if (key.startsWith('areas')) return goToKey('areas');
     if (key.startsWith('facility_ids')) return goToKey('facilities');
+    if (key.startsWith('addon_ids')) return goToKey('addons');
     if (key === 'terms_key') return goToKey('terms');
     if (['operating_start', 'operating_end', 'operating_days'].includes(key)) return goToKey('hours');
     goToKey('info');
@@ -402,6 +423,7 @@ const submit = () => {
         ...data,
         sort_order: data.sort_order === '' ? 0 : Number(data.sort_order),
         facility_ids: data.facility_ids.map(Number),
+        addon_ids: data.addon_ids.map(Number),
         terms_key: data.terms_key || null,
         areas: data.areas.map((area, index) => ({
             ...area,
@@ -658,26 +680,62 @@ const submit = () => {
                 </div>
 
                 <div v-if="facilities.length" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    <label
+                    <button
                         v-for="facility in facilities"
                         :key="facility.id"
-                        class="flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition"
+                        type="button"
+                        class="flex items-center gap-2 rounded-xl border p-3 text-left text-sm font-medium transition"
                         :class="
-                            form.facility_ids.includes(facility.id) ? 'border-sky-500 bg-sky-50' : 'border-slate-200 bg-white hover:border-slate-300'
+                            form.facility_ids.includes(facility.id)
+                                ? 'border-sky-500 bg-sky-50 text-sky-800'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         "
+                        @click="toggleFacility(facility.id, !form.facility_ids.includes(facility.id))"
                     >
-                        <Checkbox
-                            :model-value="form.facility_ids.includes(facility.id)"
-                            @update:model-value="(value) => toggleFacility(facility.id, !!value)"
-                        />
-                        <component :is="facilityIcon(facility.icon)" v-if="facilityIcon(facility.icon)" class="size-4 text-sky-700" />
-                        <span class="font-medium">{{ facility.name }}</span>
-                    </label>
+                        <component :is="facilityIcon(facility.icon)" v-if="facilityIcon(facility.icon)" class="size-4 shrink-0" />
+                        <span class="flex-1">{{ facility.name }}</span>
+                        <Check v-if="form.facility_ids.includes(facility.id)" class="size-4 text-sky-600" />
+                    </button>
                 </div>
                 <div v-else class="text-muted-foreground rounded-xl border border-dashed px-4 py-8 text-center text-sm">
                     Belum ada fasilitas. Tambahkan dulu di menu Fasilitas.
                 </div>
                 <InputError :message="form.errors.facility_ids" />
+            </section>
+
+            <!-- Step: Layanan -->
+            <section v-else-if="currentKey === 'addons'" class="space-y-4">
+                <div>
+                    <h2 class="text-lg font-semibold">Tambahan layanan</h2>
+                    <p class="text-muted-foreground text-sm">
+                        Pilih layanan tambahan yang tersedia di venue ini. Semua tercentang secara default — hapus centang yang tidak perlu.
+                    </p>
+                </div>
+
+                <div v-if="addons.length" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <button
+                        v-for="addon in addons"
+                        :key="addon.id"
+                        type="button"
+                        class="flex items-start justify-between gap-2 rounded-xl border p-3 text-left text-sm transition"
+                        :class="form.addon_ids.includes(addon.id) ? 'border-sky-500 bg-sky-50' : 'border-slate-200 bg-white hover:border-slate-300'"
+                        @click="toggleAddon(addon.id, !form.addon_ids.includes(addon.id))"
+                    >
+                        <span>
+                            <span class="block font-medium" :class="form.addon_ids.includes(addon.id) ? 'text-sky-800' : 'text-slate-700'">
+                                {{ addon.name }}
+                            </span>
+                            <span v-if="addon.harga != null" class="text-muted-foreground text-xs">
+                                Rp {{ addon.harga.toLocaleString('id-ID') }}
+                            </span>
+                        </span>
+                        <Check v-if="form.addon_ids.includes(addon.id)" class="mt-0.5 size-4 shrink-0 text-sky-600" />
+                    </button>
+                </div>
+                <div v-else class="text-muted-foreground rounded-xl border border-dashed px-4 py-8 text-center text-sm">
+                    Belum ada layanan. Tambahkan dulu di menu Layanan.
+                </div>
+                <InputError :message="form.errors.addon_ids" />
             </section>
 
             <!-- Step: Tata tertib -->
@@ -881,6 +939,10 @@ const submit = () => {
                             {{ form.facility_ids.length }} fasilitas
                         </div>
                         <div class="flex items-center gap-2">
+                            <Package class="text-muted-foreground size-4" />
+                            {{ form.addon_ids.length }} layanan
+                        </div>
+                        <div class="flex items-center gap-2">
                             <ScrollText class="text-muted-foreground size-4" />
                             {{ terms.find((t) => t.value === form.terms_key)?.label ?? 'Tanpa tata tertib' }}
                         </div>
@@ -940,6 +1002,23 @@ const submit = () => {
                             </li>
                         </ul>
                         <p v-else class="text-muted-foreground text-sm">Belum ada fasilitas dipilih.</p>
+                    </div>
+
+                    <div class="border-border rounded-2xl border bg-white p-5 shadow-sm">
+                        <div class="mb-3 flex items-center justify-between">
+                            <p class="text-sm font-semibold">Layanan</p>
+                            <button type="button" class="text-xs font-semibold text-sky-700 hover:underline" @click="goToKey('addons')">Ubah</button>
+                        </div>
+                        <ul v-if="form.addon_ids.length" class="flex flex-wrap gap-1.5">
+                            <li
+                                v-for="addon in addons.filter((a) => form.addon_ids.includes(a.id))"
+                                :key="addon.id"
+                                class="bg-muted rounded-full px-2.5 py-0.5 text-xs font-medium"
+                            >
+                                {{ addon.name }}
+                            </li>
+                        </ul>
+                        <p v-else class="text-muted-foreground text-sm">Belum ada layanan dipilih.</p>
                     </div>
                 </div>
             </section>

@@ -184,6 +184,8 @@ Route::middleware(['booking.web:admin_upt'])->prefix('booking/admin')->group(fun
     Route::put('/settings', [EBookingAdminSettingsController::class, 'update'])->name('e-booking.admin.settings.update');
     Route::get('/closures', [EBookingAdminClosureController::class, 'index'])->name('e-booking.admin.closures.index');
     Route::post('/closures', [EBookingAdminClosureController::class, 'store'])->name('e-booking.admin.closures.store');
+    Route::delete('/closures/batch/{batchId}', [EBookingAdminClosureController::class, 'destroyBatch'])
+        ->name('e-booking.admin.closures.destroyBatch');
     Route::delete('/closures/{id}', [EBookingAdminClosureController::class, 'destroy'])
         ->whereNumber('id')
         ->name('e-booking.admin.closures.destroy');

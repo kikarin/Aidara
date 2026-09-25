@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import AppImage from '@/components/AppImage.vue';
 import { Skeleton } from '@/components/ui/skeleton';
+import ToastContainer from '@/components/ui/toast/ToastContainer.vue';
+import { useToast } from '@/components/ui/toast/useToast';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     Building2,
@@ -15,7 +17,7 @@ import {
     ScrollText,
     Settings2,
 } from 'lucide-vue-next';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 defineProps<{
     active?: 'dashboard' | 'bookings' | 'settings' | 'closures' | 'venues' | 'addons' | 'document-types' | 'facilities' | 'terms' | 'priority-rules';
@@ -23,8 +25,18 @@ defineProps<{
 
 const page = usePage();
 const bookingAuth = computed(() => page.props.bookingAuth as { name: string; email: string } | null);
-const flashSuccess = computed(() => (page.props.flash as { success?: string } | undefined)?.success);
-const flashError = computed(() => (page.props.flash as { error?: string } | undefined)?.error);
+const { toast } = useToast();
+
+watch(
+    () => page.props.flash,
+    (flash) => {
+        const messages = flash as { success?: string; error?: string } | undefined;
+        const message = messages?.success ?? messages?.error;
+        if (!message) return;
+        toast({ title: message, variant: messages?.error ? 'destructive' : 'success' });
+    },
+    { immediate: true },
+);
 
 const isNavigating = ref(false);
 let removeStart: (() => void) | undefined;
@@ -137,19 +149,6 @@ const navItems = [
             </div>
         </header>
 
-        <div class="px-4 pt-4 sm:px-6">
-            <div v-if="flashSuccess" class="mx-auto max-w-6xl">
-                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-sm">
-                    {{ flashSuccess }}
-                </div>
-            </div>
-            <div v-if="flashError" class="mx-auto mt-3 max-w-6xl">
-                <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm">
-                    {{ flashError }}
-                </div>
-            </div>
-        </div>
-
         <main class="relative mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:py-8">
             <!-- Overlay skeleton saat pindah halaman admin -->
             <div
@@ -174,5 +173,7 @@ const navItems = [
                 <slot />
             </div>
         </main>
+
+        <ToastContainer />
     </div>
 </template>
