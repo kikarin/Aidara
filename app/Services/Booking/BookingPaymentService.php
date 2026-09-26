@@ -113,7 +113,7 @@ class BookingPaymentService
             $booking->forceFill(['confirmed_at' => now()])->save();
 
             return [
-                'booking' => $booking->load(['payments', 'venue', 'area', 'items']),
+                'booking' => $booking->load(['payments', 'venue', 'areas', 'items']),
                 'payment' => $payment->refresh(),
             ];
         });

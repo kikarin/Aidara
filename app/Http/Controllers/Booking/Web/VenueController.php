@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Booking\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Booking\BookingAddon;
 use App\Models\Booking\BookingSetting;
 use App\Models\Booking\BookingTarif;
 use App\Models\Booking\BookingVenue;
@@ -95,6 +94,7 @@ class VenueController extends Controller
             'oldForm' => [
                 'tarif_id' => old('tarif_id'),
                 'area_id' => old('area_id'),
+                'areas' => old('areas', []),
                 'kategori_tarif' => old('kategori_tarif', 'non_pemerintah'),
                 'starts_at' => old('starts_at'),
                 'ends_at' => old('ends_at'),
@@ -105,6 +105,7 @@ class VenueController extends Controller
                 'addon_ids' => old('addon_ids', []),
             ],
             'branding' => BookingSetting::getValue('branding_name', 'E-Booking') ?? 'E-Booking',
+            'slaHariKerja' => max(1, (int) (BookingSetting::getValue('pengajuan_sla_hari_kerja', 7) ?? 7)),
         ]);
     }
 
@@ -113,6 +114,8 @@ class VenueController extends Controller
         $data = $request->validate([
             'date' => ['required', 'date'],
             'area_id' => ['nullable', 'integer', 'exists:booking_areas,id'],
+            'area_ids' => ['nullable', 'array'],
+            'area_ids.*' => ['integer', 'exists:booking_areas,id'],
             'duration_hours' => ['nullable', 'integer', 'min:1', 'max:12'],
             'step_hours' => ['nullable', 'integer', 'min:1', 'max:12'],
         ]);
@@ -121,6 +124,7 @@ class VenueController extends Controller
             $slots = $this->availability->daySlots([
                 'venue_id' => $id,
                 'date' => $data['date'],
+                'area_ids' => isset($data['area_ids']) ? array_map('intval', $data['area_ids']) : null,
                 'area_id' => $data['area_id'] ?? null,
                 'duration_hours' => $data['duration_hours'] ?? 1,
                 'step_hours' => $data['step_hours'] ?? 1,
@@ -143,12 +147,15 @@ class VenueController extends Controller
         $data = $request->validate([
             'month' => ['required', 'regex:/^\d{4}-\d{2}$/'],
             'area_id' => ['nullable', 'integer', 'exists:booking_areas,id'],
+            'area_ids' => ['nullable', 'array'],
+            'area_ids.*' => ['integer', 'exists:booking_areas,id'],
         ]);
 
         try {
             $overview = $this->availability->monthOverview([
                 'venue_id' => $id,
                 'month' => $data['month'],
+                'area_ids' => isset($data['area_ids']) ? array_map('intval', $data['area_ids']) : null,
                 'area_id' => $data['area_id'] ?? null,
             ]);
         } catch (InvalidArgumentException $e) {

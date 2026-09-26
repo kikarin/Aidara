@@ -21,7 +21,7 @@ class BookingPaymentExpireService
     public function expireDue(?Carbon $now = null): array
     {
         $now = $now ?? now();
-        $defaultHours = (int) (BookingSetting::getValue('payment_expire_hours', 48) ?? 48);
+        $defaultHours = (int) (BookingSetting::getValue('payment_expire_hours', 72) ?? 72);
         if ($defaultHours < 1) {
             $defaultHours = 48;
         }

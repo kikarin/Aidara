@@ -17,6 +17,8 @@ class CheckAvailabilityRequest extends FormRequest
         return [
             'venue_id' => ['required', 'integer', 'exists:booking_venues,id'],
             'area_id' => ['nullable', 'integer', 'exists:booking_areas,id'],
+            'area_ids' => ['nullable', 'array'],
+            'area_ids.*' => ['integer', 'exists:booking_areas,id'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'exclude_booking_id' => ['nullable', 'integer', 'exists:bookings,id'],

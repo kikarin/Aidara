@@ -3,6 +3,7 @@
 namespace App\Services\Booking;
 
 use App\Models\Booking\BookingAddon;
+use App\Models\Booking\BookingArea;
 use App\Models\Booking\BookingTarif;
 use App\Support\Booking\BookingSatuan;
 use Carbon\Carbon;
@@ -11,8 +12,15 @@ use InvalidArgumentException;
 class PricingService
 {
     /**
+     * Hitung harga booking. Dua bentuk input:
+     *  - Seluruh venue: tarif_id (harus tarif venue-wide / tanpa area).
+     *  - Area spesifik (bisa lebih dari satu): areas = [{area_id, tarif_id, qty?, luas_m2?}].
+     * Bentuk lama (tarif_id + area_id) masih didukung.
+     *
      * @param  array{
-     *   tarif_id: int,
+     *   tarif_id?: int|null,
+     *   area_id?: int|null,
+     *   areas?: list<array{area_id: mixed, tarif_id: mixed, qty?: mixed, luas_m2?: mixed}>,
      *   kategori_tarif: string,
      *   starts_at: string|\DateTimeInterface,
      *   ends_at: string|\DateTimeInterface,
@@ -27,36 +35,15 @@ class PricingService
      *   grand_total: int,
      *   lines: array<int, array<string, mixed>>,
      *   addons: array<int, array<string, mixed>>,
-     *   tarif: array<string, mixed>,
+     *   tarif: array<string, mixed>|null,
      *   duration: array<string, mixed>
      * }
      */
     public function quote(array $input): array
     {
-        $tarif = BookingTarif::query()
-            ->with(['venue:id,code,name', 'area:id,code,name'])
-            ->where('is_active', true)
-            ->find($input['tarif_id'] ?? null);
-
-        if (! $tarif) {
-            throw new InvalidArgumentException('Tarif tidak ditemukan atau tidak aktif.');
-        }
-
         $kategori = $input['kategori_tarif'] ?? null;
         if (! in_array($kategori, ['pemerintah', 'non_pemerintah'], true)) {
             throw new InvalidArgumentException('kategori_tarif harus pemerintah atau non_pemerintah.');
-        }
-
-        $unitPrice = $kategori === 'pemerintah'
-            ? $tarif->tarif_pemerintah
-            : $tarif->tarif_non_pemerintah;
-
-        if ($unitPrice === null) {
-            throw new InvalidArgumentException(
-                $kategori === 'pemerintah'
-                    ? 'Tarif pemerintah tidak tersedia untuk item ini. Hubungi admin.'
-                    : 'Tarif non pemerintah tidak tersedia untuk item ini.'
-            );
         }
 
         $startsAt = Carbon::parse($input['starts_at']);
@@ -66,8 +53,150 @@ class PricingService
             throw new InvalidArgumentException('ends_at harus setelah starts_at.');
         }
 
-        $qty = max(1, (int) ($input['qty'] ?? 1));
-        $luas = isset($input['luas_m2']) ? (float) $input['luas_m2'] : null;
+        $rows = $this->normalizeQuoteRows($input);
+        $lines = [];
+
+        foreach ($rows as $row) {
+            $lines[] = $this->buildQuoteLine($row, $kategori, $startsAt, $endsAt, $input['duration_value'] ?? null);
+        }
+
+        $subtotal = array_sum(array_column($lines, 'line_total'));
+        $venueId = $rows[0]['venue_id'];
+        $addons = $this->quoteAddons($input['addon_ids'] ?? [], $venueId);
+        $addonTotal = array_sum(array_column($addons, 'line_total'));
+
+        return [
+            'subtotal' => (int) $subtotal,
+            'addon_total' => $addonTotal,
+            'grand_total' => (int) ($subtotal + $addonTotal),
+            'lines' => $lines,
+            'addons' => $addons,
+            'tarif' => $lines[0]['tarif'] ?? null,
+            'duration' => $lines[0]['duration'],
+            'kategori_tarif' => $kategori,
+            'starts_at' => $startsAt->toDateTimeString(),
+            'ends_at' => $endsAt->toDateTimeString(),
+        ];
+    }
+
+    /**
+     * Normalisasi input ke daftar baris area.
+     *
+     * @param  array<string, mixed>  $input
+     * @return list<array{area_id: ?int, tarif_id: int, qty: int, luas_m2: ?float, venue_id: int}>
+     */
+    private function normalizeQuoteRows(array $input): array
+    {
+        $rawRows = isset($input['areas']) && is_array($input['areas']) && $input['areas'] !== []
+            ? array_values($input['areas'])
+            : null;
+
+        if ($rawRows === null) {
+            $tarif = BookingTarif::query()->find($input['tarif_id'] ?? null);
+            if (! $tarif) {
+                throw new InvalidArgumentException('Tarif tidak ditemukan atau tidak aktif.');
+            }
+
+            $areaId = isset($input['area_id']) && $input['area_id'] !== '' && $input['area_id'] !== null
+                ? (int) $input['area_id']
+                : $tarif->area_id;
+
+            $rawRows = [[
+                'area_id' => $areaId,
+                'tarif_id' => $tarif->id,
+                'qty' => $input['qty'] ?? 1,
+                'luas_m2' => $input['luas_m2'] ?? null,
+            ]];
+        }
+
+        if ($rawRows === []) {
+            throw new InvalidArgumentException('Pilih minimal satu area yang akan disewa.');
+        }
+
+        $rows = [];
+        $seenAreas = [];
+
+        foreach ($rawRows as $index => $raw) {
+            $raw = is_array($raw) ? $raw : [];
+            $tarifId = (int) ($raw['tarif_id'] ?? 0);
+            $areaIdRaw = $raw['area_id'] ?? null;
+            $areaId = ($areaIdRaw === null || $areaIdRaw === '' || (int) $areaIdRaw === 0) ? null : (int) $areaIdRaw;
+
+            $tarif = BookingTarif::query()
+                ->where('is_active', true)
+                ->find($tarifId);
+
+            if (! $tarif) {
+                throw new InvalidArgumentException('Tarif tidak ditemukan atau tidak aktif.');
+            }
+
+            if ($areaId === null) {
+                if ($tarif->area_id !== null) {
+                    throw new InvalidArgumentException(
+                        "{$tarif->uraian} adalah tarif area tertentu — pilih area terlebih dahulu."
+                    );
+                }
+                $area = null;
+            } else {
+                $area = BookingArea::query()->where('is_active', true)->find($areaId);
+
+                if (! $area || $area->venue_id !== $tarif->venue_id) {
+                    throw new InvalidArgumentException('Area tidak ditemukan atau tidak aktif untuk venue ini.');
+                }
+
+                if ($tarif->area_id !== null && (int) $tarif->area_id !== $area->id) {
+                    throw new InvalidArgumentException("Jenis sewa {$tarif->uraian} bukan untuk area {$area->name}.");
+                }
+
+                if (isset($seenAreas[$area->id])) {
+                    throw new InvalidArgumentException("Area {$area->name} dipilih lebih dari sekali.");
+                }
+                $seenAreas[$area->id] = true;
+            }
+
+            $rows[] = [
+                'area_id' => $area?->id,
+                'tarif_id' => $tarif->id,
+                'qty' => max(1, (int) ($raw['qty'] ?? 1)),
+                'luas_m2' => isset($raw['luas_m2']) && $raw['luas_m2'] !== '' && $raw['luas_m2'] !== null
+                    ? (float) $raw['luas_m2']
+                    : null,
+                'venue_id' => (int) $tarif->venue_id,
+                'tarif_model' => $tarif,
+                'area_model' => $area,
+            ];
+        }
+
+        $venueIds = array_unique(array_column($rows, 'venue_id'));
+        if (count($venueIds) > 1) {
+            throw new InvalidArgumentException('Semua area yang dipilih harus berada di venue yang sama.');
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  array{area_id: ?int, tarif_id: int, qty: int, luas_m2: ?float, tarif_model: BookingTarif, area_model: ?BookingArea}  $row
+     * @return array<string, mixed>
+     */
+    private function buildQuoteLine(array $row, string $kategori, Carbon $startsAt, Carbon $endsAt, mixed $durationOverride = null): array
+    {
+        $tarif = $row['tarif_model'];
+        $area = $row['area_model'];
+
+        $unitPrice = $kategori === 'pemerintah'
+            ? $tarif->tarif_pemerintah
+            : $tarif->tarif_non_pemerintah;
+
+        if ($unitPrice === null) {
+            throw new InvalidArgumentException(
+                $kategori === 'pemerintah'
+                    ? "Tarif pemerintah belum tersedia untuk {$tarif->uraian}. Hubungi admin."
+                    : "Tarif non pemerintah belum tersedia untuk {$tarif->uraian}."
+            );
+        }
+
+        $luas = $row['luas_m2'];
 
         if (in_array($tarif->satuan, [BookingSatuan::PER_M2_DAY, BookingSatuan::PER_M2_MONTH], true)
             && ($luas === null || $luas <= 0)
@@ -75,25 +204,38 @@ class PricingService
             throw new InvalidArgumentException('luas_m2 wajib untuk satuan M².');
         }
 
-        $duration = $this->resolveDuration($tarif->satuan, $startsAt, $endsAt, $input['duration_value'] ?? null);
+        $duration = $this->resolveDuration($tarif->satuan, $startsAt, $endsAt, $durationOverride);
         $this->assertMetaHourConstraints($tarif->meta, $duration['hours']);
-        $lineTotal = $this->calculateLineTotal($tarif->satuan, (int) $unitPrice, $qty, $luas, $duration['value']);
+        $lineTotal = $this->calculateLineTotal($tarif->satuan, (int) $unitPrice, $row['qty'], $luas, $duration['value']);
 
-        $line = [
+        return [
             'tarif_id' => $tarif->id,
+            'area_id' => $area?->id,
+            'area' => $area ? [
+                'id' => $area->id,
+                'code' => $area->code,
+                'name' => $area->name,
+            ] : null,
             'uraian' => $tarif->uraian,
             'satuan' => $tarif->satuan,
-            'qty' => $qty,
+            'qty' => $row['qty'],
             'luas_m2' => $luas,
             'duration_value' => $duration['value'],
             'duration_label' => $duration['label'],
             'unit_price' => (int) $unitPrice,
             'line_total' => $lineTotal,
+            'tarif' => [
+                'id' => $tarif->id,
+                'code' => $tarif->code,
+                'uraian' => $tarif->uraian,
+                'satuan' => $tarif->satuan,
+            ],
+            'duration' => $duration,
             'snapshot' => [
                 'tarif_code' => $tarif->code,
                 'kategori_tarif' => $kategori,
                 'venue_id' => $tarif->venue_id,
-                'area_id' => $tarif->area_id,
+                'area_id' => $area?->id,
                 'time_slot' => $tarif->time_slot,
                 'audience_type' => $tarif->audience_type,
                 'day_type' => $tarif->day_type,
@@ -101,31 +243,6 @@ class PricingService
                 'event_level' => $tarif->event_level,
                 'category' => $tarif->category,
             ],
-        ];
-
-        $addons = $this->quoteAddons($input['addon_ids'] ?? [], $tarif->venue_id);
-        $addonTotal = array_sum(array_column($addons, 'line_total'));
-        $subtotal = $lineTotal;
-        $grandTotal = $subtotal + $addonTotal;
-
-        return [
-            'subtotal' => $subtotal,
-            'addon_total' => $addonTotal,
-            'grand_total' => $grandTotal,
-            'lines' => [$line],
-            'addons' => $addons,
-            'tarif' => [
-                'id' => $tarif->id,
-                'code' => $tarif->code,
-                'uraian' => $tarif->uraian,
-                'satuan' => $tarif->satuan,
-                'venue' => $tarif->venue,
-                'area' => $tarif->area,
-            ],
-            'duration' => $duration,
-            'kategori_tarif' => $kategori,
-            'starts_at' => $startsAt->toDateTimeString(),
-            'ends_at' => $endsAt->toDateTimeString(),
         ];
     }
 

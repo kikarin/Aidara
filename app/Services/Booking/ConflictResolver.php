@@ -28,23 +28,26 @@ class ConflictResolver
      */
     public function resolve(int $bookingId): array
     {
-        $booking = Booking::query()->with(['priorityRule', 'area'])->findOrFail($bookingId);
+        $booking = Booking::query()->with(['priorityRule', 'areas'])->findOrFail($bookingId);
 
         $bufferBefore = (int) ($booking->buffer_before_days ?? 1);
         $bufferAfter = (int) ($booking->buffer_after_days ?? 1);
         $windowStart = Carbon::parse($booking->starts_at)->subDays($bufferBefore)->startOfDay();
         $windowEnd = Carbon::parse($booking->ends_at)->addDays($bufferAfter)->endOfDay();
 
+        $selfAreaIds = $booking->areas->pluck('id')->map(fn ($id) => (int) $id)->all();
+
         $others = Booking::query()
-            ->with(['priorityRule', 'area'])
+            ->with(['priorityRule', 'areas'])
             ->where('id', '!=', $booking->id)
             ->where('venue_id', $booking->venue_id)
             ->whereIn('status', BookingStatus::locking())
             ->where('starts_at', '<', $windowEnd)
             ->where('ends_at', '>', $windowStart)
-            ->when($booking->area_id, function ($q) use ($booking) {
-                $q->where(function ($inner) use ($booking) {
-                    $inner->where('area_id', $booking->area_id)->orWhereNull('area_id');
+            ->when($selfAreaIds !== [], function ($q) use ($selfAreaIds) {
+                $q->where(function ($inner) use ($selfAreaIds) {
+                    $inner->whereHas('areas', fn ($aq) => $aq->whereIn('booking_areas.id', $selfAreaIds))
+                        ->orWhereDoesntHave('areas');
                 });
             })
             ->get();
@@ -153,12 +156,16 @@ class ConflictResolver
     /** @param  list<string>  $tentativeCodes */
     private function isTentativeArea(Booking $booking, array $tentativeCodes): bool
     {
-        if ($booking->area?->is_tentative) {
-            return true;
+        foreach ($booking->areas as $area) {
+            if ($area->is_tentative) {
+                return true;
+            }
+
+            if ($area->code !== null && in_array($area->code, $tentativeCodes, true)) {
+                return true;
+            }
         }
 
-        $code = $booking->area?->code;
-
-        return $code !== null && in_array($code, $tentativeCodes, true);
+        return false;
     }
 }

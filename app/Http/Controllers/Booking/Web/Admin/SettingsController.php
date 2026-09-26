@@ -18,6 +18,8 @@ class SettingsController extends Controller
         'kontak_klarifikasi',
         'branding_name',
         'payment_expire_hours',
+        'pengajuan_sla_hari_kerja',
+        'surat_kop',
     ];
 
     public function edit(): Response
@@ -49,9 +51,16 @@ class SettingsController extends Controller
             'kontak_klarifikasi' => ['nullable', 'string', 'max:64'],
             'payment_mode' => ['nullable', 'in:manual,bjb'],
             'payment_expire_hours' => ['nullable', 'integer', 'min:1', 'max:720'],
+            'pengajuan_sla_hari_kerja' => ['nullable', 'integer', 'min:1', 'max:90'],
             'rekening_bank' => ['nullable', 'string', 'max:150'],
             'rekening_nomor' => ['nullable', 'string', 'max:64'],
             'rekening_atas_nama' => ['nullable', 'string', 'max:150'],
+            'surat_instansi' => ['nullable', 'string', 'max:150'],
+            'surat_alamat' => ['nullable', 'string', 'max:255'],
+            'surat_email' => ['nullable', 'string', 'max:120'],
+            'surat_telp' => ['nullable', 'string', 'max:64'],
+            'surat_penandatangan_nama' => ['nullable', 'string', 'max:150'],
+            'surat_penandatangan_jabatan' => ['nullable', 'string', 'max:150'],
         ]);
 
         if (array_key_exists('branding_name', $data) && $data['branding_name'] !== null) {
@@ -65,6 +74,9 @@ class SettingsController extends Controller
         }
         if (isset($data['payment_expire_hours'])) {
             BookingSetting::setValue('payment_expire_hours', (int) $data['payment_expire_hours']);
+        }
+        if (isset($data['pengajuan_sla_hari_kerja'])) {
+            BookingSetting::setValue('pengajuan_sla_hari_kerja', (int) $data['pengajuan_sla_hari_kerja']);
         }
 
         $currentRek = BookingSetting::getValue('rekening_transfer');
@@ -80,6 +92,17 @@ class SettingsController extends Controller
         }
         if ($rek !== []) {
             BookingSetting::setValue('rekening_transfer', $rek);
+        }
+
+        $currentKop = BookingSetting::getValue('surat_kop');
+        $kop = is_array($currentKop) ? $currentKop : [];
+        foreach (['surat_instansi' => 'instansi', 'surat_alamat' => 'alamat', 'surat_email' => 'email', 'surat_telp' => 'telp', 'surat_penandatangan_nama' => 'penandatangan_nama', 'surat_penandatangan_jabatan' => 'penandatangan_jabatan'] as $field => $kopKey) {
+            if (array_key_exists($field, $data) && $data[$field] !== null) {
+                $kop[$kopKey] = $data[$field];
+            }
+        }
+        if ($kop !== []) {
+            BookingSetting::setValue('surat_kop', $kop);
         }
 
         return redirect()

@@ -33,7 +33,7 @@ class BookingResource extends JsonResource
             'terms_accepted_at' => optional($this->terms_accepted_at)->toDateTimeString(),
             'submitted_at' => optional($this->submitted_at)->toDateTimeString(),
             'venue' => $this->whenLoaded('venue'),
-            'area' => $this->whenLoaded('area'),
+            'areas' => $this->whenLoaded('areas'),
             'user' => $this->whenLoaded('user', fn () => $this->user ? [
                 'id' => $this->user->id,
                 'name' => $this->user->name,

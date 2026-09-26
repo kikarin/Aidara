@@ -41,7 +41,7 @@ class ManualTransferGateway implements PaymentGatewayInterface
             ];
         }
 
-        $expireHours = (int) (BookingSetting::getValue('payment_expire_hours', 48) ?? 48);
+        $expireHours = (int) (BookingSetting::getValue('payment_expire_hours', 72) ?? 72);
         if ($expireHours < 1) {
             $expireHours = 48;
         }

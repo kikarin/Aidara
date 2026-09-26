@@ -5,6 +5,7 @@ namespace App\Models\Booking;
 use App\Blameable;
 use App\Models\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -45,8 +46,8 @@ class BookingArea extends Model
         return $this->hasMany(BookingTarif::class, 'area_id');
     }
 
-    public function bookings(): HasMany
+    public function bookings(): BelongsToMany
     {
-        return $this->hasMany(Booking::class, 'area_id');
+        return $this->belongsToMany(Booking::class, 'booking_area_selected', 'area_id', 'booking_id');
     }
 }

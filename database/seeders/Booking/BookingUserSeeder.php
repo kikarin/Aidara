@@ -25,13 +25,14 @@ class BookingUserSeeder extends Seeder
             ['email' => 'admin.upt@test.local'],
             [
                 'name' => 'Admin UPT E-Booking',
-                'password' => Hash::make('password123'),
+                'password' => Hash::make('Sewdaq123'),
                 'no_hp' => '085777183633',
                 'is_active' => 1,
                 'email_verified_at' => now(),
                 'is_verifikasi' => 1,
                 'current_role_id' => $adminRole->id,
             ]
+
         );
         if (! $admin->hasRole('admin_upt')) {
             $admin->assignRole($adminRole);
@@ -48,8 +49,42 @@ class BookingUserSeeder extends Seeder
                 'email_verified_at' => now(),
                 'is_verifikasi' => 1,
                 'current_role_id' => $penyewaRole->id,
+            ],
+            //  ['email' => 'nikoagustio22@gmail.com'],
+            // [
+            //     'name' => 'Admin UPT E-Booking',
+            //     'password' => Hash::make('Sewdaq123'),
+            //     'no_hp' => '085777183633',
+            //     'is_active' => 1,
+            //     'email_verified_at' => now(),
+            //     'is_verifikasi' => 1,
+            //     'current_role_id' => $adminRole->id,
+            // ]
+        );
+
+        $penyewa = User::query()->updateOrCreate(
+            // ['email' => 'penyewa.demo@test.local'],
+            // [
+            //     'name' => 'Penyewa Demo',
+            //     'password' => Hash::make('password123'),
+            //     'no_hp' => '081234567890',
+            //     'is_active' => 1,
+            //     'email_verified_at' => now(),
+            //     'is_verifikasi' => 1,
+            //     'current_role_id' => $penyewaRole->id,
+            // ],
+            ['email' => 'nikoagustio22@gmail.com'],
+            [
+                'name' => 'Admin UPT E-Booking',
+                'password' => Hash::make('Sewdaq123'),
+                'no_hp' => '085777183633',
+                'is_active' => 1,
+                'email_verified_at' => now(),
+                'is_verifikasi' => 1,
+                'current_role_id' => $penyewaRole->id,
             ]
         );
+
         if (! $penyewa->hasRole('penyewa')) {
             $penyewa->assignRole($penyewaRole);
         }

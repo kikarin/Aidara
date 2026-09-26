@@ -19,6 +19,7 @@ class AvailabilityService
      * @param  array{
      *   venue_id: int,
      *   area_id?: int|null,
+     *   area_ids?: list<int>|null,
      *   starts_at: string|\DateTimeInterface,
      *   ends_at: string|\DateTimeInterface,
      *   exclude_booking_id?: int|null
@@ -30,6 +31,7 @@ class AvailabilityService
      *   within_horizon: bool,
      *   horizon_days: int|null,
      *   closed: bool,
+     *   pengajuan: bool,
      *   closures: array<int, array<string, mixed>>,
      *   conflicts: array<int, array<string, mixed>>,
      *   buffer: array{before: int, after: int}
@@ -49,7 +51,7 @@ class AvailabilityService
             throw new InvalidArgumentException('ends_at harus setelah starts_at.');
         }
 
-        $areaId = isset($input['area_id']) ? (int) $input['area_id'] : null;
+        $areaIds = $this->resolveAreaIds($input);
         $excludeId = isset($input['exclude_booking_id']) ? (int) $input['exclude_booking_id'] : null;
 
         $bufferBefore = (int) ($this->rules->get('buffer_before_days', $venueId, 1) ?? 1);
@@ -63,23 +65,32 @@ class AvailabilityService
             $withinHorizon = $startsAt->lte($latest) && $startsAt->gte(now()->startOfDay());
         }
 
-        $closureRows = ($input['ignore_closures'] ?? false)
-            ? []
-            : $this->closures->overlappingClosures($venueId, $startsAt, $endsAt, $areaId);
+        $closureRows = [];
+        if (! ($input['ignore_closures'] ?? false)) {
+            $allClosures = $this->closures->overlappingClosures($venueId, $startsAt, $endsAt, null);
+            $closureRows = array_values(array_filter(
+                $allClosures,
+                fn (array $closure) => $areaIds === []
+                    || $closure['area_id'] === null
+                    || in_array((int) $closure['area_id'], $areaIds, true)
+            ));
+        }
         $closed = $closureRows !== [];
 
         $windowStart = $startsAt->copy()->subDays($bufferBefore)->startOfDay();
         $windowEnd = $endsAt->copy()->addDays($bufferAfter)->endOfDay();
 
         $query = Booking::query()
+            ->with('areas:id,code,name')
             ->where('venue_id', $venueId)
             ->whereIn('status', BookingStatus::locking())
             ->where('starts_at', '<', $windowEnd)
             ->where('ends_at', '>', $windowStart);
 
-        if ($areaId) {
-            $query->where(function ($q) use ($areaId) {
-                $q->where('area_id', $areaId)->orWhereNull('area_id');
+        if ($areaIds !== []) {
+            $query->where(function ($q) use ($areaIds) {
+                $q->whereHas('areas', fn ($aq) => $aq->whereIn('booking_areas.id', $areaIds))
+                    ->orWhereDoesntHave('areas');
             });
         }
 
@@ -89,36 +100,47 @@ class AvailabilityService
 
         $conflicts = $query
             ->orderBy('starts_at')
-            ->get(['id', 'nomor', 'status', 'priority_flag', 'area_id', 'starts_at', 'ends_at', 'buffer_before_days', 'buffer_after_days']);
+            ->get(['id', 'nomor', 'status', 'priority_flag', 'starts_at', 'ends_at', 'buffer_before_days', 'buffer_after_days']);
+
+        // Pengajuan (menunggu_approval/perlu_klarifikasi) TIDAK memblokir —
+        // hanya dihitung sebagai info "ada pengajuan" tanpa detail pemohon.
+        $pengajuanQuery = Booking::query()
+            ->where('venue_id', $venueId)
+            ->whereIn('status', BookingStatus::pengajuan())
+            ->where('starts_at', '<', $windowEnd)
+            ->where('ends_at', '>', $windowStart);
+        if ($areaIds !== []) {
+            $pengajuanQuery->where(function ($q) use ($areaIds) {
+                $q->whereHas('areas', fn ($aq) => $aq->whereIn('booking_areas.id', $areaIds))
+                    ->orWhereDoesntHave('areas');
+            });
+        }
+        if ($excludeId) {
+            $pengajuanQuery->where('id', '!=', $excludeId);
+        }
+        $hasPengajuan = $pengajuanQuery->exists();
 
         $hasHard = false;
-        $hasSoftOrHold = false;
         $mapped = [];
 
         foreach ($conflicts as $booking) {
-            $lockLevel = $this->lockLevel($booking->status);
-            if ($lockLevel === 'hard') {
-                $hasHard = true;
-            } elseif ($lockLevel !== null) {
-                $hasSoftOrHold = true;
-            }
+            $hasHard = true;
 
             $mapped[] = [
                 'id' => $booking->id,
                 'nomor' => $booking->nomor,
                 'status' => $booking->status,
                 'priority_flag' => $booking->priority_flag,
-                'area_id' => $booking->area_id,
+                'area_ids' => $booking->areas->pluck('id')->all(),
+                'areas' => $booking->areas->map(fn ($a) => ['id' => $a->id, 'code' => $a->code, 'name' => $a->name])->all(),
                 'starts_at' => optional($booking->starts_at)->toDateTimeString(),
                 'ends_at' => optional($booking->ends_at)->toDateTimeString(),
-                'lock_level' => $lockLevel,
+                'lock_level' => 'hard',
             ];
         }
 
         if ($closed || $hasHard) {
             $status = 'merah';
-        } elseif ($hasSoftOrHold) {
-            $status = 'kuning';
         } else {
             $status = 'hijau';
         }
@@ -132,6 +154,7 @@ class AvailabilityService
             'within_horizon' => $withinHorizon,
             'horizon_days' => $horizonDays,
             'closed' => $closed,
+            'pengajuan' => $hasPengajuan,
             'closures' => $closureRows,
             'conflicts' => $mapped,
             'buffer' => [
@@ -177,6 +200,7 @@ class AvailabilityService
      * @param  array{
      *   venue_id: int,
      *   area_id?: int|null,
+     *   area_ids?: list<int>|null,
      *   starts_at: string|\DateTimeInterface,
      *   ends_at: string|\DateTimeInterface,
      *   exclude_booking_id?: int|null
@@ -195,6 +219,7 @@ class AvailabilityService
      *   venue_id: int,
      *   date: string,
      *   area_id?: int|null,
+     *   area_ids?: list<int>|null,
      *   duration_hours?: int
      * }  $input
      * @return array{
@@ -214,9 +239,7 @@ class AvailabilityService
         }
 
         $date = Carbon::parse($input['date'] ?? now()->toDateString())->startOfDay();
-        $areaId = isset($input['area_id']) && $input['area_id'] !== '' && $input['area_id'] !== null
-            ? (int) $input['area_id']
-            : null;
+        $areaIds = $this->resolveAreaIds($input);
         $durationHours = max(1, min(12, (int) ($input['duration_hours'] ?? 1)));
         $stepHours = max(1, min(12, (int) ($input['step_hours'] ?? 1)));
 
@@ -233,7 +256,13 @@ class AvailabilityService
         $horizonDays = $this->rules->get('booking_horizon_days', $venueId, null);
         $horizonDays = is_numeric($horizonDays) ? (int) $horizonDays : null;
 
-        $windowClosures = $this->closures->overlappingClosures($venueId, $open, $close, $areaId);
+        $allWindowClosures = $this->closures->overlappingClosures($venueId, $open, $close, null);
+        $windowClosures = array_values(array_filter(
+            $allWindowClosures,
+            fn (array $closure) => $areaIds === []
+                || $closure['area_id'] === null
+                || in_array((int) $closure['area_id'], $areaIds, true)
+        ));
         $coversWholeDay = fn (array $closure): bool => ($closure['is_full_day'] ?? false)
             || (Carbon::parse($closure['starts_at'])->lte($open) && Carbon::parse($closure['ends_at'])->gte($close));
         $fullDayClosure = collect($windowClosures)->first($coversWholeDay);
@@ -257,6 +286,7 @@ class AvailabilityService
                     'label' => $startsAt->format('H:i').'–'.$endsAt->format('H:i'),
                     'status' => 'merah',
                     'bookable' => false,
+                    'pengajuan' => false,
                     'reason' => 'Sudah lewat',
                 ];
                 $cursor->addHours($stepHours);
@@ -266,7 +296,7 @@ class AvailabilityService
 
             $check = $this->check([
                 'venue_id' => $venueId,
-                'area_id' => $areaId,
+                'area_ids' => $areaIds,
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
             ]);
@@ -279,9 +309,7 @@ class AvailabilityService
             } elseif (! empty($check['closed'])) {
                 $reason = $check['closures'][0]['reason'] ?? 'Ditutup pengelola';
             } elseif ($check['status'] === 'merah') {
-                $reason = 'Sudah dipesan';
-            } elseif ($check['status'] === 'kuning') {
-                $reason = 'Sedang ada pengajuan lain';
+                $reason = 'Sudah dipesan / disetujui';
             }
 
             $slots[] = [
@@ -290,6 +318,7 @@ class AvailabilityService
                 'label' => $startsAt->format('H:i').'–'.$endsAt->format('H:i'),
                 'status' => $check['status'],
                 'bookable' => (bool) $check['bookable'],
+                'pengajuan' => (bool) $check['pengajuan'],
                 'reason' => $reason,
             ];
 
@@ -317,12 +346,13 @@ class AvailabilityService
      * @param  array{
      *   venue_id: int,
      *   month: string,
-     *   area_id?: int|null
+     *   area_id?: int|null,
+     *   area_ids?: list<int>|null
      * }  $input
      * @return array{
      *   month: string,
      *   operating_hours: array{start: string, end: string},
-     *   days: array<int, array{date: string, status: string, bookable: bool, reason: string|null}>
+     *   days: array<int, array{date: string, status: string, bookable: bool, pengajuan: bool, reason: string|null}>
      * }
      */
     public function monthOverview(array $input): array
@@ -338,9 +368,7 @@ class AvailabilityService
             throw new InvalidArgumentException('Format month harus Y-m.');
         }
 
-        $areaId = isset($input['area_id']) && $input['area_id'] !== '' && $input['area_id'] !== null
-            ? (int) $input['area_id']
-            : null;
+        $areaIds = $this->resolveAreaIds($input);
 
         $hoursRule = $this->rules->get('operating_hours', $venueId, ['start' => '06:00', 'end' => '21:00']);
         $openStr = is_array($hoursRule) ? (string) ($hoursRule['start'] ?? '06:00') : '06:00';
@@ -376,7 +404,7 @@ class AvailabilityService
 
             $check = $this->check([
                 'venue_id' => $venueId,
-                'area_id' => $areaId,
+                'area_ids' => $areaIds,
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
             ]);
@@ -391,7 +419,7 @@ class AvailabilityService
             if ($hasPartialClosure) {
                 $check = $this->check([
                     'venue_id' => $venueId,
-                    'area_id' => $areaId,
+                    'area_ids' => $areaIds,
                     'starts_at' => $startsAt,
                     'ends_at' => $endsAt,
                     'ignore_closures' => true,
@@ -409,9 +437,7 @@ class AvailabilityService
                     ? "Hanya bisa dipesan sampai {$check['horizon_days']} hari ke depan"
                     : 'Di luar batas pemesanan';
             } elseif ($check['status'] === 'merah') {
-                $reason = 'Sudah dipesan / penuh';
-            } elseif ($check['status'] === 'kuning') {
-                $reason = 'Ada pengajuan lain';
+                $reason = 'Sudah dipesan / disetujui';
             } elseif ($hasPartialClosure) {
                 $reason = 'Sebagian jam ditutup';
             }
@@ -420,6 +446,7 @@ class AvailabilityService
                 'date' => $dateStr,
                 'status' => $check['status'],
                 'bookable' => (bool) $check['bookable'],
+                'pengajuan' => (bool) $check['pengajuan'],
                 'reason' => $reason,
             ];
 
@@ -436,16 +463,32 @@ class AvailabilityService
         ];
     }
 
+    /**
+     * Normalisasi area terpilih: `area_ids` (multi) dipakai dulu, fallback ke `area_id` tunggal.
+     * Daftar kosong = seluruh venue.
+     *
+     * @param  array<string, mixed>  $input
+     * @return list<int>
+     */
+    private function resolveAreaIds(array $input): array
+    {
+        if (! empty($input['area_ids']) && is_array($input['area_ids'])) {
+            $ids = array_values(array_filter(array_map('intval', $input['area_ids'])));
+
+            return array_values(array_unique($ids));
+        }
+
+        if (! empty($input['area_id'])) {
+            return [(int) $input['area_id']];
+        }
+
+        return [];
+    }
+
     private function lockLevel(string $status): ?string
     {
         if (in_array($status, BookingStatus::hardLock(), true)) {
             return 'hard';
-        }
-        if (in_array($status, BookingStatus::holdLock(), true)) {
-            return 'hold';
-        }
-        if (in_array($status, BookingStatus::softLock(), true)) {
-            return 'soft';
         }
 
         return null;

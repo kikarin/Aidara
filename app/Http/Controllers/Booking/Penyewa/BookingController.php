@@ -32,7 +32,7 @@ class BookingController extends Controller
     {
         $bookings = Booking::query()
             ->where('user_id', $request->user()->id)
-            ->with(['venue:id,code,name', 'area:id,code,name', 'items', 'addonSelected'])
+            ->with(['venue:id,code,name', 'areas:id,code,name', 'items', 'addonSelected'])
             ->latest()
             ->paginate(20);
 
@@ -46,7 +46,7 @@ class BookingController extends Controller
     {
         $booking = Booking::query()
             ->where('user_id', $request->user()->id)
-            ->with(['venue', 'area', 'items', 'addonSelected', 'payments', 'statusLogs'])
+            ->with(['venue', 'areas', 'items', 'addonSelected', 'payments', 'statusLogs'])
             ->findOrFail($id);
 
         return response()->json([

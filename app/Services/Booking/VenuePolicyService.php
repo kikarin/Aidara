@@ -102,7 +102,7 @@ class VenuePolicyService
             $booking->forceFill(['cancelled_at' => now()])->save();
 
             return [
-                'booking' => $booking->fresh(['venue', 'area', 'statusLogs']),
+                'booking' => $booking->fresh(['venue', 'areas', 'statusLogs']),
                 'outcome' => $outcome,
             ];
         });
@@ -153,7 +153,7 @@ class VenuePolicyService
 
             return [
                 'incident' => $incident,
-                'booking' => $booking->fresh(['incidents', 'venue', 'area']),
+                'booking' => $booking->fresh(['incidents', 'venue', 'areas']),
                 'decision' => $incident->decision,
             ];
         });
@@ -242,7 +242,7 @@ class VenuePolicyService
                 $booking->forceFill(['confirmed_at' => now()])->save();
             }
 
-            return $booking->fresh(['venue', 'area', 'statusLogs']);
+            return $booking->fresh(['venue', 'areas', 'statusLogs']);
         });
     }
 

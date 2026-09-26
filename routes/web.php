@@ -42,11 +42,13 @@ use App\Http\Controllers\Booking\Web\Admin\DocumentTypeController as EBookingAdm
 use App\Http\Controllers\Booking\Web\Admin\FacilityController as EBookingAdminFacilityController;
 use App\Http\Controllers\Booking\Web\Admin\PriorityRuleController as EBookingAdminPriorityRuleController;
 use App\Http\Controllers\Booking\Web\Admin\SettingsController as EBookingAdminSettingsController;
+use App\Http\Controllers\Booking\Web\Admin\SuratController as EBookingAdminSuratController;
 use App\Http\Controllers\Booking\Web\Admin\TermsController as EBookingAdminTermsController;
 use App\Http\Controllers\Booking\Web\Admin\VenueController as EBookingAdminVenueController;
 use App\Http\Controllers\Booking\Web\AuthController as EBookingAuthController;
 use App\Http\Controllers\Booking\Web\BookingController as EBookingBookingController;
 use App\Http\Controllers\Booking\Web\CatalogController as EBookingCatalogController;
+use App\Http\Controllers\Booking\Web\SuratSharedController as EBookingSuratSharedController;
 use App\Http\Controllers\Booking\Web\VenueController as EBookingVenueController;
 use App\Http\Controllers\PublicEventController;
 use App\Http\Controllers\PelatihController;
@@ -141,6 +143,11 @@ Route::prefix('booking')->group(function () {
 
 Route::post('/booking/quote', [EBookingBookingController::class, 'quote'])->name('e-booking.quote');
 
+Route::get('/booking/surat/{surat}', EBookingSuratSharedController::class)
+    ->whereNumber('surat')
+    ->middleware('signed')
+    ->name('e-booking.surat.shared');
+
 Route::middleware(['booking.web:penyewa,admin_upt'])->prefix('booking')->group(function () {
     Route::post('/logout', [EBookingAuthController::class, 'logout'])->name('e-booking.logout');
     Route::get('/bookings', [EBookingBookingController::class, 'index'])->name('e-booking.bookings.index');
@@ -148,6 +155,9 @@ Route::middleware(['booking.web:penyewa,admin_upt'])->prefix('booking')->group(f
     Route::get('/bookings/{id}', [EBookingBookingController::class, 'show'])
         ->whereNumber('id')
         ->name('e-booking.bookings.show');
+    Route::get('/bookings/{id}/surat/{surat}', [EBookingBookingController::class, 'downloadSurat'])
+        ->whereNumber(['id', 'surat'])
+        ->name('e-booking.bookings.surat.download');
     Route::post('/bookings/{id}/payment/bukti', [EBookingBookingController::class, 'uploadBukti'])
         ->whereNumber('id')
         ->name('e-booking.bookings.bukti');
@@ -174,6 +184,18 @@ Route::middleware(['booking.web:admin_upt'])->prefix('booking/admin')->group(fun
     Route::post('/bookings/{id}/klarifikasi', [EBookingAdminBookingController::class, 'klarifikasi'])
         ->whereNumber('id')
         ->name('e-booking.admin.bookings.klarifikasi');
+    Route::post('/bookings/{id}/surat', [EBookingAdminSuratController::class, 'store'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.bookings.surat.store');
+    Route::get('/surat/{surat}/download', [EBookingAdminSuratController::class, 'download'])
+        ->whereNumber('surat')
+        ->name('e-booking.admin.bookings.surat.download');
+    Route::post('/surat/{surat}/email', [EBookingAdminSuratController::class, 'sendEmail'])
+        ->whereNumber('surat')
+        ->name('e-booking.admin.bookings.surat.email');
+    Route::get('/surat/{surat}/whatsapp', [EBookingAdminSuratController::class, 'shareWhatsApp'])
+        ->whereNumber('surat')
+        ->name('e-booking.admin.bookings.surat.whatsapp');
     Route::post('/payments/{paymentId}/verify', [EBookingAdminBookingController::class, 'verifyPayment'])
         ->whereNumber('paymentId')
         ->name('e-booking.admin.payments.verify');

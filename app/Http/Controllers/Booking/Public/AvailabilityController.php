@@ -112,7 +112,8 @@ class AvailabilityController extends Controller
                 'rekening_transfer' => BookingSetting::getValue('rekening_transfer'),
                 'kontak_klarifikasi' => BookingSetting::getValue('kontak_klarifikasi'),
                 'branding_name' => BookingSetting::getValue('branding_name', 'E-Booking'),
-                'payment_expire_hours' => (int) (BookingSetting::getValue('payment_expire_hours', 48) ?? 48),
+                'payment_expire_hours' => (int) (BookingSetting::getValue('payment_expire_hours', 72) ?? 72),
+                'pengajuan_sla_hari_kerja' => max(1, (int) (BookingSetting::getValue('pengajuan_sla_hari_kerja', 7) ?? 7)),
             ],
         ]);
     }

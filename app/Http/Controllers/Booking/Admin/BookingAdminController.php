@@ -56,7 +56,7 @@ class BookingAdminController extends Controller
     public function show(int $id): JsonResponse
     {
         $booking = Booking::query()
-            ->with(['venue', 'area', 'user', 'penyewaProfile.documents', 'items', 'addonSelected', 'payments', 'statusLogs', 'priorityRule'])
+            ->with(['venue', 'areas', 'user', 'penyewaProfile.documents', 'items', 'addonSelected', 'payments', 'statusLogs', 'priorityRule'])
             ->findOrFail($id);
 
         return response()->json([

@@ -3,7 +3,7 @@ import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
 import EBookingLayout from '@/layouts/e-booking/EBookingLayout.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
-import { LoaderCircle } from 'lucide-vue-next';
+import { FileText, LoaderCircle } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 type PaymentInfo = {
@@ -36,9 +36,22 @@ const props = defineProps<{
         addon_total: number;
         can_upload_bukti: boolean;
         venue: { id: number; code: string; name: string } | null;
-        area: { id: number; code: string; name: string } | null;
+        areas: Array<{ id: number; code: string; name: string }>;
         items: Array<{ uraian: string; satuan: string; qty: number; line_total: number }>;
         addons: Array<{ name: string; qty: number; line_total: number }>;
+        dokumen_wajib: string[];
+        surats: Array<{
+            id: number;
+            jenis_label: string;
+            nomor_surat: string;
+            perihal: string;
+            meeting_at: string | null;
+            meeting_place: string | null;
+            dokumen: string[] | null;
+            sent_email_at: string | null;
+            created_at: string | null;
+            download_url: string;
+        }>;
         payment: PaymentInfo | null;
         status_logs: Array<{
             from_status: string | null;
@@ -47,14 +60,14 @@ const props = defineProps<{
             created_at: string | null;
         }>;
     };
+    slaHariKerja?: number;
 }>();
 
 const page = usePage();
 const flashSuccess = computed(() => (page.props.flash as { success?: string } | undefined)?.success);
 const flashError = computed(() => (page.props.flash as { error?: string } | undefined)?.error);
 
-const formatRp = (n: number) =>
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
+const formatRp = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
 const statusLabel = (status: string) => {
     const map: Record<string, string> = {
@@ -146,7 +159,7 @@ const nextStepText = computed(() => {
         return 'Silakan transfer sesuai petunjuk di bawah, lalu kirim bukti pembayaran.';
     }
     if (props.booking.status === 'menunggu_approval') {
-        return 'Pengajuan Anda sudah masuk. Pengelola akan meninjau terlebih dahulu.';
+        return `Pengajuan Anda sudah masuk. Proses peninjauan maksimal ${props.slaHariKerja ?? 7} hari kerja — balasan berupa surat akan dikirim setelah selesai.`;
     }
     if (props.booking.status === 'perlu_klarifikasi') {
         return 'Pengelola perlu konfirmasi tambahan. Mohon cek catatan terbaru.';
@@ -160,20 +173,16 @@ const nextStepText = computed(() => {
     <SeoHead :title="`Booking ${booking.nomor}`" />
 
     <EBookingLayout active="history">
-        <div
-            v-if="flashSuccess"
-            class="mb-4 rounded-[24px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
-        >
+        <div v-if="flashSuccess" class="mb-4 rounded-[24px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             {{ flashSuccess }}
         </div>
-        <div
-            v-if="flashError"
-            class="mb-4 rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-        >
+        <div v-if="flashError" class="mb-4 rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {{ flashError }}
         </div>
 
-        <section class="mb-6 rounded-[32px] bg-[linear-gradient(135deg,#0f3d87_0%,#1479d1_58%,#44b6ff_100%)] p-6 text-white shadow-[0_20px_60px_rgba(20,121,209,0.25)] sm:p-8">
+        <section
+            class="mb-6 rounded-[32px] bg-[linear-gradient(135deg,#0f3d87_0%,#1479d1_58%,#44b6ff_100%)] p-6 text-white shadow-[0_20px_60px_rgba(20,121,209,0.25)] sm:p-8"
+        >
             <Link :href="route('e-booking.bookings.index')" class="text-sm font-semibold text-white/85 hover:text-white">
                 ← Kembali ke pesanan saya
             </Link>
@@ -195,9 +204,9 @@ const nextStepText = computed(() => {
                         <span class="text-slate-500">Tempat</span>
                         <span class="text-right font-medium text-slate-900">{{ booking.venue?.name }}</span>
                     </div>
-                    <div v-if="booking.area" class="flex justify-between gap-3">
+                    <div v-if="booking.areas?.length" class="flex justify-between gap-3">
                         <span class="text-slate-500">Area</span>
-                        <span class="text-right text-slate-900">{{ booking.area.name }}</span>
+                        <span class="text-right text-slate-900">{{ booking.areas.map((a) => a.name).join(', ') }}</span>
                     </div>
                     <div class="flex justify-between gap-3">
                         <span class="text-slate-500">Jadwal</span>
@@ -209,7 +218,9 @@ const nextStepText = computed(() => {
                     </div>
                     <div class="flex justify-between gap-3">
                         <span class="text-slate-500">Jenis pemohon</span>
-                        <span class="text-right text-slate-900">{{ booking.kategori_tarif === 'pemerintah' ? 'Instansi pemerintah' : 'Umum / non pemerintah' }}</span>
+                        <span class="text-right text-slate-900">{{
+                            booking.kategori_tarif === 'pemerintah' ? 'Instansi pemerintah' : 'Umum / non pemerintah'
+                        }}</span>
                     </div>
                     <div class="space-y-1 border-t border-slate-200 pt-3">
                         <div class="flex justify-between gap-3">
@@ -251,9 +262,41 @@ const nextStepText = computed(() => {
                         </li>
                     </ul>
                 </div>
+
+                <div v-if="booking.dokumen_wajib.length" class="rounded-[28px] border border-amber-200 bg-amber-50/70 p-5 text-sm shadow-sm">
+                    <h2 class="font-semibold text-slate-900">Dokumen yang perlu disiapkan</h2>
+                    <p class="mt-1 text-xs text-slate-600">Bawa dokumen berikut saat meeting dengan pengelola.</p>
+                    <ul class="mt-3 list-disc space-y-1 pl-5 text-slate-700">
+                        <li v-for="(dok, i) in booking.dokumen_wajib" :key="i">{{ dok }}</li>
+                    </ul>
+                </div>
+
+                <div v-if="booking.surats.length" class="rounded-[28px] border border-slate-200 bg-white p-5 text-sm shadow-sm">
+                    <h2 class="mb-3 flex items-center gap-2 font-semibold text-slate-900">
+                        <FileText class="size-4 text-[var(--brand-green,#2e7d32)]" />
+                        Surat dari pengelola
+                    </h2>
+                    <ul class="space-y-3">
+                        <li v-for="s in booking.surats" :key="s.id" class="rounded-2xl border border-slate-200 p-4">
+                            <p class="font-semibold text-slate-900">{{ s.jenis_label }}</p>
+                            <p class="mt-0.5 text-xs text-slate-500">{{ s.nomor_surat }} · {{ s.perihal }}</p>
+                            <p v-if="s.meeting_at || s.meeting_place" class="mt-2 text-xs text-slate-700">
+                                Meeting: {{ s.meeting_at?.replace('T', ' ') }}{{ s.meeting_place ? ' · ' + s.meeting_place : '' }}
+                            </p>
+                            <p v-if="s.dokumen?.length" class="mt-1 text-xs text-slate-600">Dokumen: {{ s.dokumen.join(', ') }}</p>
+                            <a
+                                :href="s.download_url"
+                                class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                            >
+                                <FileText class="size-3.5" />
+                                Unduh surat (PDF)
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </div>
 
-            <aside class="space-y-4 lg:sticky lg:top-24 lg:self-start">
+            <aside class="space-y-4 lg:sticky lg:top-36 lg:self-start">
                 <div class="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
                     <h2 class="text-lg font-semibold text-slate-900">Pembayaran</h2>
 
@@ -274,9 +317,7 @@ const nextStepText = computed(() => {
                             </div>
                             <p v-if="countdown" class="mt-2 text-xs font-medium text-amber-700">
                                 Batas waktu bayar: {{ countdown }}
-                                <template v-if="booking.payment.expires_at">
-                                    ({{ booking.payment.expires_at }})
-                                </template>
+                                <template v-if="booking.payment.expires_at"> ({{ booking.payment.expires_at }}) </template>
                             </p>
                             <div v-if="booking.payment.bukti_url" class="mt-3">
                                 <p class="mb-1 text-xs text-slate-500">Bukti yang sudah dikirim</p>
@@ -291,15 +332,9 @@ const nextStepText = computed(() => {
                             </div>
                         </div>
                     </template>
-                    <p v-else class="mt-3 text-sm text-slate-500">
-                        Petunjuk pembayaran akan muncul setelah pengajuan Anda disetujui pengelola.
-                    </p>
+                    <p v-else class="mt-3 text-sm text-slate-500">Petunjuk pembayaran akan muncul setelah pengajuan Anda disetujui pengelola.</p>
 
-                    <form
-                        v-if="booking.can_upload_bukti"
-                        class="mt-5 space-y-3 border-t border-slate-200 pt-4"
-                        @submit.prevent="submitBukti"
-                    >
+                    <form v-if="booking.can_upload_bukti" class="mt-5 space-y-3 border-t border-slate-200 pt-4" @submit.prevent="submitBukti">
                         <p class="text-sm font-medium text-slate-900">Kirim bukti pembayaran</p>
                         <input
                             type="file"

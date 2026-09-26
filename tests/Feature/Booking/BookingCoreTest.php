@@ -256,7 +256,7 @@ class BookingCoreTest extends TestCase
     }
 
     #[Test]
-    public function peer_conflict_syncs_perlu_klarifikasi(): void
+    public function approve_ignores_overlapping_pengajuan(): void
     {
         $rule = BookingPriorityRule::query()->updateOrCreate(
             ['code' => 'umum_komersial'],
@@ -273,9 +273,9 @@ class BookingCoreTest extends TestCase
 
         $result = app(AdminApprovalService::class)->approve($a, $this->admin);
 
-        $this->assertSame(BookingStatus::PERLU_KLARIFIKASI, $result['booking']->fresh()->status);
-        $this->assertTrue($result['conflict']['needs_clarification']);
-        $this->assertSame(BookingStatus::PERLU_KLARIFIKASI, $b->fresh()->status);
+        $this->assertSame(BookingStatus::AWAITING_PAYMENT, $result['booking']->fresh()->status);
+        $this->assertFalse($result['conflict']['needs_clarification']);
+        $this->assertSame(BookingStatus::MENUNGGU_APPROVAL, $b->fresh()->status);
     }
 
     #[Test]

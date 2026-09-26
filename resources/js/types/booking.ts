@@ -49,6 +49,8 @@ export type BookingQuote = {
         qty: number;
         line_total: number;
         duration_label?: string;
+        area_id?: number | null;
+        area?: { id: number; code: string; name: string } | null;
     }>;
     addons: Array<{
         name: string;
@@ -64,6 +66,7 @@ export type BookingAvailability = {
     within_horizon?: boolean;
     horizon_days?: number | null;
     closed?: boolean;
+    pengajuan?: boolean;
     closures?: Array<{
         id: number;
         venue_id: number;
@@ -71,5 +74,15 @@ export type BookingAvailability = {
         starts_at: string;
         ends_at: string;
         reason: string | null;
+    }>;
+    conflicts?: Array<{
+        id: number;
+        nomor: string;
+        status: string;
+        area_ids?: number[];
+        areas?: Array<{ id: number; code: string; name: string }>;
+        starts_at: string;
+        ends_at: string;
+        lock_level?: string | null;
     }>;
 };

@@ -7,11 +7,14 @@ use App\Http\Requests\Booking\QuoteBookingRequest;
 use App\Http\Requests\Booking\StoreBookingRequest;
 use App\Http\Requests\Booking\UploadBuktiBayarRequest;
 use App\Models\Booking\Booking;
-use App\Models\Booking\BookingTarif;
+use App\Models\Booking\BookingDocumentType;
+use App\Models\Booking\BookingSetting;
+use App\Models\Booking\BookingSurat;
 use App\Services\Booking\AvailabilityService;
 use App\Services\Booking\BookingPaymentService;
 use App\Services\Booking\BookingSubmitService;
 use App\Services\Booking\PricingService;
+use App\Services\Booking\SuratService;
 use App\Support\Booking\BookingStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,7 +38,7 @@ class BookingController extends Controller
 
         $query = Booking::query()
             ->where('user_id', $request->user()->id)
-            ->with(['venue:id,code,name', 'area:id,code,name'])
+            ->with(['venue:id,code,name', 'areas:id,code,name'])
             ->latest('id');
 
         if (is_string($status) && $status !== '' && in_array($status, BookingStatus::all(), true)) {
@@ -60,13 +63,13 @@ class BookingController extends Controller
 
         try {
             $quote = $this->pricing->quote($validated);
-            $tarif = BookingTarif::query()->findOrFail((int) $validated['tarif_id']);
-            $areaId = $request->filled('area_id')
-                ? $request->integer('area_id')
-                : $tarif->area_id;
+            $areaIds = array_values(array_filter(array_map(
+                fn (array $line) => $line['area_id'],
+                $quote['lines']
+            )));
             $availability = $this->availability->check([
-                'venue_id' => $tarif->venue_id,
-                'area_id' => $areaId,
+                'venue_id' => (int) $quote['lines'][0]['snapshot']['venue_id'],
+                'area_ids' => $areaIds,
                 'starts_at' => $validated['starts_at'],
                 'ends_at' => $validated['ends_at'],
             ]);
@@ -91,9 +94,14 @@ class BookingController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
+        $slaHari = max(1, (int) (BookingSetting::getValue('pengajuan_sla_hari_kerja', 7) ?? 7));
+
         return redirect()
             ->route('e-booking.bookings.show', $booking->id)
-            ->with('success', 'Pengajuan berhasil dikirim. Mohon tunggu peninjauan dari pengelola.');
+            ->with(
+                'success',
+                "Pengajuan berhasil dikirim. Proses peninjauan maksimal {$slaHari} hari kerja — balasan berupa surat akan dikirim setelah selesai."
+            );
     }
 
     public function show(Request $request, int $id): Response
@@ -102,17 +110,32 @@ class BookingController extends Controller
             ->where('user_id', $request->user()->id)
             ->with([
                 'venue:id,code,name',
-                'area:id,code,name',
+                'areas:id,code,name',
                 'items',
                 'addonSelected',
                 'payments' => fn ($q) => $q->latest('id'),
                 'statusLogs' => fn ($q) => $q->latest('id')->limit(20),
+                'surats' => fn ($q) => $q->latest('id'),
             ])
             ->findOrFail($id);
 
         return Inertia::render('modules/e-booking/Detail', [
             'booking' => $this->detailPayload($booking),
+            'slaHariKerja' => max(1, (int) (BookingSetting::getValue('pengajuan_sla_hari_kerja', 7) ?? 7)),
         ]);
+    }
+
+    public function downloadSurat(Request $request, int $id, int $suratId)
+    {
+        $booking = Booking::query()
+            ->where('user_id', $request->user()->id)
+            ->findOrFail($id);
+
+        $surat = BookingSurat::query()
+            ->where('booking_id', $booking->id)
+            ->findOrFail($suratId);
+
+        return app(SuratService::class)->downloadResponse($surat);
     }
 
     public function uploadBukti(UploadBuktiBayarRequest $request, int $id): RedirectResponse
@@ -151,7 +174,7 @@ class BookingController extends Controller
             'ends_at' => optional($booking->ends_at)?->format('Y-m-d H:i'),
             'grand_total' => (int) $booking->grand_total,
             'venue' => $booking->venue?->only(['id', 'code', 'name']),
-            'area' => $booking->area?->only(['id', 'code', 'name']),
+            'areas' => $booking->areas->map(fn ($a) => $a->only(['id', 'code', 'name']))->all(),
             'created_at' => optional($booking->created_at)?->format('Y-m-d H:i'),
         ];
     }
@@ -178,7 +201,7 @@ class BookingController extends Controller
             'addon_total' => (int) $booking->addon_total,
             'can_upload_bukti' => $booking->status === BookingStatus::AWAITING_PAYMENT,
             'venue' => $booking->venue?->only(['id', 'code', 'name']),
-            'area' => $booking->area?->only(['id', 'code', 'name']),
+            'areas' => $booking->areas->map(fn ($a) => $a->only(['id', 'code', 'name']))->all(),
             'items' => $booking->items->map(fn ($i) => [
                 'uraian' => $i->uraian,
                 'satuan' => $i->satuan,
@@ -189,6 +212,19 @@ class BookingController extends Controller
                 'name' => $a->name,
                 'qty' => $a->qty,
                 'line_total' => (int) $a->line_total,
+            ]),
+            'dokumen_wajib' => $this->dokumenWajibNames($booking),
+            'surats' => $booking->surats->map(fn (BookingSurat $s) => [
+                'id' => $s->id,
+                'jenis_label' => $s->jenisLabel(),
+                'nomor_surat' => $s->nomor_surat,
+                'perihal' => $s->perihal,
+                'meeting_at' => optional($s->meeting_at)?->format('Y-m-d H:i'),
+                'meeting_place' => $s->meeting_place,
+                'dokumen' => $s->dokumen,
+                'sent_email_at' => optional($s->sent_email_at)?->format('Y-m-d H:i'),
+                'created_at' => optional($s->created_at)?->format('Y-m-d H:i'),
+                'download_url' => route('e-booking.bookings.surat.download', ['id' => $booking->id, 'surat' => $s->id]),
             ]),
             'payment' => $payment ? [
                 'id' => $payment->id,
@@ -215,7 +251,35 @@ class BookingController extends Controller
     }
 
     /**
-     * @param  mixed  $raw
+     * Daftar dokumen wajib (dinamis dari master jenis dokumen) yang harus
+     * disiapkan penyewa — tampil setelah pengajuan disetujui / ada surat.
+     *
+     * @return list<string>
+     */
+    private function dokumenWajibNames(Booking $booking): array
+    {
+        $unlocked = in_array($booking->status, [
+            BookingStatus::APPROVED,
+            BookingStatus::AWAITING_PAYMENT,
+            BookingStatus::PAID,
+            BookingStatus::CONFIRMED,
+            BookingStatus::RESCHEDULE_PENDING,
+        ], true);
+
+        if (! $unlocked && $booking->surats->isEmpty()) {
+            return [];
+        }
+
+        return BookingDocumentType::query()
+            ->where('is_active', true)
+            ->where('is_required', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->pluck('name')
+            ->all();
+    }
+
+    /**
      * @return list<array{id: int, qty: int}>
      */
     private function normalizeAddonIds(mixed $raw): array

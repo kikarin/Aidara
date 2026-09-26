@@ -14,7 +14,7 @@ type BookingRow = {
     ends_at: string | null;
     grand_total: number;
     venue: { id: number; code: string; name: string } | null;
-    area: { id: number; code: string; name: string } | null;
+    areas: Array<{ id: number; code: string; name: string }>;
     created_at: string | null;
 };
 
@@ -33,8 +33,7 @@ const props = defineProps<{
 
 const statusFilter = ref(props.filters.status || '');
 
-const formatRp = (n: number) =>
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
+const formatRp = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
 const statusLabel = (status: string) => {
     const map: Record<string, string> = {
@@ -69,11 +68,7 @@ const statusClass = (status: string) => {
 };
 
 const applyFilter = () => {
-    router.get(
-        route('e-booking.bookings.index'),
-        { status: statusFilter.value || undefined },
-        { preserveState: true, replace: true },
-    );
+    router.get(route('e-booking.bookings.index'), { status: statusFilter.value || undefined }, { preserveState: true, replace: true });
 };
 
 const statusFilterOptions = computed(() => [
@@ -89,9 +84,7 @@ const statusFilterValue = computed({
     },
 });
 
-const pageLinks = computed(() =>
-    props.bookings.links.filter((l) => l.label !== '&laquo; Previous' && l.label !== 'Next &raquo;'),
-);
+const pageLinks = computed(() => props.bookings.links.filter((l) => l.label !== '&laquo; Previous' && l.label !== 'Next &raquo;'));
 </script>
 
 <template>
@@ -101,9 +94,7 @@ const pageLinks = computed(() =>
         <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight text-slate-900">Pesanan saya</h1>
-                <p class="mt-2 text-sm text-slate-600">
-                    Lihat perkembangan pengajuan, petunjuk pembayaran, dan bukti transfer di sini.
-                </p>
+                <p class="mt-2 text-sm text-slate-600">Lihat perkembangan pengajuan, petunjuk pembayaran, dan bukti transfer di sini.</p>
             </div>
             <div class="flex items-center gap-2">
                 <label class="sr-only" for="status">Filter status</label>
@@ -139,11 +130,9 @@ const pageLinks = computed(() =>
                         <p class="font-semibold text-slate-900">{{ item.nomor }}</p>
                         <p class="mt-1 text-sm text-slate-600">
                             {{ item.venue?.name }}
-                            <template v-if="item.area"> · {{ item.area.name }}</template>
+                            <template v-if="item.areas?.length"> · {{ item.areas.map((a) => a.name).join(', ') }}</template>
                         </p>
-                        <p class="mt-1 text-xs text-slate-500">
-                            {{ item.starts_at }} — {{ item.ends_at }}
-                        </p>
+                        <p class="mt-1 text-xs text-slate-500">{{ item.starts_at }} — {{ item.ends_at }}</p>
                     </div>
                     <div class="text-right">
                         <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium" :class="statusClass(item.status)">
@@ -156,24 +145,19 @@ const pageLinks = computed(() =>
             </Link>
         </div>
 
-        <nav
-            v-if="bookings.last_page > 1"
-            class="mt-8 flex flex-wrap items-center justify-center gap-2"
-            aria-label="Pagination"
-        >
+        <nav v-if="bookings.last_page > 1" class="mt-8 flex flex-wrap items-center justify-center gap-2" aria-label="Pagination">
             <template v-for="(link, idx) in pageLinks" :key="idx">
                 <Link
                     v-if="link.url"
                     :href="link.url"
                     class="rounded-full border px-3 py-1.5 text-sm"
-                    :class="link.active ? 'border-[var(--brand-green,#2e7d32)] bg-[var(--brand-green,#2e7d32)] text-white' : 'border-slate-200 bg-white'"
-                    v-html="link.label"
-                />
-                <span
-                    v-else
-                    class="rounded-full border border-transparent px-3 py-1.5 text-sm text-slate-400"
-                    v-html="link.label"
-                />
+                    :class="
+                        link.active ? 'border-[var(--brand-green,#2e7d32)] bg-[var(--brand-green,#2e7d32)] text-white' : 'border-slate-200 bg-white'
+                    "
+                >
+                    <span v-html="link.label" />
+                </Link>
+                <span v-else class="rounded-full border border-transparent px-3 py-1.5 text-sm text-slate-400" v-html="link.label" />
             </template>
         </nav>
     </EBookingLayout>

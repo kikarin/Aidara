@@ -7,12 +7,13 @@ type DayCell = {
     date: string;
     status: string;
     bookable: boolean;
+    pengajuan?: boolean;
     reason: string | null;
 };
 
 const props = defineProps<{
     venueId: number;
-    areaId?: number | '' | null;
+    areaIds?: number[];
     modelValue: string;
 }>();
 
@@ -89,11 +90,23 @@ const cellClass = (meta: DayCell | null, selected: boolean) => {
 
         return 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400';
     }
-    if (meta.status === 'kuning') {
-        return 'border-amber-200 bg-amber-50 text-amber-900 hover:border-amber-400';
-    }
 
     return 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:border-emerald-400';
+};
+
+const dayTitle = (meta: DayCell | null, date: string) => {
+    if (!meta) {
+        return date;
+    }
+    const parts: string[] = [];
+    if (meta.reason) {
+        parts.push(meta.reason);
+    }
+    if (meta.pengajuan) {
+        parts.push('Ada pengajuan — masih bisa diajukan');
+    }
+
+    return parts.length > 0 ? parts.join(' • ') : date;
 };
 
 const selectDay = (meta: DayCell | null) => {
@@ -109,8 +122,8 @@ const loadMonth = async () => {
 
     try {
         const params = new URLSearchParams({ month: monthCursor.value });
-        if (props.areaId !== '' && props.areaId != null) {
-            params.set('area_id', String(props.areaId));
+        for (const areaId of props.areaIds ?? []) {
+            params.append('area_ids[]', String(areaId));
         }
 
         const res = await fetch(`${route('e-booking.venues.month-overview', props.venueId)}?${params.toString()}`, {
@@ -130,7 +143,7 @@ const loadMonth = async () => {
 };
 
 watch(
-    () => [monthCursor.value, props.areaId] as const,
+    () => [monthCursor.value, (props.areaIds ?? []).join(',')] as const,
     () => {
         loadMonth();
     },
@@ -165,7 +178,7 @@ onMounted(() => {
                 <ChevronLeft class="size-4" />
             </button>
             <div class="text-center">
-                <p class="text-sm font-bold capitalize text-slate-900">{{ monthLabel }}</p>
+                <p class="text-sm font-bold text-slate-900 capitalize">{{ monthLabel }}</p>
                 <p class="text-[11px] text-slate-500">Klik tanggal hijau untuk memilih</p>
             </div>
             <button
@@ -192,11 +205,7 @@ onMounted(() => {
 
         <template v-else>
             <div class="mb-1.5 grid grid-cols-7 gap-1.5">
-                <div
-                    v-for="label in weekdayLabels"
-                    :key="label"
-                    class="text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400"
-                >
+                <div v-for="label in weekdayLabels" :key="label" class="text-center text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                     {{ label }}
                 </div>
             </div>
@@ -205,26 +214,28 @@ onMounted(() => {
                     v-for="cell in calendarCells"
                     :key="cell.key"
                     type="button"
-                    class="aspect-square rounded-xl border text-sm font-semibold transition"
+                    class="relative aspect-square rounded-xl border text-sm font-semibold transition"
                     :class="cellClass(cell.meta, cell.date === modelValue)"
                     :disabled="!cell.meta || !cell.meta.bookable"
-                    :title="cell.meta?.reason || cell.date || ''"
+                    :title="dayTitle(cell.meta, cell.date || '')"
                     @click="selectDay(cell.meta)"
                 >
                     {{ cell.dayNum }}
+                    <span
+                        v-if="cell.meta?.pengajuan && cell.meta.bookable && cell.date !== modelValue"
+                        class="absolute top-1 right-1 size-1.5 rounded-full bg-orange-500"
+                    />
                 </button>
             </div>
         </template>
 
         <div class="mt-3 flex flex-wrap gap-3 text-[11px] text-slate-600">
+            <span class="inline-flex items-center gap-1.5"> <span class="size-2.5 rounded-full bg-emerald-400" /> Kosong / tersedia </span>
             <span class="inline-flex items-center gap-1.5">
-                <span class="size-2.5 rounded-full bg-emerald-400" /> Kosong / tersedia
+                <span class="size-1.5 rounded-full bg-orange-500" /> Ada pengajuan (masih bisa diajukan)
             </span>
             <span class="inline-flex items-center gap-1.5">
-                <span class="size-2.5 rounded-full bg-amber-400" /> Ada antrean
-            </span>
-            <span class="inline-flex items-center gap-1.5">
-                <span class="size-2.5 rounded-full bg-slate-300" /> Penuh / tutup / lewat
+                <span class="size-2.5 rounded-full bg-slate-300" /> Disetujui / dipesan / tutup / lewat
             </span>
         </div>
     </div>

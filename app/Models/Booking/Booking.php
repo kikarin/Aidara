@@ -6,6 +6,7 @@ use App\Blameable;
 use App\Models\Model;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -21,7 +22,6 @@ class Booking extends Model
         'user_id',
         'penyewa_profile_id',
         'venue_id',
-        'area_id',
         'priority_rule_id',
         'kategori_tarif',
         'tujuan',
@@ -84,9 +84,12 @@ class Booking extends Model
         return $this->belongsTo(BookingVenue::class, 'venue_id');
     }
 
-    public function area(): BelongsTo
+    /**
+     * Area yang disewa. Kosong = seluruh venue.
+     */
+    public function areas(): BelongsToMany
     {
-        return $this->belongsTo(BookingArea::class, 'area_id');
+        return $this->belongsToMany(BookingArea::class, 'booking_area_selected', 'booking_id', 'area_id');
     }
 
     public function priorityRule(): BelongsTo
@@ -117,5 +120,10 @@ class Booking extends Model
     public function statusLogs(): HasMany
     {
         return $this->hasMany(BookingStatusLog::class, 'booking_id');
+    }
+
+    public function surats(): HasMany
+    {
+        return $this->hasMany(BookingSurat::class, 'booking_id');
     }
 }

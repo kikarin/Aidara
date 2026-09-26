@@ -44,7 +44,7 @@ class AdminApprovalService
             $this->syncPeersToKlarifikasi($conflict['peers'], $admin, $message);
 
             return [
-                'booking' => $booking->load(['priorityRule', 'payments', 'venue', 'area', 'items']),
+                'booking' => $booking->load(['priorityRule', 'payments', 'venue', 'areas', 'items']),
                 'conflict' => $conflict,
                 'payment' => null,
             ];
@@ -85,7 +85,7 @@ class AdminApprovalService
             );
 
             return [
-                'booking' => $booking->load(['priorityRule', 'payments', 'venue', 'area', 'items', 'addonSelected']),
+                'booking' => $booking->load(['priorityRule', 'payments', 'venue', 'areas', 'items', 'addonSelected']),
                 'conflict' => $conflict,
                 'payment' => $payment,
             ];
@@ -107,7 +107,7 @@ class AdminApprovalService
                 BookingStatus::REJECTED,
                 $reason,
                 $admin->id
-            )->load(['venue', 'area', 'items']);
+            )->load(['venue', 'areas', 'items']);
         });
     }
 
@@ -121,7 +121,7 @@ class AdminApprovalService
         $booking = $this->applyKlarifikasi($booking, $admin, $message);
         $this->syncPeersToKlarifikasi($conflict['peers'], $admin, $message);
 
-        return $booking->load(['priorityRule', 'venue', 'area', 'items']);
+        return $booking->load(['priorityRule', 'venue', 'areas', 'items']);
     }
 
     public function analyze(Booking $booking): array
