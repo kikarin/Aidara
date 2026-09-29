@@ -36,6 +36,7 @@ const props = defineProps<{
     bookings?: {
         data: Row[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
+        current_page: number;
         last_page: number;
     };
     counts?: Counts;
@@ -195,6 +196,26 @@ const statusFilterSelect = computed({
     },
 });
 
+const pageLinks = computed(() =>
+    (props.bookings?.links ?? []).filter(
+        (l) => l.label !== '&laquo; Previous' && l.label !== 'Next &raquo;',
+    ),
+);
+
+const currentPage = computed(() => props.bookings?.current_page ?? 1);
+
+const applyPage = (page: number) => {
+    router.get(
+        route('e-booking.admin.bookings.index'),
+        {
+            page,
+            tab: activeTab.value,
+            ...(activeTab.value === 'all' && statusFilter.value ? { status: statusFilter.value } : {}),
+        },
+        { preserveState: true, preserveScroll: true, replace: true },
+    );
+};
+
 const displayStatus = (item: Row) => {
     if (item.needs_verify) {
         return 'Bukti perlu dicek';
@@ -334,20 +355,58 @@ const displayStatus = (item: Row) => {
                     </Link>
                 </div>
 
-                <nav v-if="bookings.last_page > 1" class="mt-6 flex flex-wrap justify-center gap-2">
-                    <Link
-                        v-for="(link, idx) in bookings.links"
+                <nav
+                    v-if="(props.bookings?.last_page ?? 0) > 1"
+                    class="mt-6 flex flex-wrap items-center justify-center gap-2"
+                    aria-label="Pagination"
+                >
+                    <button
+                        type="button"
+                        class="rounded-full border px-3.5 py-1.5 text-sm transition disabled:opacity-40"
+                        :class="
+                            currentPage <= 1
+                                ? 'border-slate-100 bg-white text-slate-300'
+                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        "
+                        :disabled="currentPage <= 1"
+                        @click="currentPage > 1 && applyPage(currentPage - 1)"
+                    >
+                        Sebelumnya
+                    </button>
+
+                    <button
+                        v-for="(link, idx) in pageLinks"
                         :key="idx"
-                        :href="link.url || '#'"
-                        class="rounded-full border px-3 py-1.5 text-sm"
+                        type="button"
+                        class="rounded-full border px-3 py-1.5 text-sm transition"
                         :class="
                             link.active
-                                ? 'border-transparent bg-[var(--brand-green,#2e7d32)] text-white'
-                                : 'border-slate-200 bg-white text-slate-700'
+                                ? 'border-transparent bg-[var(--brand-green,#2e7d32)] font-semibold text-white'
+                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                         "
-                        v-html="link.label"
-                    />
+                        @click="applyPage(Number(link.label))"
+                    >
+                        {{ link.label }}
+                    </button>
+
+                    <button
+                        type="button"
+                        class="rounded-full border px-3.5 py-1.5 text-sm transition disabled:opacity-40"
+                        :class="
+                            currentPage >= (props.bookings?.last_page ?? 1)
+                                ? 'border-slate-100 bg-white text-slate-300'
+                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        "
+                        :disabled="currentPage >= (props.bookings?.last_page ?? 1)"
+                        @click="currentPage < (props.bookings?.last_page ?? 1) && applyPage(currentPage + 1)"
+                    >
+                        Berikutnya
+                    </button>
                 </nav>
+
+                <p v-if="(props.bookings?.last_page ?? 0) > 1" class="mt-3 text-center text-xs text-slate-500">
+                    Halaman {{ currentPage }} dari {{ props.bookings?.last_page }}
+                </p>
             </div>
         </Deferred>
     </AdminLayout>

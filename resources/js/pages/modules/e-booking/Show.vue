@@ -124,6 +124,7 @@ const initAreaRows = (): AreaRow[] => {
 
 let areaRowSeq = 0;
 const bookingMode = ref<'all' | 'areas'>('all');
+const allAreasShortcut = ref(false);
 const areaRows = ref<AreaRow[]>([]);
 
 const selectedAddonIds = ref<number[]>(fromOldAddonIds());
@@ -175,6 +176,7 @@ if (areaRows.value.length) {
 const allTarifId = ref<number | ''>(props.oldForm?.tarif_id != null && props.oldForm.tarif_id !== '' ? Number(props.oldForm.tarif_id) : '');
 
 const venueWideTarifs = computed(() => props.tarifs.filter((t) => t.area_id === null));
+const hasVenueWideTarif = computed(() => venueWideTarifs.value.length > 0);
 
 const selectedAreaIds = computed(() => areaRows.value.filter((row) => row.area_id !== '').map((row) => Number(row.area_id)));
 
@@ -194,7 +196,7 @@ const firstRowTarif = computed(() => (areaRows.value.length ? tarifForRow(areaRo
 const activeTarif = computed(() => (bookingMode.value === 'all' ? selectedTarif.value : firstRowTarif.value));
 
 const selectedAreaName = computed(() => {
-    if (bookingMode.value === 'all') {
+    if (bookingMode.value === 'all' || allAreasShortcut.value) {
         return 'Semua area';
     }
 
@@ -206,6 +208,10 @@ const selectedAreaName = computed(() => {
 });
 
 const selectedTarifNames = computed(() => {
+    if (allAreasShortcut.value) {
+        return `Seluruh venue · ${areaRows.value.length} area, harga per area`;
+    }
+
     if (bookingMode.value === 'all') {
         return selectedTarif.value?.uraian ?? '-';
     }
@@ -262,6 +268,16 @@ const dayOptions = computed(() => [1, 2, 3, 4, 5, 7, 14, 30]);
 const monthOptions = computed(() => [1, 2, 3, 6, 12]);
 
 const setBookingMode = (mode: 'all' | 'areas') => {
+    if (mode === 'all' && !hasVenueWideTarif.value) {
+        selectAllAreas();
+        allAreasShortcut.value = true;
+        bookingMode.value = 'areas';
+        refreshSchedule();
+
+        return;
+    }
+
+    allAreasShortcut.value = false;
     bookingMode.value = mode;
     if (mode === 'areas' && areaRows.value.length === 0) {
         addAreaRow();
@@ -269,7 +285,26 @@ const setBookingMode = (mode: 'all' | 'areas') => {
     refreshSchedule();
 };
 
+const selectAllAreas = () => {
+    const rows: AreaRow[] = [];
+    for (const area of props.venue.areas) {
+        const tarif = tarifsForArea(area.id)[0];
+        if (!tarif) {
+            continue;
+        }
+        rows.push({
+            uid: ++areaRowSeq,
+            area_id: area.id,
+            tarif_id: tarif.id,
+            qty: 1,
+            luas_m2: '',
+        });
+    }
+    areaRows.value = rows;
+};
+
 const addAreaRow = () => {
+    allAreasShortcut.value = false;
     const used = new Set(selectedAreaIds.value);
     const free = props.venue.areas.filter((area) => !used.has(area.id));
     if (free.length === 0) {
@@ -287,10 +322,12 @@ const addAreaRow = () => {
 };
 
 const removeAreaRow = (uid: number) => {
+    allAreasShortcut.value = false;
     areaRows.value = areaRows.value.filter((row) => row.uid !== uid);
 };
 
 const onRowAreaChange = (row: AreaRow) => {
+    allAreasShortcut.value = false;
     const options = tarifsForArea(row.area_id);
     const stillValid = options.some((t) => t.id === Number(row.tarif_id));
     if (!stillValid) {
@@ -1019,11 +1056,10 @@ const slotTitle = (slot: DaySlot) => {
                             type="button"
                             class="rounded-full border px-4 py-2 text-sm font-semibold transition"
                             :class="
-                                bookingMode === 'all'
+                                bookingMode === 'all' || allAreasShortcut
                                     ? 'border-sky-600 bg-sky-600 text-white shadow-sm'
                                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                             "
-                            :disabled="venueWideTarifs.length === 0"
                             @click="setBookingMode('all')"
                         >
                             Seluruh venue
@@ -1032,7 +1068,7 @@ const slotTitle = (slot: DaySlot) => {
                             type="button"
                             class="rounded-full border px-4 py-2 text-sm font-semibold transition"
                             :class="
-                                bookingMode === 'areas'
+                                bookingMode === 'areas' && !allAreasShortcut
                                     ? 'border-sky-600 bg-sky-600 text-white shadow-sm'
                                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                             "
@@ -1041,6 +1077,11 @@ const slotTitle = (slot: DaySlot) => {
                         >
                             Area tertentu
                         </button>
+                    </div>
+
+                    <div v-if="allAreasShortcut" class="mb-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800">
+                        Seluruh area venue ini dipilih otomatis karena belum ada tarif khusus "semua area". Harga dihitung per area — silakan
+                        sesuaikan jenis sewa tiap area bila perlu.
                     </div>
 
                     <template v-if="bookingMode === 'all'">
