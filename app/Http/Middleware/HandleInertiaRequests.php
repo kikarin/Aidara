@@ -2,8 +2,9 @@
 
 namespace App\Http\Middleware;
 
-use Illuminate\Foundation\Inspiring;
+use App\Services\AppSettingService;
 use Illuminate\Http\Request;
+use Illuminate\Foundation\Inspiring;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
 
@@ -51,10 +52,28 @@ class HandleInertiaRequests extends Middleware
                 'location' => $request->url(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'chatbot'     => [
+                'enabled' => (bool) config('gemini.enabled') && ! empty(config('gemini.api_key')),
+            ],
+            'worldcup' => fn () => app(AppSettingService::class)->getWorldCupSettings(),
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
             ],
+            'bookingAuth' => function () use ($request) {
+                $user = $request->user();
+                if (! $user) {
+                    return null;
+                }
+
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'is_penyewa' => $user->hasRole('penyewa'),
+                    'is_admin_upt' => $user->hasRole('admin_upt'),
+                ];
+            },
         ];
     }
 }

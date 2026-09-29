@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\MstParameter;
+use App\Services\UserPesertaLinkService;
 
 class AtletRepository
 {
@@ -47,6 +48,7 @@ class AtletRepository
             'kesehatan.created_by_user',
             'kesehatan.updated_by_user',
             'caborKategoriAtlet.cabor',
+            'caborKategoriAtlet.cabor.kategoriPeserta',
             'caborKategoriAtlet.caborKategori',
             'kategoriAtlet',
             'kategoriPesertas',
@@ -59,7 +61,56 @@ class AtletRepository
 
         $auth = Auth::user();
         if ($auth && (int) $auth->current_role_id === 35) {
+            // Atlet hanya melihat data mereka sendiri
             $query->where('users_id', $auth->id);
+        } elseif ($auth && (int) $auth->current_role_id === 36) {
+            // Pelatih hanya melihat atlet yang memiliki kategori peserta yang sama
+            if ($auth->pelatih && $auth->pelatih->id) {
+                // Ambil kategori peserta dari pelatih
+                $pelatihKategoriPesertaIds = DB::table('pelatih_kategori_peserta')
+                    ->where('pelatih_id', $auth->pelatih->id)
+                    ->whereNull('deleted_at')
+                    ->pluck('mst_kategori_peserta_id')
+                    ->toArray();
+                
+                if (!empty($pelatihKategoriPesertaIds)) {
+                    // Filter atlet yang memiliki kategori peserta yang sama dengan pelatih
+                    $query->whereExists(function ($subQuery) use ($pelatihKategoriPesertaIds) {
+                        $subQuery->select(DB::raw(1))
+                            ->from('atlet_kategori_peserta')
+                            ->whereColumn('atlet_kategori_peserta.atlet_id', 'atlets.id')
+                            ->whereIn('atlet_kategori_peserta.mst_kategori_peserta_id', $pelatihKategoriPesertaIds)
+                            ->whereNull('atlet_kategori_peserta.deleted_at'); // Filter soft deleted
+                    });
+                } else {
+                    // Jika pelatih tidak punya kategori peserta, tidak tampilkan atlet apapun
+                    $query->whereRaw('1 = 0');
+                }
+            }
+        } elseif ($auth && (int) $auth->current_role_id === 37) {
+            // Tenaga Pendukung hanya melihat atlet yang memiliki kategori peserta yang sama
+            if ($auth->tenagaPendukung && $auth->tenagaPendukung->id) {
+                // Ambil kategori peserta dari tenaga pendukung
+                $tenagaPendukungKategoriPesertaIds = DB::table('tenaga_pendukung_kategori_peserta')
+                    ->where('tenaga_pendukung_id', $auth->tenagaPendukung->id)
+                    ->whereNull('deleted_at')
+                    ->pluck('mst_kategori_peserta_id')
+                    ->toArray();
+                
+                if (!empty($tenagaPendukungKategoriPesertaIds)) {
+                    // Filter atlet yang memiliki kategori peserta yang sama dengan tenaga pendukung
+                    $query->whereExists(function ($subQuery) use ($tenagaPendukungKategoriPesertaIds) {
+                        $subQuery->select(DB::raw(1))
+                            ->from('atlet_kategori_peserta')
+                            ->whereColumn('atlet_kategori_peserta.atlet_id', 'atlets.id')
+                            ->whereIn('atlet_kategori_peserta.mst_kategori_peserta_id', $tenagaPendukungKategoriPesertaIds)
+                            ->whereNull('atlet_kategori_peserta.deleted_at'); // Filter soft deleted
+                    });
+                } else {
+                    // Jika tenaga pendukung tidak punya kategori peserta, tidak tampilkan atlet apapun
+                    $query->whereRaw('1 = 0');
+                }
+            }
         }
 
         // Filter untuk exclude atlet yang sudah ada di kategori tertentu
@@ -84,6 +135,7 @@ class AtletRepository
                         ->where('atlet_kategori_peserta.mst_kategori_peserta_id', $caborKategori->kategori_peserta_id);
                 });
             }
+            
         }
 
         // Apply filters
@@ -118,14 +170,31 @@ class AtletRepository
         if ($perPage === -1) {
             $all         = $query->get();
             $transformed = collect($all)->map(function ($item) {
-                // relasi caborKategoriAtlet dimuat
-                $item->load(['caborKategoriAtlet.cabor']);
+                // relasi caborKategoriAtlet dan kategoriPesertas dimuat
+                $item->load(['caborKategoriAtlet.cabor.kategoriPeserta', 'kategoriPesertas']);
                 $itemArray = $item->toArray();
                 if (!isset($itemArray['cabor_kategori_atlet'])) {
                     $itemArray['cabor_kategori_atlet'] = $item->caborKategoriAtlet->map(function ($cabor) {
+                        $caborData = $cabor->cabor ? $cabor->cabor->toArray() : null;
+                        // Include kategori_peserta dari cabor
+                        if ($caborData && $cabor->cabor && $cabor->cabor->kategoriPeserta) {
+                            $caborData['kategori_peserta'] = [
+                                'id' => $cabor->cabor->kategoriPeserta->id,
+                                'nama' => $cabor->cabor->kategoriPeserta->nama,
+                            ];
+                        }
                         return [
                             'id'    => $cabor->id,
-                            'cabor' => $cabor->cabor ? $cabor->cabor->toArray() : null,
+                            'cabor' => $caborData,
+                        ];
+                    })->toArray();
+                }
+                // Ensure kategori_pesertas ter-include
+                if (!isset($itemArray['kategori_pesertas'])) {
+                    $itemArray['kategori_pesertas'] = $item->kategoriPesertas->map(function ($kategori) {
+                        return [
+                            'id'   => $kategori->id,
+                            'nama' => $kategori->nama,
                         ];
                     })->toArray();
                 }
@@ -146,14 +215,31 @@ class AtletRepository
         $pageForPaginate = $page < 1 ? 1 : $page;
         $items           = $query->paginate($perPage, ['*'], 'page', $pageForPaginate)->withQueryString();
         $transformed     = collect($items->items())->map(function ($item) {
-            // relasi caborKategoriAtlet dimuat
-            $item->load(['caborKategoriAtlet.cabor']);
+            // relasi caborKategoriAtlet dan kategoriPesertas dimuat
+            $item->load(['caborKategoriAtlet.cabor.kategoriPeserta', 'kategoriPesertas']);
             $itemArray = $item->toArray();
             if (!isset($itemArray['cabor_kategori_atlet'])) {
                 $itemArray['cabor_kategori_atlet'] = $item->caborKategoriAtlet->map(function ($cabor) {
+                    $caborData = $cabor->cabor ? $cabor->cabor->toArray() : null;
+                    // Include kategori_peserta dari cabor
+                    if ($caborData && $cabor->cabor && $cabor->cabor->kategoriPeserta) {
+                        $caborData['kategori_peserta'] = [
+                            'id' => $cabor->cabor->kategoriPeserta->id,
+                            'nama' => $cabor->cabor->kategoriPeserta->nama,
+                        ];
+                    }
                     return [
                         'id'    => $cabor->id,
-                        'cabor' => $cabor->cabor ? $cabor->cabor->toArray() : null,
+                        'cabor' => $caborData,
+                    ];
+                })->toArray();
+            }
+            // Ensure kategori_pesertas ter-include
+            if (!isset($itemArray['kategori_pesertas'])) {
+                $itemArray['kategori_pesertas'] = $item->kategoriPesertas->map(function ($kategori) {
+                    return [
+                        'id'   => $kategori->id,
+                        'nama' => $kategori->nama,
                     ];
                 })->toArray();
             }
@@ -461,7 +547,8 @@ class AtletRepository
             Log::info('AtletRepository: Starting file upload process', [
                 'method'         => $method,
                 'has_file'       => isset($data['file']),
-                'file_data'      => $data['file'] ? 'File exists' : 'No file',
+                'file_type'      => isset($data['file']) ? gettype($data['file']) : 'N/A',
+                'is_uploaded_file' => isset($data['file']) && $data['file'] instanceof \Illuminate\Http\UploadedFile,
                 'is_delete_foto' => @$data['is_delete_foto'],
             ]);
 
@@ -471,23 +558,49 @@ class AtletRepository
                 Log::info('AtletRepository: Cleared media collection');
             }
 
-            if (@$data['file']) {
-                Log::info('AtletRepository: Adding media file', [
-                    'file_name' => $data['file']->getClientOriginalName(),
-                    'file_size' => $data['file']->getSize(),
-                    'model_id'  => $model->id,
-                ]);
+            // Validasi file sebelum memproses - pastikan adalah UploadedFile instance yang valid
+            if (isset($data['file']) && $data['file'] instanceof \Illuminate\Http\UploadedFile) {
+                // Pastikan file valid dan ter-upload dengan benar
+                if ($data['file']->isValid()) {
+                    try {
+                        Log::info('AtletRepository: Adding media file', [
+                            'file_name' => $data['file']->getClientOriginalName(),
+                            'file_size' => $data['file']->getSize(),
+                            'mime_type' => $data['file']->getMimeType(),
+                            'model_id'  => $model->id,
+                        ]);
 
-                $media = $model->addMedia($data['file'])
-                    ->usingName($data['nama'])
-                    ->toMediaCollection('images');
+                        $media = $model->addMedia($data['file'])
+                            ->usingName($data['nama'] ?? 'Foto Atlet')
+                            ->toMediaCollection('images');
 
-                Log::info('AtletRepository: Media added successfully', [
-                    'media_id'  => $media->id,
-                    'file_name' => $media->file_name,
-                    'disk'      => $media->disk,
-                    'path'      => $media->getPath(),
+                        Log::info('AtletRepository: Media added successfully', [
+                            'media_id'  => $media->id,
+                            'file_name' => $media->file_name,
+                            'disk'      => $media->disk,
+                            'path'      => $media->getPath(),
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error('AtletRepository: Error adding media', [
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
+                        throw $e;
+                    }
+                } else {
+                    Log::warning('AtletRepository: File upload is not valid', [
+                        'error' => $data['file']->getError(),
+                        'error_message' => $data['file']->getErrorMessage(),
+                    ]);
+                    // Jangan throw error, hanya log warning karena mungkin file tidak ter-upload dengan benar
+                }
+            } elseif (isset($data['file'])) {
+                // File ada tapi bukan UploadedFile instance (mungkin string path yang tidak valid)
+                Log::warning('AtletRepository: File is not a valid UploadedFile instance', [
+                    'file_type' => gettype($data['file']),
+                    'file_value' => is_string($data['file']) ? $data['file'] : 'Not a string',
                 ]);
+                // Jangan proses file jika bukan UploadedFile instance untuk menghindari error
             }
 
             // Handle AtletOrangTua data
@@ -630,24 +743,23 @@ class AtletRepository
             'email'           => $data['akun_email'],
             'no_hp'           => $atlet->no_hp,
             'is_active'       => 1,
-            'current_role_id' => 35, // Set current_role_id ke Role Atlet
+            'current_role_id' => 35,
             'created_by'      => $userId,
             'updated_by'      => $userId,
         ];
 
-        // Jika ada password, hash password
         if (isset($data['akun_password']) && $data['akun_password']) {
             $userData['password'] = bcrypt($data['akun_password']);
         }
 
-        // Jika sudah ada users_id, update user
+        $user = null;
+
         if (isset($data['users_id']) && $data['users_id']) {
             $user = User::find($data['users_id']);
             if ($user) {
                 $user->update($userData);
 
-                // Ensure role is assigned using Spatie Permission
-                $role = Role::find(35); // Role Atlet
+                $role = Role::find(35);
                 if ($role && !$user->hasRole($role)) {
                     $user->assignRole($role);
                 }
@@ -658,30 +770,28 @@ class AtletRepository
                 ]);
             }
         } else {
-            // Create new user
             $user = User::create($userData);
 
-            // Assign role Atlet using Spatie Permission
-            $role = Role::find(35); // Role Atlet
+            $role = Role::find(35);
             if ($role) {
                 $user->assignRole($role);
             }
 
-            // Also create users_role record for compatibility
             $user->users_role()->create([
                 'users_id'   => $user->id,
-                'role_id'    => 35, // Role Atlet
+                'role_id'    => 35,
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
-
-            // Update atlet dengan users_id
-            $atlet->update(['users_id' => $user->id]);
 
             Log::info('AtletRepository: Created new user for atlet', [
                 'atlet_id' => $atlet->id,
                 'user_id'  => $user->id,
             ]);
+        }
+
+        if ($user) {
+            app(UserPesertaLinkService::class)->link($user, 'atlet', $atlet->id);
         }
     }
 

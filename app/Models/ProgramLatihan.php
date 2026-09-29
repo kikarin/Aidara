@@ -27,6 +27,11 @@ class ProgramLatihan extends Model implements HasMedia
         'cabor_id',
         'nama_program',
         'cabor_kategori_id',
+        'mode_pelatih',
+        'pelatih_id',
+        'wajib_absen_atlet',
+        'absen_jam_mulai',
+        'absen_jam_selesai',
         'periode_mulai',
         'periode_selesai',
         'tahap',
@@ -34,6 +39,10 @@ class ProgramLatihan extends Model implements HasMedia
         'created_by',
         'updated_by',
         'deleted_by',
+    ];
+
+    protected $casts = [
+        'wajib_absen_atlet' => 'boolean',
     ];
 
     protected $appends = ['periode_hitung'];
@@ -48,9 +57,25 @@ class ProgramLatihan extends Model implements HasMedia
         return $this->belongsTo(CaborKategori::class, 'cabor_kategori_id');
     }
 
+    public function pelatih()
+    {
+        return $this->belongsTo(Pelatih::class, 'pelatih_id');
+    }
+
+    public function pelatihs()
+    {
+        return $this->belongsToMany(Pelatih::class, 'program_latihan_pelatih', 'program_latihan_id', 'pelatih_id')
+            ->withTimestamps();
+    }
+
     public function rekapAbsen()
     {
         return $this->hasMany(RekapAbsenProgramLatihan::class, 'program_latihan_id');
+    }
+
+    public function absenAtlet()
+    {
+        return $this->hasMany(ProgramLatihanAbsenAtlet::class, 'program_latihan_id');
     }
 
     public function getActivitylogOptions(): LogOptions

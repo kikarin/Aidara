@@ -25,6 +25,7 @@ class CaborKategoriPelatih extends Model
         'cabor_kategori_id',
         'pelatih_id',
         'jenis_pelatih',
+        'posisi_atlet',
         'is_active',
         'created_by',
         'updated_by',

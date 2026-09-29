@@ -3,10 +3,16 @@
 namespace App\Repositories;
 
 use App\Http\Requests\CaborKategoriRequest;
+use App\Models\Atlet;
 use App\Models\CaborKategori;
+use App\Models\CaborKategoriAtlet;
+use App\Models\CaborKategoriPelatih;
 use App\Models\CaborKategoriTenagaPendukung;
+use App\Models\Pelatih;
+use App\Models\TenagaPendukung;
 use App\Traits\RepositoryTrait;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class CaborKategoriRepository
@@ -94,6 +100,7 @@ class CaborKategoriRepository
                     'jenis_kelamin'           => $item->jenis_kelamin,
                     'kategori_peserta_id'     => $item->kategori_peserta_id,
                     'kategori_peserta_nama'   => $item->kategoriPeserta?->nama ?? '-',
+                    'jenis'                   => $item->jenis,
                     'deskripsi'               => $item->deskripsi,
                     'jumlah_atlet'            => $item->jumlah_atlet,
                     'jumlah_pelatih'          => $item->jumlah_pelatih,
@@ -217,5 +224,144 @@ class CaborKategoriRepository
         $messages = method_exists($request, 'messages') ? $request->messages() : [];
 
         return $request->validate($rules, $messages);
+    }
+
+    /**
+     * Callback setelah store atau update untuk auto-tambah peserta dari cabor
+     */
+    public function callbackAfterStoreOrUpdate($model, $data, $method = 'store', $record_sebelumnya = null)
+    {
+        $userId = Auth::id();
+
+        // Hanya proses untuk create (store), bukan update
+        if ($method === 'store') {
+            $caborId = $model->cabor_id;
+            $caborKategoriId = $model->id;
+            $jenisKelamin = $model->jenis_kelamin;
+
+            // Get semua atlet dari cabor (dari tabel pivot dengan cabor_id)
+            $atletQuery = DB::table('cabor_kategori_atlet')
+                ->where('cabor_id', $caborId)
+                ->whereNull('deleted_at')
+                ->select('atlet_id', 'posisi_atlet')
+                ->distinct();
+
+            // Filter berdasarkan jenis kelamin kategori jika L atau P
+            if ($jenisKelamin === 'L' || $jenisKelamin === 'P') {
+                $atletIds = $atletQuery->pluck('atlet_id')->unique();
+                $atletIds = Atlet::whereIn('id', $atletIds)
+                    ->where('jenis_kelamin', $jenisKelamin)
+                    ->pluck('id')
+                    ->toArray();
+            } else {
+                // Campuran: ambil semua
+                $atletIds = $atletQuery->pluck('atlet_id')->unique()->toArray();
+            }
+
+            // Insert atlet ke kategori baru
+            // Unique constraint adalah cabor_kategori_id + atlet_id, jadi atlet bisa punya beberapa kategori dalam satu cabor
+            foreach ($atletIds as $atletId) {
+                // Cek apakah sudah ada record dengan cabor_kategori_id + atlet_id (unique constraint)
+                $existing = CaborKategoriAtlet::where('cabor_kategori_id', $caborKategoriId)
+                    ->where('atlet_id', $atletId)
+                    ->whereNull('deleted_at')
+                    ->first();
+
+                if ($existing) {
+                    // Jika sudah ada, skip (tidak perlu update karena sudah di kategori ini)
+                    continue;
+                } else {
+                    // Buat record baru untuk kategori ini
+                    // Ambil posisi_atlet dari record yang sudah ada di cabor (jika ada)
+                    $existingCaborAtlet = DB::table('cabor_kategori_atlet')
+                        ->where('cabor_id', $caborId)
+                        ->where('atlet_id', $atletId)
+                        ->whereNull('deleted_at')
+                        ->first();
+
+                    CaborKategoriAtlet::create([
+                        'cabor_id' => $caborId,
+                        'cabor_kategori_id' => $caborKategoriId,
+                        'atlet_id' => $atletId,
+                        'posisi_atlet' => $existingCaborAtlet->posisi_atlet ?? null,
+                        'is_active' => 1,
+                        'created_by' => $userId,
+                        'updated_by' => $userId,
+                    ]);
+                }
+            }
+
+            // Get semua pelatih dari cabor (tidak peduli gender)
+            $pelatihIds = DB::table('cabor_kategori_pelatih')
+                ->where('cabor_id', $caborId)
+                ->whereNull('deleted_at')
+                ->pluck('pelatih_id')
+                ->unique()
+                ->toArray();
+
+            // Insert pelatih ke kategori baru
+            foreach ($pelatihIds as $pelatihId) {
+                // Cek apakah sudah ada
+                $existing = CaborKategoriPelatih::where('cabor_kategori_id', $caborKategoriId)
+                    ->where('pelatih_id', $pelatihId)
+                    ->first();
+
+                if (!$existing) {
+                    // Ambil jenis_pelatih dari record yang sudah ada di cabor (jika ada)
+                    $existingCaborPelatih = DB::table('cabor_kategori_pelatih')
+                        ->where('cabor_id', $caborId)
+                        ->where('pelatih_id', $pelatihId)
+                        ->whereNull('deleted_at')
+                        ->first();
+
+                    CaborKategoriPelatih::create([
+                        'cabor_id' => $caborId,
+                        'cabor_kategori_id' => $caborKategoriId,
+                        'pelatih_id' => $pelatihId,
+                        'jenis_pelatih' => $existingCaborPelatih->jenis_pelatih ?? null,
+                        'is_active' => 1,
+                        'created_by' => $userId,
+                        'updated_by' => $userId,
+                    ]);
+                }
+            }
+
+            // Get semua tenaga pendukung dari cabor (tidak peduli gender)
+            $tenagaPendukungIds = DB::table('cabor_kategori_tenaga_pendukung')
+                ->where('cabor_id', $caborId)
+                ->whereNull('deleted_at')
+                ->pluck('tenaga_pendukung_id')
+                ->unique()
+                ->toArray();
+
+            // Insert tenaga pendukung ke kategori baru
+            foreach ($tenagaPendukungIds as $tenagaPendukungId) {
+                // Cek apakah sudah ada
+                $existing = CaborKategoriTenagaPendukung::where('cabor_kategori_id', $caborKategoriId)
+                    ->where('tenaga_pendukung_id', $tenagaPendukungId)
+                    ->first();
+
+                if (!$existing) {
+                    // Ambil jenis_tenaga_pendukung dari record yang sudah ada di cabor (jika ada)
+                    $existingCaborTenaga = DB::table('cabor_kategori_tenaga_pendukung')
+                        ->where('cabor_id', $caborId)
+                        ->where('tenaga_pendukung_id', $tenagaPendukungId)
+                        ->whereNull('deleted_at')
+                        ->first();
+
+                    CaborKategoriTenagaPendukung::create([
+                        'cabor_id' => $caborId,
+                        'cabor_kategori_id' => $caborKategoriId,
+                        'tenaga_pendukung_id' => $tenagaPendukungId,
+                        'jenis_tenaga_pendukung' => $existingCaborTenaga->jenis_tenaga_pendukung ?? null,
+                        'is_active' => 1,
+                        'created_by' => $userId,
+                        'updated_by' => $userId,
+                    ]);
+                }
+            }
+        }
+
+        return $model;
     }
 }

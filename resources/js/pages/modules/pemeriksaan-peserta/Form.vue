@@ -188,7 +188,7 @@ const columns = computed(() => {
         format: (row: any) =>
             row.foto
                 ? `<div class='cursor-pointer' onclick=\"window.open('${row.foto}', '_blank')\"><img src='${row.foto}' alt='Foto' class='w-12 h-12 object-cover rounded-full border hover:shadow-md transition-shadow' /></div>`
-                : "<div class='w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-xs'>No</div>",
+                : "<div class='flex h-12 w-12 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground'>No</div>",
     };
 
     if (jenisPeserta.value === 'pelatih') {

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast/useToast';
 import axios from 'axios';
 import { ArrowDown, ArrowUp, Loader2, TrendingUp } from 'lucide-vue-next';
@@ -125,7 +126,7 @@ const getTrendIcon = (trend: string) => {
 const getTrendColor = (trend: string) => {
     if (trend === 'naik') return 'text-green-600';
     if (trend === 'turun') return 'text-red-600';
-    return 'text-gray-600';
+    return 'text-muted-foreground';
 };
 
 const formatDate = (date: string) => {
@@ -152,11 +153,11 @@ const getPredikatColor = (predikat: string | null) => {
     const map: Record<string, string> = {
         sangat_kurang: 'bg-red-100 text-red-800',
         kurang: 'bg-orange-100 text-orange-800',
-        sedang: 'bg-yellow-100 text-yellow-800',
-        mendekati_target: 'bg-blue-100 text-blue-800',
-        target: 'bg-green-100 text-green-800',
+        sedang: 'badge-warning',
+        mendekati_target: 'stat-chip stat-chip-atlet',
+        target: 'badge-success',
     };
-    return predikat ? map[predikat] || 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800';
+    return predikat ? map[predikat] || 'badge-muted' : 'badge-muted';
 };
 
 // Computed untuk cek apakah bisa load perbandingan
@@ -231,7 +232,7 @@ onMounted(async () => {
 
                     <!-- Filter Pemeriksaan (multi-select) -->
                     <div class="space-y-2">
-                        <Label>Pemeriksaan Khusus (Min. 2)</Label>
+                        <Label>Pemeriksaan Fisik (Min. 2)</Label>
                         <div class="border rounded-md p-2 min-h-[40px] max-h-32 overflow-auto">
                             <div v-if="loadingPemeriksaan" class="flex items-center justify-center py-2">
                                 <Loader2 class="h-4 w-4 animate-spin" />
@@ -281,9 +282,7 @@ onMounted(async () => {
                 <CardDescription>Perbandingan performa aspek antar pemeriksaan</CardDescription>
             </CardHeader>
             <CardContent>
-                <div v-if="loadingPerbandingan" class="flex items-center justify-center py-8">
-                    <Loader2 class="h-8 w-8 animate-spin" />
-                </div>
+                <TableSkeleton v-if="loadingPerbandingan" :rows="6" :columns="5" />
                 <div v-else-if="!perbandinganData || !perbandinganData.perbandingan_per_peserta || perbandinganData.perbandingan_per_peserta.length === 0" class="text-center py-8 text-muted-foreground">
                     Tidak ada data perbandingan
                 </div>

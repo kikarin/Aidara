@@ -4,7 +4,7 @@ import { useToast } from '@/components/ui/toast/useToast';
 import PageIndex from '@/pages/modules/base-page/PageIndex.vue';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import BadgeGroup from '../components/BadgeGroup.vue';
 
 const breadcrumbs = [{ title: 'Program Latihan', href: '/program-latihan' }];
@@ -99,15 +99,15 @@ const actions = (row: any) => [
     {
         label: 'Rekap Absen',
         onClick: () => router.visit(`/program-latihan/${row.id}/rekap-absen`),
-        permission: 'Program Latihan Detail',
+        permission: 'Program Latihan Rekap Absen',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/program-latihan/${row.id}/edit`),
         permission: 'Program Latihan Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Program Latihan Delete',
     },
@@ -145,16 +145,30 @@ const bukaFilterModal = () => {
 
 const handleFilter = (filters: any) => {
     currentFilters.value = filters;
-    // Apply filters to the data table
     pageIndex.value.handleFilterFromParent(filters);
     toast({ title: 'Filter berhasil diterapkan', variant: 'success' });
 };
+
+onMounted(() => {
+    const params = new URLSearchParams(window.location.search);
+    const caborId = params.get('cabor_id');
+    const kategoriId = params.get('cabor_kategori_id');
+
+    if (caborId || kategoriId) {
+        const filters: Record<string, string> = {};
+        if (caborId) filters.cabor_id = caborId;
+        if (kategoriId) filters.cabor_kategori_id = kategoriId;
+        currentFilters.value = filters;
+        pageIndex.value?.handleFilterFromParent(filters);
+    }
+});
 </script>
 
 <template>
     <PageIndex
         title="Program Latihan"
         module-name="Program Latihan"
+        base-url="program-latihan"
         :breadcrumbs="breadcrumbs"
         :columns="columns"
         :create-url="'/program-latihan/create'"

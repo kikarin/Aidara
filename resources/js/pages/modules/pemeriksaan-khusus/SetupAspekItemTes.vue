@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast/useToast';
 import axios from 'axios';
+import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, Loader2, Plus, Save, Trash2, X } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 
@@ -364,9 +365,8 @@ onMounted(async () => {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <div v-if="loadingTemplate" class="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 class="h-4 w-4 animate-spin" />
-                    <span>Memeriksa template...</span>
+                <div v-if="loadingTemplate" class="flex items-center gap-3">
+                    <Skeleton class="h-10 w-40 rounded-md" />
                 </div>
                 <div v-else class="flex gap-2">
                     <Button @click="loadFromTemplate" variant="outline" :disabled="loading">
