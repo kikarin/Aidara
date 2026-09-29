@@ -36,3 +36,4 @@ scripts/patch-php85-deprecations.php
 config/database.php
 composer.json
 package-lock.json
+.cursorrules
