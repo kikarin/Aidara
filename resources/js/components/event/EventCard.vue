@@ -1,100 +1,77 @@
 <script setup lang="ts">
-import type { EventStatus, PublicEventSummary } from '@/types/event';
 import AppImage from '@/components/AppImage.vue';
+import EventCoverPlaceholder from '@/components/event/EventCoverPlaceholder.vue';
+import { EVENT_PHASE_LABEL, eventDateRange, eventDateTile, eventPhase, eventPhaseClass } from '@/lib/publicEvent';
+import { trackSpotlight } from '@/lib/publicMotion';
+import type { PublicEventSummary } from '@/types/event';
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faArrowRight, faCalendarDays, faLocationDot, faMedal } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { Link } from '@inertiajs/vue3';
-import { CalendarDays, MapPin } from 'lucide-vue-next';
 import { computed } from 'vue';
+
+library.add(faArrowRight, faCalendarDays, faLocationDot, faMedal);
 
 const props = defineProps<{
     event: PublicEventSummary;
     compact?: boolean;
 }>();
 
-const statusClass = computed(() => {
-    const map: Record<EventStatus, string> = {
-        draft: 'bg-muted text-muted-foreground',
-        publish: 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300',
-        selesai: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300',
-        dibatalkan: 'bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300',
-    };
-
-    return map[props.event.status] ?? map.draft;
-});
-
-const formatDate = (value: string | null) => {
-    if (!value) {
-        return '-';
-    }
-
-    return new Date(value).toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
-};
-
-const dateRange = computed(() => {
-    const mulai = formatDate(props.event.tanggal_mulai);
-    const selesai = formatDate(props.event.tanggal_selesai);
-
-    if (mulai === selesai || selesai === '-') {
-        return mulai;
-    }
-
-    return `${mulai} – ${selesai}`;
-});
+const phase = computed(() => eventPhase(props.event));
+const dateTile = computed(() => eventDateTile(props.event));
+const dateRange = computed(() => eventDateRange(props.event));
 </script>
 
 <template>
     <Link
         :href="route('event.public.show', { id: event.id })"
-        class="content-panel group flex h-full flex-col overflow-hidden transition-shadow hover:shadow-md"
+        class="wp-surface wp-tile group flex h-full flex-col rounded-3xl p-2"
+        @pointermove="trackSpotlight"
     >
-        <div class="relative aspect-[16/10] overflow-hidden bg-muted">
+        <div class="relative aspect-[16/10] overflow-hidden rounded-2xl">
             <AppImage
                 v-if="event.foto_url"
                 :src="event.foto_url"
-                :alt="event.nama_event"
-                class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                :alt="`Poster ${event.nama_event}`"
+                class="size-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
             />
-            <div
-                v-else
-                class="flex h-full w-full items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-950/30 dark:to-emerald-950/20"
-            >
-                <CalendarDays class="text-muted-foreground/50 h-12 w-12" />
+            <EventCoverPlaceholder v-else />
+
+            <div v-if="dateTile" class="wp-glass absolute top-3 left-3 flex w-12 flex-col items-center rounded-xl py-1.5 leading-none">
+                <span class="text-lg font-bold tabular-nums">{{ dateTile.day }}</span>
+                <span class="text-muted-foreground mt-1 text-[0.65rem] font-semibold">{{ dateTile.month }}</span>
             </div>
-            <span
-                class="absolute top-3 right-3 rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-sm"
-                :class="statusClass"
-            >
-                {{ event.status_label }}
+            <span class="absolute top-3 right-3 rounded-md px-2 py-1 text-xs font-semibold" :class="eventPhaseClass(phase)">
+                {{ EVENT_PHASE_LABEL[phase] }}
             </span>
         </div>
 
         <div class="flex flex-1 flex-col p-4 lg:p-5">
-            <p v-if="!compact" class="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
-                {{ event.kategori_event_nama }}
-            </p>
-            <h3 class="text-foreground group-hover:text-[var(--brand-green,#2e7d32)] mb-2 line-clamp-2 text-base font-bold transition-colors lg:text-lg">
-                {{ event.nama_event }}
-            </h3>
-            <p v-if="event.deskripsi_singkat" class="text-muted-foreground mb-4 line-clamp-2 text-sm leading-relaxed">
+            <p v-if="!compact" class="text-muted-foreground text-xs font-medium">{{ event.kategori_event_nama }}</p>
+            <h3 class="mt-1.5 line-clamp-2 text-lg leading-snug font-semibold tracking-[-0.015em]">{{ event.nama_event }}</h3>
+            <p v-if="event.deskripsi_singkat" class="text-muted-foreground mt-2 line-clamp-2 text-sm leading-relaxed">
                 {{ event.deskripsi_singkat }}
             </p>
 
-            <div class="text-muted-foreground mt-auto space-y-2 text-xs">
-                <div class="flex items-center gap-2">
-                    <CalendarDays class="h-3.5 w-3.5 shrink-0" />
-                    <span>{{ dateRange }}</span>
-                </div>
-                <div v-if="event.lokasi" class="flex items-center gap-2">
-                    <MapPin class="h-3.5 w-3.5 shrink-0" />
+            <ul class="text-muted-foreground mt-auto space-y-1.5 pt-5 text-xs">
+                <li class="flex items-center gap-2">
+                    <FontAwesomeIcon :icon="['fas', 'calendar-days']" class="size-3.5 shrink-0 text-(--wp-accent)" />
+                    <span class="tabular-nums">{{ dateRange }}</span>
+                </li>
+                <li v-if="event.lokasi" class="flex items-center gap-2">
+                    <FontAwesomeIcon :icon="['fas', 'location-dot']" class="size-3.5 shrink-0 text-(--wp-accent)" />
                     <span class="line-clamp-1">{{ event.lokasi }}</span>
-                </div>
-                <p v-if="compact" class="text-muted-foreground/80">{{ event.tingkat_event_nama }}</p>
-            </div>
+                </li>
+                <li v-if="compact" class="flex items-center gap-2">
+                    <FontAwesomeIcon :icon="['fas', 'medal']" class="size-3.5 shrink-0 text-(--wp-accent)" />
+                    <span>{{ event.tingkat_event_nama }}</span>
+                </li>
+            </ul>
 
-            <p class="text-[var(--brand-green,#2e7d32)] mt-4 text-sm font-semibold">Lihat detail →</p>
+            <span class="wp-link-arrow mt-4 inline-flex items-center gap-2 text-sm font-semibold">
+                Lihat detail
+                <FontAwesomeIcon :icon="['fas', 'arrow-right']" class="size-3 text-(--wp-accent)" />
+            </span>
         </div>
     </Link>
 </template>

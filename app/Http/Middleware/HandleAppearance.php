@@ -18,7 +18,7 @@ class HandleAppearance
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $appearance = $request->cookie('appearance') ?? 'dispora';
+        $appearance = $request->cookie('appearance') ?? 'slate';
 
         if ($appearance === 'default') {
             $appearance = 'light';
@@ -35,13 +35,13 @@ class HandleAppearance
     private function resolveTheme(string $appearance): string
     {
         if ($appearance === 'system') {
-            return 'dispora';
+            return 'slate';
         }
 
         if (in_array($appearance, self::VALID_THEMES, true)) {
             return $appearance;
         }
 
-        return 'dispora';
+        return 'slate';
     }
 }

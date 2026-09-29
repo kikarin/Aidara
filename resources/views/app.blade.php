@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="{{ $resolvedTheme ?? 'dispora' }}" @class(['dark' => ($resolvedTheme ?? 'dispora') === 'dark'])>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="{{ $resolvedTheme ?? 'slate' }}" @class(['dark' => ($resolvedTheme ?? 'slate') === 'dark'])>
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,15 +15,15 @@
         <script>
             (function() {
                 const valid = ['light', 'slate', 'warm', 'sport', 'dispora', 'dark'];
-                const appearance = @json($appearance ?? 'dispora');
+                const appearance = @json($appearance ?? 'slate');
                 let resolved = appearance;
 
                 if (appearance === 'default') {
                     resolved = 'light';
                 } else if (appearance === 'system') {
-                    resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'dispora';
+                    resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'slate';
                 } else if (!valid.includes(appearance)) {
-                    resolved = 'dispora';
+                    resolved = 'slate';
                 }
 
                 document.documentElement.dataset.theme = resolved;
@@ -39,7 +39,7 @@
         {{-- Inline style to set the HTML background color based on our theme in app.css --}}
         <style>
             html {
-                background-color: oklch(0.97 0.018 145);
+                background-color: oklch(0.94 0.012 250);
             }
 
             html[data-theme='light'] {

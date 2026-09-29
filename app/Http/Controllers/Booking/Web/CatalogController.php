@@ -16,6 +16,13 @@ class CatalogController extends Controller
                 ->where('is_active', true)
                 ->withCount([
                     'areas' => fn ($q) => $q->where('is_active', true),
+                    'tarifs' => fn ($q) => $q->where('is_active', true),
+                ])
+                ->with([
+                    'areas' => fn ($q) => $q->where('is_active', true)
+                        ->orderBy('sort_order')
+                        ->orderBy('name')
+                        ->select(['id', 'venue_id', 'name']),
                 ])
                 ->orderBy('sort_order')
                 ->orderBy('name')
@@ -27,8 +34,10 @@ class CatalogController extends Controller
                     'description' => $v->description,
                     'cover_url' => $v->cover_url,
                     'areas_count' => (int) $v->areas_count,
+                    'tarifs_count' => (int) $v->tarifs_count,
+                    'area_names' => $v->areas->pluck('name')->values(),
                 ])),
-            'branding' => 'E-Booking',
+            'branding' => 'Si Bola',
         ]);
     }
 }

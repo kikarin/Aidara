@@ -2,20 +2,43 @@
 import AppImage from '@/components/AppImage.vue';
 import RowActionsMenu from '@/components/e-booking/RowActionsMenu.vue';
 import TablePagination from '@/components/e-booking/TablePagination.vue';
-import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
 import TimeField from '@/components/TimeField.vue';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import SimpleSelect from '@/components/ui/select/SimpleSelect.vue';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
+import type { IconName } from '@fortawesome/fontawesome-svg-core';
+import { library } from '@fortawesome/fontawesome-svg-core';
+import {
+    faArrowLeft,
+    faBuilding,
+    faCircleNotch,
+    faFloppyDisk,
+    faLayerGroup,
+    faPen,
+    faPlus,
+    faPowerOff,
+    faScroll,
+    faTag,
+    faTrash,
+} from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, LoaderCircle, Pencil, Plus, Power, Trash2 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, h, ref, type FunctionalComponent } from 'vue';
+
+library.add(faArrowLeft, faBuilding, faCircleNotch, faFloppyDisk, faLayerGroup, faPen, faPlus, faPowerOff, faScroll, faTag, faTrash);
+
+const faAction =
+    (name: IconName): FunctionalComponent =>
+    (_, { attrs }) =>
+        h(FontAwesomeIcon, { ...attrs, icon: ['fas', name], 'aria-hidden': 'true' });
+const Pencil = faAction('pen');
+const Power = faAction('power-off');
+const Trash2 = faAction('trash');
+
+const selectTrigger = 'h-10 w-full rounded-xl border-(--wp-hairline) bg-background px-3.5 text-sm shadow-none';
+const invalid = (message?: string) => (message ? 'true' : undefined);
 
 type Venue = {
     id: number;
@@ -411,451 +434,813 @@ const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !
     <SeoHead :title="`Venue ${venue.name} — E-Booking`" />
 
     <AdminLayout active="venues">
-        <Link :href="route('e-booking.admin.venues.index')" class="text-muted-foreground inline-flex items-center gap-1 text-sm hover:underline">
-            <ArrowLeft class="size-4" />
+        <Link
+            :href="route('e-booking.admin.venues.index')"
+            class="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 rounded-sm text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--wp-accent)"
+        >
+            <FontAwesomeIcon :icon="['fas', 'arrow-left']" class="size-3.5" aria-hidden="true" />
             Kembali ke daftar venue
         </Link>
 
-        <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-                <AppImage v-if="venue.cover_url" :src="venue.cover_url" :alt="venue.name" class="size-14 rounded-xl object-cover" />
-                <div v-else class="size-14 rounded-xl bg-slate-100"></div>
-                <div>
-                    <h1 class="text-foreground text-2xl font-bold">{{ venue.name }}</h1>
-                    <p class="text-muted-foreground text-sm">
-                        <code class="text-xs">{{ venue.code }}</code>
-                        <Badge class="ml-2" :variant="venue.is_active ? 'default' : 'secondary'">
+        <header class="mt-4 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex min-w-0 items-center gap-4">
+                <AppImage v-if="venue.cover_url" :src="venue.cover_url" :alt="venue.name" class="size-16 shrink-0 rounded-xl object-cover" />
+                <div v-else class="wp-icon size-16 shrink-0 rounded-xl" aria-hidden="true">
+                    <FontAwesomeIcon :icon="['fas', 'building']" class="size-6" />
+                </div>
+                <div class="min-w-0">
+                    <h1 class="text-foreground text-2xl font-bold tracking-tight sm:text-3xl">{{ venue.name }}</h1>
+                    <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span class="text-muted-foreground font-mono text-xs">{{ venue.code }}</span>
+                        <span class="sb-badge" :class="venue.is_active ? 'sb-tone-success' : 'sb-tone-neutral'">
                             {{ venue.is_active ? 'Aktif' : 'Nonaktif' }}
-                        </Badge>
-                    </p>
+                        </span>
+                    </div>
                 </div>
             </div>
-            <Button as-child variant="outline" size="sm">
-                <Link :href="route('e-booking.admin.venues.edit', venue.id)">Ubah venue</Link>
-            </Button>
-        </div>
+            <Link :href="route('e-booking.admin.venues.edit', venue.id)" class="wp-btn wp-btn-quiet px-4 py-2 text-sm">
+                <FontAwesomeIcon :icon="['fas', 'pen']" class="size-3.5" aria-hidden="true" />
+                Ubah venue
+            </Link>
+        </header>
 
-        <Tabs default-value="area" class="mt-8">
-            <TabsList>
-                <TabsTrigger value="area">Area ({{ areas.total }})</TabsTrigger>
-                <TabsTrigger value="tarif">Tarif ({{ tarifs.total }})</TabsTrigger>
-                <TabsTrigger value="aturan">Aturan</TabsTrigger>
-            </TabsList>
+        <div class="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <Tabs default-value="area" class="min-w-0">
+                <TabsList class="sb-card-muted w-fit gap-1 p-1">
+                    <TabsTrigger value="area" class="text-muted-foreground gap-2 rounded-xl px-4 py-2">
+                        Area <span class="tabular-nums">({{ areas.total }})</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="tarif" class="text-muted-foreground gap-2 rounded-xl px-4 py-2">
+                        Tarif <span class="tabular-nums">({{ tarifs.total }})</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="aturan" class="text-muted-foreground gap-2 rounded-xl px-4 py-2">Aturan</TabsTrigger>
+                </TabsList>
 
-            <TabsContent value="area" class="mt-4">
-                <form class="border-border grid gap-3 rounded-xl border p-4 sm:grid-cols-2" @submit.prevent="submitArea">
-                    <div class="flex items-center justify-between sm:col-span-2">
-                        <h2 class="text-sm font-semibold">{{ areaEditingId ? 'Ubah area' : 'Tambah area' }}</h2>
-                        <button
-                            v-if="areaEditingId"
-                            type="button"
-                            class="text-muted-foreground text-xs font-semibold hover:underline"
-                            @click="resetAreaForm"
-                        >
-                            Batal edit
-                        </button>
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium">Kode</label>
-                        <Input v-model="areaForm.code" type="text" maxlength="64" placeholder="lapangan_utama" />
-                        <InputError :message="areaForm.errors.code" />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium">Nama</label>
-                        <Input v-model="areaForm.name" type="text" maxlength="150" placeholder="Lapangan Utama" />
-                        <InputError :message="areaForm.errors.name" />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium">Urutan</label>
-                        <Input v-model="areaForm.sort_order" type="number" min="0" />
-                        <InputError :message="areaForm.errors.sort_order" />
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <label class="flex items-center gap-2 text-sm font-medium">
-                            <Checkbox v-model="areaForm.is_tentative" />
-                            Tentatif
-                        </label>
-                        <label class="flex items-center gap-2 text-sm font-medium">
-                            <Checkbox v-model="areaForm.is_active" />
-                            Aktif
-                        </label>
-                    </div>
-                    <div class="sm:col-span-2">
-                        <Button type="submit" :disabled="areaForm.processing">
-                            <LoaderCircle v-if="areaForm.processing" class="size-4 animate-spin" />
-                            <Plus v-else class="size-4" />
-                            {{ areaEditingId ? 'Simpan area' : 'Tambah area' }}
-                        </Button>
-                    </div>
-                </form>
-
-                <Table class="mt-4 min-w-[560px]">
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Nama</TableHead>
-                            <TableHead>Kode</TableHead>
-                            <TableHead>Tentatif</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead></TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <TableRow v-for="row in areas.data" :key="row.id">
-                            <TableCell class="font-medium">{{ row.name }}</TableCell>
-                            <TableCell>
-                                <code class="text-xs">{{ row.code }}</code>
-                            </TableCell>
-                            <TableCell>{{ row.is_tentative ? 'Ya' : '—' }}</TableCell>
-                            <TableCell>
-                                <Badge :variant="row.is_active ? 'default' : 'secondary'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
-                            </TableCell>
-                            <TableCell class="text-right">
-                                <RowActionsMenu :items="areaRowActions(row)" />
-                            </TableCell>
-                        </TableRow>
-                        <TableRow v-if="areas.data.length === 0">
-                            <TableCell colspan="5" class="text-muted-foreground py-8 text-center">Belum ada area.</TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-
-                <TablePagination :links="areas.links" :from="areas.from" :to="areas.to" :total="areas.total" label="area" />
-            </TabsContent>
-
-            <TabsContent value="tarif" class="mt-4">
-                <form class="border-border grid gap-3 rounded-xl border p-4 sm:grid-cols-2" @submit.prevent="submitTarif">
-                    <div class="flex items-center justify-between sm:col-span-2">
-                        <h2 class="text-sm font-semibold">{{ tarifEditingId ? 'Ubah tarif' : 'Tambah tarif' }}</h2>
-                        <button
-                            v-if="tarifEditingId"
-                            type="button"
-                            class="text-muted-foreground text-xs font-semibold hover:underline"
-                            @click="resetTarifForm"
-                        >
-                            Batal edit
-                        </button>
-                    </div>
-                    <div class="sm:col-span-2">
-                        <label class="mb-1.5 block text-sm font-medium">Area</label>
-                        <SimpleSelect v-model="tarifForm.area_id" :options="areaOptions" placeholder="Tanpa area" />
-                        <InputError :message="tarifForm.errors.area_id" />
-                    </div>
-                    <div class="sm:col-span-2">
-                        <label class="mb-1.5 block text-sm font-medium">Uraian</label>
-                        <Input v-model="tarifForm.uraian" type="text" maxlength="255" placeholder="Latihan" />
-                        <InputError :message="tarifForm.errors.uraian" />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium">Satuan</label>
-                        <SimpleSelect v-model="tarifForm.satuan" :options="satuanOptions" />
-                        <InputError :message="tarifForm.errors.satuan" />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium">Kategori</label>
-                        <SimpleSelect v-model="tarifForm.category" :options="categoryOptions" />
-                        <InputError :message="tarifForm.errors.category" />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium">Tarif instansi pemerintah</label>
-                        <Input v-model="tarifForm.tarif_pemerintah" type="number" min="0" placeholder="0" />
-                        <InputError :message="tarifForm.errors.tarif_pemerintah" />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium">Tarif umum / non-pemerintah</label>
-                        <Input v-model="tarifForm.tarif_non_pemerintah" type="number" min="0" placeholder="0" />
-                        <InputError :message="tarifForm.errors.tarif_non_pemerintah" />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium">Min jam (opsional)</label>
-                        <Input v-model="tarifForm.min_hours" type="number" min="1" max="24" placeholder="—" />
-                        <InputError :message="tarifForm.errors.min_hours" />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium">Max jam (opsional)</label>
-                        <Input v-model="tarifForm.max_hours" type="number" min="1" max="24" placeholder="—" />
-                        <InputError :message="tarifForm.errors.max_hours" />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium">Kode (opsional)</label>
-                        <Input v-model="tarifForm.code" type="text" maxlength="96" />
-                        <InputError :message="tarifForm.errors.code" />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium">Time slot (opsional)</label>
-                        <Input v-model="tarifForm.time_slot" type="text" maxlength="32" placeholder="pagi/siang/malam" />
-                        <InputError :message="tarifForm.errors.time_slot" />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium">Event level (opsional)</label>
-                        <Input v-model="tarifForm.event_level" type="text" maxlength="64" placeholder="nasional" />
-                        <InputError :message="tarifForm.errors.event_level" />
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <Checkbox id="tarif-active" v-model="tarifForm.is_active" />
-                        <label for="tarif-active" class="text-sm font-medium">Aktif</label>
-                    </div>
-                    <div class="sm:col-span-2">
-                        <Button type="submit" :disabled="tarifForm.processing">
-                            <LoaderCircle v-if="tarifForm.processing" class="size-4 animate-spin" />
-                            <Plus v-else class="size-4" />
-                            {{ tarifEditingId ? 'Simpan tarif' : 'Tambah tarif' }}
-                        </Button>
-                    </div>
-                </form>
-
-                <Table class="mt-4 min-w-[820px]">
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Uraian</TableHead>
-                            <TableHead>Area</TableHead>
-                            <TableHead>Satuan</TableHead>
-                            <TableHead>Durasi</TableHead>
-                            <TableHead>Instansi</TableHead>
-                            <TableHead>Umum</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead></TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <TableRow v-for="row in tarifs.data" :key="row.id">
-                            <TableCell>
-                                <p class="font-medium">{{ row.uraian }}</p>
-                                <p class="text-muted-foreground text-xs">
-                                    {{ row.category ? (categoryLabels[row.category] ?? row.category) : '—' }}
-                                </p>
-                            </TableCell>
-                            <TableCell>{{ row.area_name || 'Venue' }}</TableCell>
-                            <TableCell>{{ satuanLabels[row.satuan] ?? row.satuan }}</TableCell>
-                            <TableCell class="whitespace-nowrap">
-                                <template v-if="row.min_hours || row.max_hours"> {{ row.min_hours ?? 1 }}–{{ row.max_hours ?? '∞' }} jam </template>
-                                <template v-else>—</template>
-                            </TableCell>
-                            <TableCell class="whitespace-nowrap">{{ formatRupiah(row.tarif_pemerintah) }}</TableCell>
-                            <TableCell class="whitespace-nowrap">{{ formatRupiah(row.tarif_non_pemerintah) }}</TableCell>
-                            <TableCell>
-                                <Badge :variant="row.is_active ? 'default' : 'secondary'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
-                            </TableCell>
-                            <TableCell class="text-right">
-                                <RowActionsMenu :items="tarifRowActions(row)" />
-                            </TableCell>
-                        </TableRow>
-                        <TableRow v-if="tarifs.data.length === 0">
-                            <TableCell colspan="8" class="text-muted-foreground py-8 text-center">Belum ada tarif.</TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-
-                <TablePagination :links="tarifs.links" :from="tarifs.from" :to="tarifs.to" :total="tarifs.total" label="tarif" />
-            </TabsContent>
-
-            <TabsContent value="aturan" class="mt-4">
-                <form class="space-y-6" @submit.prevent="submitRules">
-                    <section class="border-border grid gap-3 rounded-xl border p-4 sm:grid-cols-3">
-                        <h2 class="text-sm font-semibold sm:col-span-3">Jam & hari operasional</h2>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Jam buka</label>
-                            <TimeField v-model="ruleForm.operating_start" />
+                <!-- Area -->
+                <TabsContent value="area" class="mt-5 space-y-5">
+                    <form class="sb-card p-5 sm:p-6" @submit.prevent="submitArea">
+                        <div class="flex items-center justify-between gap-3">
+                            <h2 class="text-base font-semibold tracking-tight">{{ areaEditingId ? 'Ubah area' : 'Tambah area' }}</h2>
+                            <button v-if="areaEditingId" type="button" class="wp-btn wp-btn-quiet px-3 py-1.5 text-xs" @click="resetAreaForm">
+                                Batal edit
+                            </button>
                         </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Jam tutup</label>
-                            <TimeField v-model="ruleForm.operating_end" />
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Timezone</label>
-                            <Input v-model="ruleForm.operating_timezone" type="text" maxlength="64" placeholder="Asia/Jakarta" />
-                        </div>
-                        <div class="sm:col-span-3">
-                            <label class="mb-1.5 block text-sm font-medium">Hari operasional</label>
-                            <div class="flex flex-wrap gap-3">
-                                <label v-for="day in days" :key="day" class="flex items-center gap-1.5 text-sm capitalize">
-                                    <Checkbox
-                                        :model-value="ruleForm.operating_days.includes(day)"
-                                        @update:model-value="(value) => toggleInArray(ruleForm.operating_days, day, !!value)"
-                                    />
-                                    {{ day }}
-                                </label>
+                        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label for="area-code" class="sb-label">Kode</label>
+                                <input
+                                    id="area-code"
+                                    v-model="areaForm.code"
+                                    type="text"
+                                    maxlength="64"
+                                    placeholder="lapangan_utama"
+                                    class="sb-input font-mono"
+                                    :aria-invalid="invalid(areaForm.errors.code)"
+                                    :aria-describedby="areaForm.errors.code ? 'area-code-error' : undefined"
+                                />
+                                <p v-if="areaForm.errors.code" id="area-code-error" class="sb-error">{{ areaForm.errors.code }}</p>
                             </div>
-                        </div>
-                    </section>
-
-                    <section class="border-border grid gap-3 rounded-xl border p-4 sm:grid-cols-3">
-                        <h2 class="text-sm font-semibold sm:col-span-3">Batas & buffer booking</h2>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Horizon booking (hari)</label>
-                            <Input v-model="ruleForm.booking_horizon_days" type="number" min="1" placeholder="Tanpa batas" />
-                            <p class="text-muted-foreground mt-1 text-xs">Kosongkan = tanpa batas.</p>
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Buffer sebelum (hari)</label>
-                            <Input v-model="ruleForm.buffer_before_days" type="number" min="0" />
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Buffer sesudah (hari)</label>
-                            <Input v-model="ruleForm.buffer_after_days" type="number" min="0" />
-                        </div>
-                    </section>
-
-                    <section class="border-border grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
-                        <h2 class="text-sm font-semibold sm:col-span-2">Kebijakan pembatalan & hujan</h2>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Batas batal</label>
-                            <Input v-model="ruleForm.cancel_deadline" type="text" maxlength="32" placeholder="H-1" />
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Batal hari H</label>
-                            <Input v-model="ruleForm.cancel_on_day_h" type="text" maxlength="32" placeholder="forfeited" />
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Hujan sebelum main</label>
-                            <Input v-model="ruleForm.force_majeure_rain_before_play" type="text" maxlength="32" placeholder="reschedule" />
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Ambang hujan (menit)</label>
-                            <Input v-model="ruleForm.force_majeure_rain_after_play_minutes" type="number" min="0" placeholder="20" />
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Keputusan setelah ambang</label>
-                            <Input
-                                v-model="ruleForm.force_majeure_rain_after_play_decision"
-                                type="text"
-                                maxlength="32"
-                                placeholder="no_compensation"
-                            />
-                        </div>
-                        <div class="flex flex-col gap-2 pt-6">
-                            <label class="flex items-center gap-2 text-sm font-medium">
-                                <Checkbox v-model="ruleForm.allow_same_day_reschedule" />
-                                Izinkan reschedule hari H
-                            </label>
-                            <label class="flex items-center gap-2 text-sm font-medium">
-                                <Checkbox v-model="ruleForm.allow_same_day_court_change" />
-                                Izinkan ganti lapangan hari H
-                            </label>
-                        </div>
-                    </section>
-
-                    <section class="border-border grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
-                        <h2 class="text-sm font-semibold sm:col-span-2">Lainnya</h2>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Tata tertib</label>
-                            <SimpleSelect v-model="ruleForm.terms_key" :options="terms" placeholder="— Tanpa tata tertib —" />
-                            <p class="text-muted-foreground mt-1 text-xs">
-                                Kelola isi di menu
-                                <Link :href="route('e-booking.admin.terms.index')" class="font-semibold text-sky-700 hover:underline"
-                                    >Tata tertib</Link
-                                >.
-                            </p>
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Prefer hari booking</label>
-                            <Input v-model="ruleForm.prefer_booking_on_weekday" type="text" maxlength="16" placeholder="monday" />
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Tentative priority</label>
-                            <Input v-model="ruleForm.tentative_priority" type="text" maxlength="64" placeholder="kegiatan_pemerintah_daerah" />
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Datang lebih awal (min)</label>
-                            <Input v-model="ruleForm.early_arrival_minutes_min" type="number" min="0" />
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Datang lebih awal (max)</label>
-                            <Input v-model="ruleForm.early_arrival_minutes_max" type="number" min="0" />
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Keluar lapangan (menit)</label>
-                            <Input v-model="ruleForm.leave_court_after_minutes" type="number" min="0" />
-                        </div>
-                        <div class="flex flex-col gap-2 pt-6">
-                            <label class="flex items-center gap-2 text-sm font-medium">
-                                <Checkbox v-model="ruleForm.advance_payment_required" />
-                                Wajib bayar di muka
-                            </label>
-                            <label class="flex items-center gap-2 text-sm font-medium">
-                                <Checkbox v-model="ruleForm.adjacent_empty_court_counts_as_rental" />
-                                Lapangan sebelah kosong dihitung sewa
-                            </label>
-                        </div>
-                        <div class="sm:col-span-2">
-                            <label class="mb-1.5 block text-sm font-medium">Area tentatif</label>
-                            <div class="flex flex-wrap gap-3">
-                                <label v-for="area in allAreas" :key="area.id" class="flex items-center gap-1.5 text-sm">
-                                    <Checkbox
-                                        :model-value="ruleForm.tentative_areas.includes(area.code)"
-                                        @update:model-value="(value) => toggleInArray(ruleForm.tentative_areas, area.code, !!value)"
-                                    />
-                                    {{ area.name }}
-                                </label>
-                                <span v-if="allAreas.length === 0" class="text-muted-foreground text-sm">Belum ada area.</span>
+                            <div>
+                                <label for="area-name" class="sb-label">Nama</label>
+                                <input
+                                    id="area-name"
+                                    v-model="areaForm.name"
+                                    type="text"
+                                    maxlength="150"
+                                    placeholder="Lapangan Utama"
+                                    class="sb-input"
+                                    :aria-invalid="invalid(areaForm.errors.name)"
+                                    :aria-describedby="areaForm.errors.name ? 'area-name-error' : undefined"
+                                />
+                                <p v-if="areaForm.errors.name" id="area-name-error" class="sb-error">{{ areaForm.errors.name }}</p>
                             </div>
+                            <div>
+                                <label for="area-sort" class="sb-label">Urutan</label>
+                                <input
+                                    id="area-sort"
+                                    v-model="areaForm.sort_order"
+                                    type="number"
+                                    min="0"
+                                    class="sb-input tabular-nums"
+                                    :aria-invalid="invalid(areaForm.errors.sort_order)"
+                                    :aria-describedby="areaForm.errors.sort_order ? 'area-sort-error' : undefined"
+                                />
+                                <p v-if="areaForm.errors.sort_order" id="area-sort-error" class="sb-error">{{ areaForm.errors.sort_order }}</p>
+                            </div>
+                            <fieldset class="flex flex-wrap items-center gap-x-5 gap-y-2 sm:pt-7">
+                                <legend class="sr-only">Status area</legend>
+                                <label class="flex items-center gap-2 text-sm font-medium">
+                                    <Checkbox v-model="areaForm.is_tentative" />
+                                    Tentatif
+                                </label>
+                                <label class="flex items-center gap-2 text-sm font-medium">
+                                    <Checkbox v-model="areaForm.is_active" />
+                                    Aktif
+                                </label>
+                            </fieldset>
                         </div>
-                    </section>
-
-                    <div class="border-border bg-background/95 sticky bottom-0 z-10 flex items-center gap-2 border-t py-3 backdrop-blur">
-                        <Button type="submit" :disabled="ruleForm.processing">
-                            <LoaderCircle v-if="ruleForm.processing" class="size-4 animate-spin" />
-                            Simpan aturan
-                        </Button>
-                    </div>
-                </form>
-
-                <div class="mt-8">
-                    <h2 class="text-sm font-semibold">Aturan lanjutan (key-value)</h2>
-                    <Table class="mt-3 min-w-[640px]">
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Key</TableHead>
-                                <TableHead>Value</TableHead>
-                                <TableHead>Aktif</TableHead>
-                                <TableHead></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            <TableRow v-for="row in ruleList.data" :key="row.id">
-                                <TableCell>
-                                    <code class="text-xs">{{ row.key }}</code>
-                                </TableCell>
-                                <TableCell class="text-muted-foreground max-w-[320px] break-all whitespace-normal">{{
-                                    ruleValueLabel(row.value)
-                                }}</TableCell>
-                                <TableCell>{{ row.is_active ? 'Ya' : 'Tidak' }}</TableCell>
-                                <TableCell class="text-right">
-                                    <RowActionsMenu :items="ruleRowActions(row)" />
-                                </TableCell>
-                            </TableRow>
-                            <TableRow v-if="ruleList.data.length === 0">
-                                <TableCell colspan="4" class="text-muted-foreground py-6 text-center">Belum ada aturan khusus venue.</TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-
-                    <TablePagination :links="ruleList.links" :from="ruleList.from" :to="ruleList.to" :total="ruleList.total" label="aturan" />
-
-                    <form class="border-border mt-4 grid gap-3 rounded-xl border p-4 sm:grid-cols-3" @submit.prevent="addRule">
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Key</label>
-                            <Input v-model="newRuleForm.key" type="text" maxlength="96" placeholder="custom_key" />
-                            <InputError :message="newRuleForm.errors.key" />
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium">Value</label>
-                            <Input v-model="newRuleForm.value" type="text" placeholder="nilai" />
-                            <InputError :message="newRuleForm.errors.value" />
-                        </div>
-                        <div class="flex items-end gap-2">
-                            <label class="flex items-center gap-2 pb-2 text-sm font-medium">
-                                <Checkbox v-model="newRuleForm.is_active" />
-                                Aktif
-                            </label>
-                            <Button type="submit" :disabled="newRuleForm.processing">
-                                <LoaderCircle v-if="newRuleForm.processing" class="size-4 animate-spin" />
-                                <Plus v-else class="size-4" />
-                                Tambah
-                            </Button>
+                        <div class="mt-5">
+                            <button type="submit" class="wp-btn wp-btn-primary px-5 py-2.5 text-sm" :disabled="areaForm.processing">
+                                <FontAwesomeIcon
+                                    v-if="areaForm.processing"
+                                    :icon="['fas', 'circle-notch']"
+                                    class="size-4 animate-spin"
+                                    aria-hidden="true"
+                                />
+                                <FontAwesomeIcon v-else :icon="['fas', 'plus']" class="size-4" aria-hidden="true" />
+                                {{ areaEditingId ? 'Simpan area' : 'Tambah area' }}
+                            </button>
                         </div>
                     </form>
-                </div>
-            </TabsContent>
-        </Tabs>
+
+                    <div class="sb-card overflow-x-auto">
+                        <table class="sb-table min-w-[560px]">
+                            <caption class="sr-only">
+                                Daftar area venue
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Nama</th>
+                                    <th scope="col">Kode</th>
+                                    <th scope="col">Tentatif</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col"><span class="sr-only">Aksi</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in areas.data" :key="row.id">
+                                    <td class="font-medium">{{ row.name }}</td>
+                                    <td class="text-muted-foreground font-mono text-xs">{{ row.code }}</td>
+                                    <td>
+                                        <span v-if="row.is_tentative" class="sb-badge sb-tone-warning">Ya</span>
+                                        <span v-else class="text-muted-foreground">—</span>
+                                    </td>
+                                    <td>
+                                        <span class="sb-badge" :class="row.is_active ? 'sb-tone-success' : 'sb-tone-neutral'">
+                                            {{ row.is_active ? 'Aktif' : 'Nonaktif' }}
+                                        </span>
+                                    </td>
+                                    <td class="text-right">
+                                        <RowActionsMenu :items="areaRowActions(row)" />
+                                    </td>
+                                </tr>
+                                <tr v-if="areas.data.length === 0">
+                                    <td colspan="5" class="text-muted-foreground py-10 text-center">Belum ada area.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <TablePagination :links="areas.links" :from="areas.from" :to="areas.to" :total="areas.total" label="area" />
+                </TabsContent>
+
+                <!-- Tarif -->
+                <TabsContent value="tarif" class="mt-5 space-y-5">
+                    <form class="sb-card p-5 sm:p-6" @submit.prevent="submitTarif">
+                        <div class="flex items-center justify-between gap-3">
+                            <h2 class="text-base font-semibold tracking-tight">{{ tarifEditingId ? 'Ubah tarif' : 'Tambah tarif' }}</h2>
+                            <button v-if="tarifEditingId" type="button" class="wp-btn wp-btn-quiet px-3 py-1.5 text-xs" @click="resetTarifForm">
+                                Batal edit
+                            </button>
+                        </div>
+                        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <label class="block sm:col-span-2">
+                                <span class="sb-label">Area</span>
+                                <SimpleSelect
+                                    v-model="tarifForm.area_id"
+                                    :options="areaOptions"
+                                    placeholder="Tanpa area"
+                                    :trigger-class="selectTrigger"
+                                />
+                                <span v-if="tarifForm.errors.area_id" class="sb-error block">{{ tarifForm.errors.area_id }}</span>
+                            </label>
+                            <div class="sm:col-span-2">
+                                <label for="tarif-uraian" class="sb-label">Uraian</label>
+                                <input
+                                    id="tarif-uraian"
+                                    v-model="tarifForm.uraian"
+                                    type="text"
+                                    maxlength="255"
+                                    placeholder="Latihan"
+                                    class="sb-input"
+                                    :aria-invalid="invalid(tarifForm.errors.uraian)"
+                                    :aria-describedby="tarifForm.errors.uraian ? 'tarif-uraian-error' : undefined"
+                                />
+                                <p v-if="tarifForm.errors.uraian" id="tarif-uraian-error" class="sb-error">{{ tarifForm.errors.uraian }}</p>
+                            </div>
+                            <label class="block">
+                                <span class="sb-label">Satuan</span>
+                                <SimpleSelect v-model="tarifForm.satuan" :options="satuanOptions" :trigger-class="selectTrigger" />
+                                <span v-if="tarifForm.errors.satuan" class="sb-error block">{{ tarifForm.errors.satuan }}</span>
+                            </label>
+                            <label class="block">
+                                <span class="sb-label">Kategori</span>
+                                <SimpleSelect v-model="tarifForm.category" :options="categoryOptions" :trigger-class="selectTrigger" />
+                                <span v-if="tarifForm.errors.category" class="sb-error block">{{ tarifForm.errors.category }}</span>
+                            </label>
+                            <div>
+                                <label for="tarif-pemerintah" class="sb-label">Tarif instansi pemerintah</label>
+                                <div class="relative">
+                                    <span
+                                        class="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-xs"
+                                        aria-hidden="true"
+                                        >Rp</span
+                                    >
+                                    <input
+                                        id="tarif-pemerintah"
+                                        v-model="tarifForm.tarif_pemerintah"
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        class="sb-input pl-10 tabular-nums"
+                                        :aria-invalid="invalid(tarifForm.errors.tarif_pemerintah)"
+                                        :aria-describedby="tarifForm.errors.tarif_pemerintah ? 'tarif-pemerintah-error' : undefined"
+                                    />
+                                </div>
+                                <p v-if="tarifForm.errors.tarif_pemerintah" id="tarif-pemerintah-error" class="sb-error">
+                                    {{ tarifForm.errors.tarif_pemerintah }}
+                                </p>
+                            </div>
+                            <div>
+                                <label for="tarif-umum" class="sb-label">Tarif umum / non-pemerintah</label>
+                                <div class="relative">
+                                    <span
+                                        class="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-xs"
+                                        aria-hidden="true"
+                                        >Rp</span
+                                    >
+                                    <input
+                                        id="tarif-umum"
+                                        v-model="tarifForm.tarif_non_pemerintah"
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        class="sb-input pl-10 tabular-nums"
+                                        :aria-invalid="invalid(tarifForm.errors.tarif_non_pemerintah)"
+                                        :aria-describedby="tarifForm.errors.tarif_non_pemerintah ? 'tarif-umum-error' : undefined"
+                                    />
+                                </div>
+                                <p v-if="tarifForm.errors.tarif_non_pemerintah" id="tarif-umum-error" class="sb-error">
+                                    {{ tarifForm.errors.tarif_non_pemerintah }}
+                                </p>
+                            </div>
+                            <div>
+                                <label for="tarif-min" class="sb-label">Min jam (opsional)</label>
+                                <input
+                                    id="tarif-min"
+                                    v-model="tarifForm.min_hours"
+                                    type="number"
+                                    min="1"
+                                    max="24"
+                                    placeholder="—"
+                                    class="sb-input tabular-nums"
+                                    :aria-invalid="invalid(tarifForm.errors.min_hours)"
+                                    :aria-describedby="tarifForm.errors.min_hours ? 'tarif-min-error' : undefined"
+                                />
+                                <p v-if="tarifForm.errors.min_hours" id="tarif-min-error" class="sb-error">{{ tarifForm.errors.min_hours }}</p>
+                            </div>
+                            <div>
+                                <label for="tarif-max" class="sb-label">Max jam (opsional)</label>
+                                <input
+                                    id="tarif-max"
+                                    v-model="tarifForm.max_hours"
+                                    type="number"
+                                    min="1"
+                                    max="24"
+                                    placeholder="—"
+                                    class="sb-input tabular-nums"
+                                    :aria-invalid="invalid(tarifForm.errors.max_hours)"
+                                    :aria-describedby="tarifForm.errors.max_hours ? 'tarif-max-error' : undefined"
+                                />
+                                <p v-if="tarifForm.errors.max_hours" id="tarif-max-error" class="sb-error">{{ tarifForm.errors.max_hours }}</p>
+                            </div>
+                            <div>
+                                <label for="tarif-code" class="sb-label">Kode (opsional)</label>
+                                <input
+                                    id="tarif-code"
+                                    v-model="tarifForm.code"
+                                    type="text"
+                                    maxlength="96"
+                                    class="sb-input font-mono"
+                                    :aria-invalid="invalid(tarifForm.errors.code)"
+                                    :aria-describedby="tarifForm.errors.code ? 'tarif-code-error' : undefined"
+                                />
+                                <p v-if="tarifForm.errors.code" id="tarif-code-error" class="sb-error">{{ tarifForm.errors.code }}</p>
+                            </div>
+                            <div>
+                                <label for="tarif-slot" class="sb-label">Time slot (opsional)</label>
+                                <input
+                                    id="tarif-slot"
+                                    v-model="tarifForm.time_slot"
+                                    type="text"
+                                    maxlength="32"
+                                    placeholder="pagi/siang/malam"
+                                    class="sb-input"
+                                    :aria-invalid="invalid(tarifForm.errors.time_slot)"
+                                    :aria-describedby="tarifForm.errors.time_slot ? 'tarif-slot-error' : undefined"
+                                />
+                                <p v-if="tarifForm.errors.time_slot" id="tarif-slot-error" class="sb-error">{{ tarifForm.errors.time_slot }}</p>
+                            </div>
+                            <div>
+                                <label for="tarif-level" class="sb-label">Event level (opsional)</label>
+                                <input
+                                    id="tarif-level"
+                                    v-model="tarifForm.event_level"
+                                    type="text"
+                                    maxlength="64"
+                                    placeholder="nasional"
+                                    class="sb-input"
+                                    :aria-invalid="invalid(tarifForm.errors.event_level)"
+                                    :aria-describedby="tarifForm.errors.event_level ? 'tarif-level-error' : undefined"
+                                />
+                                <p v-if="tarifForm.errors.event_level" id="tarif-level-error" class="sb-error">{{ tarifForm.errors.event_level }}</p>
+                            </div>
+                            <div class="flex items-center gap-2 sm:pt-7">
+                                <Checkbox id="tarif-active" v-model="tarifForm.is_active" />
+                                <label for="tarif-active" class="text-sm font-medium">Aktif</label>
+                            </div>
+                        </div>
+                        <div class="mt-5">
+                            <button type="submit" class="wp-btn wp-btn-primary px-5 py-2.5 text-sm" :disabled="tarifForm.processing">
+                                <FontAwesomeIcon
+                                    v-if="tarifForm.processing"
+                                    :icon="['fas', 'circle-notch']"
+                                    class="size-4 animate-spin"
+                                    aria-hidden="true"
+                                />
+                                <FontAwesomeIcon v-else :icon="['fas', 'plus']" class="size-4" aria-hidden="true" />
+                                {{ tarifEditingId ? 'Simpan tarif' : 'Tambah tarif' }}
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="sb-card overflow-x-auto">
+                        <table class="sb-table min-w-[820px]">
+                            <caption class="sr-only">
+                                Daftar tarif venue
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Uraian</th>
+                                    <th scope="col">Area</th>
+                                    <th scope="col">Satuan</th>
+                                    <th scope="col">Durasi</th>
+                                    <th scope="col" class="text-right">Instansi (Rp)</th>
+                                    <th scope="col" class="text-right">Umum (Rp)</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col"><span class="sr-only">Aksi</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in tarifs.data" :key="row.id">
+                                    <td>
+                                        <p class="font-medium">{{ row.uraian }}</p>
+                                        <p class="text-muted-foreground text-xs">
+                                            {{ row.category ? (categoryLabels[row.category] ?? row.category) : '—' }}
+                                        </p>
+                                    </td>
+                                    <td>{{ row.area_name || 'Venue' }}</td>
+                                    <td class="text-muted-foreground">{{ satuanLabels[row.satuan] ?? row.satuan }}</td>
+                                    <td class="whitespace-nowrap tabular-nums">
+                                        <template v-if="row.min_hours || row.max_hours">
+                                            {{ row.min_hours ?? 1 }}–{{ row.max_hours ?? '∞' }} jam
+                                        </template>
+                                        <template v-else>—</template>
+                                    </td>
+                                    <td class="text-right whitespace-nowrap tabular-nums">{{ formatRupiah(row.tarif_pemerintah) }}</td>
+                                    <td class="text-right whitespace-nowrap tabular-nums">{{ formatRupiah(row.tarif_non_pemerintah) }}</td>
+                                    <td>
+                                        <span class="sb-badge" :class="row.is_active ? 'sb-tone-success' : 'sb-tone-neutral'">
+                                            {{ row.is_active ? 'Aktif' : 'Nonaktif' }}
+                                        </span>
+                                    </td>
+                                    <td class="text-right">
+                                        <RowActionsMenu :items="tarifRowActions(row)" />
+                                    </td>
+                                </tr>
+                                <tr v-if="tarifs.data.length === 0">
+                                    <td colspan="8" class="text-muted-foreground py-10 text-center">Belum ada tarif.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <TablePagination :links="tarifs.links" :from="tarifs.from" :to="tarifs.to" :total="tarifs.total" label="tarif" />
+                </TabsContent>
+
+                <!-- Aturan -->
+                <TabsContent value="aturan" class="mt-5">
+                    <form class="space-y-5" @submit.prevent="submitRules">
+                        <section class="sb-card p-5 sm:p-6" aria-labelledby="rule-hours-title">
+                            <h2 id="rule-hours-title" class="text-base font-semibold tracking-tight">Jam & hari operasional</h2>
+                            <div class="mt-4 grid gap-4 sm:grid-cols-3">
+                                <div>
+                                    <span id="rule-open-label" class="sb-label">Jam buka</span>
+                                    <div role="group" aria-labelledby="rule-open-label">
+                                        <TimeField v-model="ruleForm.operating_start" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <span id="rule-close-label" class="sb-label">Jam tutup</span>
+                                    <div role="group" aria-labelledby="rule-close-label">
+                                        <TimeField v-model="ruleForm.operating_end" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="rule-timezone" class="sb-label">Timezone</label>
+                                    <input
+                                        id="rule-timezone"
+                                        v-model="ruleForm.operating_timezone"
+                                        type="text"
+                                        maxlength="64"
+                                        placeholder="Asia/Jakarta"
+                                        class="sb-input"
+                                    />
+                                </div>
+                                <fieldset class="sm:col-span-3">
+                                    <legend class="sb-label">Hari operasional</legend>
+                                    <div class="flex flex-wrap gap-x-4 gap-y-2">
+                                        <label v-for="day in days" :key="day" class="flex items-center gap-2 text-sm capitalize">
+                                            <Checkbox
+                                                :model-value="ruleForm.operating_days.includes(day)"
+                                                @update:model-value="(value) => toggleInArray(ruleForm.operating_days, day, !!value)"
+                                            />
+                                            {{ day }}
+                                        </label>
+                                    </div>
+                                </fieldset>
+                            </div>
+                        </section>
+
+                        <section class="sb-card p-5 sm:p-6" aria-labelledby="rule-buffer-title">
+                            <h2 id="rule-buffer-title" class="text-base font-semibold tracking-tight">Batas & buffer booking</h2>
+                            <div class="mt-4 grid gap-4 sm:grid-cols-3">
+                                <div>
+                                    <label for="rule-horizon" class="sb-label">Horizon booking (hari)</label>
+                                    <input
+                                        id="rule-horizon"
+                                        v-model="ruleForm.booking_horizon_days"
+                                        type="number"
+                                        min="1"
+                                        placeholder="Tanpa batas"
+                                        class="sb-input tabular-nums"
+                                        aria-describedby="rule-horizon-hint"
+                                    />
+                                    <p id="rule-horizon-hint" class="sb-hint">Kosongkan jika tanpa batas.</p>
+                                </div>
+                                <div>
+                                    <label for="rule-buffer-before" class="sb-label">Buffer sebelum (hari)</label>
+                                    <input
+                                        id="rule-buffer-before"
+                                        v-model="ruleForm.buffer_before_days"
+                                        type="number"
+                                        min="0"
+                                        class="sb-input tabular-nums"
+                                    />
+                                </div>
+                                <div>
+                                    <label for="rule-buffer-after" class="sb-label">Buffer sesudah (hari)</label>
+                                    <input
+                                        id="rule-buffer-after"
+                                        v-model="ruleForm.buffer_after_days"
+                                        type="number"
+                                        min="0"
+                                        class="sb-input tabular-nums"
+                                    />
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="sb-card p-5 sm:p-6" aria-labelledby="rule-cancel-title">
+                            <h2 id="rule-cancel-title" class="text-base font-semibold tracking-tight">Kebijakan pembatalan & hujan</h2>
+                            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label for="rule-cancel-deadline" class="sb-label">Batas batal</label>
+                                    <input
+                                        id="rule-cancel-deadline"
+                                        v-model="ruleForm.cancel_deadline"
+                                        type="text"
+                                        maxlength="32"
+                                        placeholder="H-1"
+                                        class="sb-input"
+                                    />
+                                </div>
+                                <div>
+                                    <label for="rule-cancel-day" class="sb-label">Batal hari H</label>
+                                    <input
+                                        id="rule-cancel-day"
+                                        v-model="ruleForm.cancel_on_day_h"
+                                        type="text"
+                                        maxlength="32"
+                                        placeholder="forfeited"
+                                        class="sb-input"
+                                    />
+                                </div>
+                                <div>
+                                    <label for="rule-rain-before" class="sb-label">Hujan sebelum main</label>
+                                    <input
+                                        id="rule-rain-before"
+                                        v-model="ruleForm.force_majeure_rain_before_play"
+                                        type="text"
+                                        maxlength="32"
+                                        placeholder="reschedule"
+                                        class="sb-input"
+                                    />
+                                </div>
+                                <div>
+                                    <label for="rule-rain-minutes" class="sb-label">Ambang hujan (menit)</label>
+                                    <input
+                                        id="rule-rain-minutes"
+                                        v-model="ruleForm.force_majeure_rain_after_play_minutes"
+                                        type="number"
+                                        min="0"
+                                        placeholder="20"
+                                        class="sb-input tabular-nums"
+                                    />
+                                </div>
+                                <div>
+                                    <label for="rule-rain-decision" class="sb-label">Keputusan setelah ambang</label>
+                                    <input
+                                        id="rule-rain-decision"
+                                        v-model="ruleForm.force_majeure_rain_after_play_decision"
+                                        type="text"
+                                        maxlength="32"
+                                        placeholder="no_compensation"
+                                        class="sb-input"
+                                    />
+                                </div>
+                                <fieldset class="flex flex-col gap-2 sm:pt-7">
+                                    <legend class="sr-only">Perubahan di hari H</legend>
+                                    <label class="flex items-center gap-2 text-sm font-medium">
+                                        <Checkbox v-model="ruleForm.allow_same_day_reschedule" />
+                                        Izinkan reschedule hari H
+                                    </label>
+                                    <label class="flex items-center gap-2 text-sm font-medium">
+                                        <Checkbox v-model="ruleForm.allow_same_day_court_change" />
+                                        Izinkan ganti lapangan hari H
+                                    </label>
+                                </fieldset>
+                            </div>
+                        </section>
+
+                        <section class="sb-card p-5 sm:p-6" aria-labelledby="rule-other-title">
+                            <h2 id="rule-other-title" class="text-base font-semibold tracking-tight">Lainnya</h2>
+                            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label class="block">
+                                        <span class="sb-label">Tata tertib</span>
+                                        <SimpleSelect
+                                            v-model="ruleForm.terms_key"
+                                            :options="terms"
+                                            placeholder="— Tanpa tata tertib —"
+                                            :trigger-class="selectTrigger"
+                                        />
+                                    </label>
+                                    <p class="sb-hint">
+                                        Kelola isi di menu
+                                        <Link
+                                            :href="route('e-booking.admin.terms.index')"
+                                            class="font-semibold text-(--wp-accent) hover:text-(--wp-accent-strong) hover:underline"
+                                            >Tata tertib</Link
+                                        >.
+                                    </p>
+                                </div>
+                                <div>
+                                    <label for="rule-prefer-day" class="sb-label">Prefer hari booking</label>
+                                    <input
+                                        id="rule-prefer-day"
+                                        v-model="ruleForm.prefer_booking_on_weekday"
+                                        type="text"
+                                        maxlength="16"
+                                        placeholder="monday"
+                                        class="sb-input"
+                                    />
+                                </div>
+                                <div>
+                                    <label for="rule-tentative-priority" class="sb-label">Tentative priority</label>
+                                    <input
+                                        id="rule-tentative-priority"
+                                        v-model="ruleForm.tentative_priority"
+                                        type="text"
+                                        maxlength="64"
+                                        placeholder="kegiatan_pemerintah_daerah"
+                                        class="sb-input"
+                                    />
+                                </div>
+                                <div>
+                                    <label for="rule-early-min" class="sb-label">Datang lebih awal (min)</label>
+                                    <input
+                                        id="rule-early-min"
+                                        v-model="ruleForm.early_arrival_minutes_min"
+                                        type="number"
+                                        min="0"
+                                        class="sb-input tabular-nums"
+                                    />
+                                </div>
+                                <div>
+                                    <label for="rule-early-max" class="sb-label">Datang lebih awal (max)</label>
+                                    <input
+                                        id="rule-early-max"
+                                        v-model="ruleForm.early_arrival_minutes_max"
+                                        type="number"
+                                        min="0"
+                                        class="sb-input tabular-nums"
+                                    />
+                                </div>
+                                <div>
+                                    <label for="rule-leave" class="sb-label">Keluar lapangan (menit)</label>
+                                    <input
+                                        id="rule-leave"
+                                        v-model="ruleForm.leave_court_after_minutes"
+                                        type="number"
+                                        min="0"
+                                        class="sb-input tabular-nums"
+                                    />
+                                </div>
+                                <fieldset class="flex flex-col gap-2 sm:col-span-2">
+                                    <legend class="sr-only">Pembayaran dan pemakaian lapangan</legend>
+                                    <label class="flex items-center gap-2 text-sm font-medium">
+                                        <Checkbox v-model="ruleForm.advance_payment_required" />
+                                        Wajib bayar di muka
+                                    </label>
+                                    <label class="flex items-center gap-2 text-sm font-medium">
+                                        <Checkbox v-model="ruleForm.adjacent_empty_court_counts_as_rental" />
+                                        Lapangan sebelah kosong dihitung sewa
+                                    </label>
+                                </fieldset>
+                                <fieldset class="sm:col-span-2">
+                                    <legend class="sb-label">Area tentatif</legend>
+                                    <div class="flex flex-wrap gap-x-4 gap-y-2">
+                                        <label v-for="area in allAreas" :key="area.id" class="flex items-center gap-2 text-sm">
+                                            <Checkbox
+                                                :model-value="ruleForm.tentative_areas.includes(area.code)"
+                                                @update:model-value="(value) => toggleInArray(ruleForm.tentative_areas, area.code, !!value)"
+                                            />
+                                            {{ area.name }}
+                                        </label>
+                                        <span v-if="allAreas.length === 0" class="text-muted-foreground text-sm">Belum ada area.</span>
+                                    </div>
+                                </fieldset>
+                            </div>
+                        </section>
+
+                        <div class="wp-glass sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3">
+                            <p class="text-muted-foreground text-sm">Perubahan aturan berlaku untuk booking baru.</p>
+                            <button type="submit" class="wp-btn wp-btn-primary px-5 py-2.5 text-sm" :disabled="ruleForm.processing">
+                                <FontAwesomeIcon
+                                    v-if="ruleForm.processing"
+                                    :icon="['fas', 'circle-notch']"
+                                    class="size-4 animate-spin"
+                                    aria-hidden="true"
+                                />
+                                <FontAwesomeIcon v-else :icon="['fas', 'floppy-disk']" class="size-4" aria-hidden="true" />
+                                Simpan aturan
+                            </button>
+                        </div>
+                    </form>
+
+                    <section class="mt-10 space-y-4" aria-labelledby="rule-custom-title">
+                        <div>
+                            <h2 id="rule-custom-title" class="text-base font-semibold tracking-tight">Aturan lanjutan (key-value)</h2>
+                            <p class="text-muted-foreground mt-1 text-sm">Aturan tambahan khusus venue ini.</p>
+                        </div>
+
+                        <div class="sb-card overflow-x-auto">
+                            <table class="sb-table min-w-[640px]">
+                                <caption class="sr-only">
+                                    Daftar aturan lanjutan
+                                </caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Key</th>
+                                        <th scope="col">Value</th>
+                                        <th scope="col">Aktif</th>
+                                        <th scope="col"><span class="sr-only">Aksi</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="row in ruleList.data" :key="row.id">
+                                        <td class="font-mono text-xs">{{ row.key }}</td>
+                                        <td class="text-muted-foreground max-w-[320px] break-all whitespace-normal">
+                                            {{ ruleValueLabel(row.value) }}
+                                        </td>
+                                        <td>
+                                            <span class="sb-badge" :class="row.is_active ? 'sb-tone-success' : 'sb-tone-neutral'">
+                                                {{ row.is_active ? 'Ya' : 'Tidak' }}
+                                            </span>
+                                        </td>
+                                        <td class="text-right">
+                                            <RowActionsMenu :items="ruleRowActions(row)" />
+                                        </td>
+                                    </tr>
+                                    <tr v-if="ruleList.data.length === 0">
+                                        <td colspan="4" class="text-muted-foreground py-8 text-center">Belum ada aturan khusus venue.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <TablePagination :links="ruleList.links" :from="ruleList.from" :to="ruleList.to" :total="ruleList.total" label="aturan" />
+
+                        <form
+                            class="sb-card-muted grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start"
+                            @submit.prevent="addRule"
+                        >
+                            <div>
+                                <label for="new-rule-key" class="sb-label">Key</label>
+                                <input
+                                    id="new-rule-key"
+                                    v-model="newRuleForm.key"
+                                    type="text"
+                                    maxlength="96"
+                                    placeholder="custom_key"
+                                    class="sb-input font-mono"
+                                    :aria-invalid="invalid(newRuleForm.errors.key)"
+                                    :aria-describedby="newRuleForm.errors.key ? 'new-rule-key-error' : undefined"
+                                />
+                                <p v-if="newRuleForm.errors.key" id="new-rule-key-error" class="sb-error">{{ newRuleForm.errors.key }}</p>
+                            </div>
+                            <div>
+                                <label for="new-rule-value" class="sb-label">Value</label>
+                                <input
+                                    id="new-rule-value"
+                                    v-model="newRuleForm.value"
+                                    type="text"
+                                    placeholder="nilai"
+                                    class="sb-input"
+                                    :aria-invalid="invalid(newRuleForm.errors.value)"
+                                    :aria-describedby="newRuleForm.errors.value ? 'new-rule-value-error' : undefined"
+                                />
+                                <p v-if="newRuleForm.errors.value" id="new-rule-value-error" class="sb-error">{{ newRuleForm.errors.value }}</p>
+                            </div>
+                            <div class="flex items-center gap-4 sm:pt-7">
+                                <label class="flex items-center gap-2 text-sm font-medium">
+                                    <Checkbox v-model="newRuleForm.is_active" />
+                                    Aktif
+                                </label>
+                                <button type="submit" class="wp-btn wp-btn-primary px-5 py-2.5 text-sm" :disabled="newRuleForm.processing">
+                                    <FontAwesomeIcon
+                                        v-if="newRuleForm.processing"
+                                        :icon="['fas', 'circle-notch']"
+                                        class="size-4 animate-spin"
+                                        aria-hidden="true"
+                                    />
+                                    <FontAwesomeIcon v-else :icon="['fas', 'plus']" class="size-4" aria-hidden="true" />
+                                    Tambah
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+                </TabsContent>
+            </Tabs>
+
+            <aside class="sb-card p-5 lg:sticky lg:top-32" aria-labelledby="venue-summary-title">
+                <h2 id="venue-summary-title" class="text-base font-semibold tracking-tight">Ringkasan venue</h2>
+                <p v-if="venue.description" class="text-muted-foreground mt-2 text-sm">{{ venue.description }}</p>
+                <dl class="mt-4 divide-y divide-(--wp-hairline) text-sm">
+                    <div class="flex items-center justify-between gap-3 py-2.5">
+                        <dt class="text-muted-foreground">Kode</dt>
+                        <dd class="font-mono text-xs">{{ venue.code }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 py-2.5">
+                        <dt class="text-muted-foreground">Status</dt>
+                        <dd>
+                            <span class="sb-badge" :class="venue.is_active ? 'sb-tone-success' : 'sb-tone-neutral'">
+                                {{ venue.is_active ? 'Aktif' : 'Nonaktif' }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 py-2.5">
+                        <dt class="text-muted-foreground flex items-center gap-2">
+                            <FontAwesomeIcon :icon="['fas', 'layer-group']" class="size-3.5" aria-hidden="true" />
+                            Area
+                        </dt>
+                        <dd class="font-semibold tabular-nums">{{ areas.total }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 py-2.5">
+                        <dt class="text-muted-foreground flex items-center gap-2">
+                            <FontAwesomeIcon :icon="['fas', 'tag']" class="size-3.5" aria-hidden="true" />
+                            Tarif
+                        </dt>
+                        <dd class="font-semibold tabular-nums">{{ tarifs.total }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 py-2.5">
+                        <dt class="text-muted-foreground flex items-center gap-2">
+                            <FontAwesomeIcon :icon="['fas', 'scroll']" class="size-3.5" aria-hidden="true" />
+                            Aturan lanjutan
+                        </dt>
+                        <dd class="font-semibold tabular-nums">{{ ruleList.total }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 py-2.5">
+                        <dt class="text-muted-foreground">Jam operasional</dt>
+                        <dd class="font-medium tabular-nums">{{ operatingHours.start ?? '—' }}–{{ operatingHours.end ?? '—' }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 py-2.5">
+                        <dt class="text-muted-foreground">Urutan tampil</dt>
+                        <dd class="font-medium tabular-nums">{{ venue.sort_order }}</dd>
+                    </div>
+                </dl>
+            </aside>
+        </div>
     </AdminLayout>
 </template>

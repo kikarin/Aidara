@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-vue-next';
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faChevronLeft, faChevronRight, faCircleNotch } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, onMounted, ref, watch } from 'vue';
+
+library.add(faChevronLeft, faChevronRight, faCircleNotch);
 
 type DayCell = {
     date: string;
@@ -78,21 +82,27 @@ const shiftMonth = (delta: number) => {
 
 const cellClass = (meta: DayCell | null, selected: boolean) => {
     if (!meta) {
-        return 'cursor-default text-transparent';
+        return 'invisible';
     }
     if (selected) {
-        return 'border-sky-600 bg-sky-600 text-white shadow-sm';
+        return 'bg-(--wp-accent) text-(--wp-accent-contrast)';
     }
     if (meta.status === 'past' || !meta.bookable) {
         if (meta.status === 'merah' || meta.status === 'past') {
-            return 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 line-through';
+            return 'cursor-not-allowed bg-muted text-muted-foreground line-through';
         }
 
-        return 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400';
+        return 'cursor-not-allowed bg-muted/50 text-muted-foreground';
     }
 
-    return 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:border-emerald-400';
+    return 'bg-(--wp-accent-soft) text-(--wp-accent-strong) ring-1 ring-(--wp-hairline) ring-inset hover:ring-(--wp-accent)';
 };
+
+const todayIso = (() => {
+    const d = new Date();
+
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+})();
 
 const dayTitle = (meta: DayCell | null, date: string) => {
     if (!meta) {
@@ -167,33 +177,33 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-        <div class="mb-3 flex items-center justify-between gap-2">
+    <div class="sb-card-muted p-4 sm:p-5">
+        <div class="mb-4 flex items-center justify-between gap-2">
             <button
                 type="button"
-                class="inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100"
+                class="bg-card text-foreground inline-flex size-9 items-center justify-center rounded-full ring-1 ring-(--wp-hairline) transition ring-inset hover:bg-(--wp-accent-soft) hover:text-(--wp-accent-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--wp-accent)"
                 aria-label="Bulan sebelumnya"
                 @click="shiftMonth(-1)"
             >
-                <ChevronLeft class="size-4" />
+                <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="size-3.5" aria-hidden="true" />
             </button>
             <div class="text-center">
-                <p class="text-sm font-bold text-slate-900 capitalize">{{ monthLabel }}</p>
-                <p class="text-[11px] text-slate-500">Klik tanggal hijau untuk memilih</p>
+                <p class="text-foreground text-sm font-semibold tracking-tight capitalize tabular-nums" aria-live="polite">{{ monthLabel }}</p>
+                <p class="text-muted-foreground text-xs">Klik tanggal hijau untuk memilih</p>
             </div>
             <button
                 type="button"
-                class="inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100"
+                class="bg-card text-foreground inline-flex size-9 items-center justify-center rounded-full ring-1 ring-(--wp-hairline) transition ring-inset hover:bg-(--wp-accent-soft) hover:text-(--wp-accent-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--wp-accent)"
                 aria-label="Bulan berikutnya"
                 @click="shiftMonth(1)"
             >
-                <ChevronRight class="size-4" />
+                <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="size-3.5" aria-hidden="true" />
             </button>
         </div>
 
         <div v-if="loading" class="space-y-2" aria-busy="true" aria-label="Memuat kalender">
-            <div class="flex items-center gap-2 text-xs text-slate-500">
-                <LoaderCircle class="size-3.5 animate-spin" />
+            <div class="text-muted-foreground flex items-center gap-2 text-xs">
+                <FontAwesomeIcon :icon="['fas', 'circle-notch']" class="size-3.5 animate-spin" aria-hidden="true" />
                 Memuat ketersediaan…
             </div>
             <div class="grid grid-cols-7 gap-1.5">
@@ -201,11 +211,11 @@ onMounted(() => {
             </div>
         </div>
 
-        <p v-else-if="error" class="text-sm text-red-600">{{ error }}</p>
+        <p v-else-if="error" class="sb-callout sb-tone-danger" role="alert">{{ error }}</p>
 
         <template v-else>
-            <div class="mb-1.5 grid grid-cols-7 gap-1.5">
-                <div v-for="label in weekdayLabels" :key="label" class="text-center text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+            <div class="mb-1.5 grid grid-cols-7 gap-1.5" aria-hidden="true">
+                <div v-for="label in weekdayLabels" :key="label" class="text-muted-foreground text-center text-xs font-medium">
                     {{ label }}
                 </div>
             </div>
@@ -214,29 +224,44 @@ onMounted(() => {
                     v-for="cell in calendarCells"
                     :key="cell.key"
                     type="button"
-                    class="relative aspect-square rounded-xl border text-sm font-semibold transition"
-                    :class="cellClass(cell.meta, cell.date === modelValue)"
+                    class="focus-visible:outline-foreground relative aspect-square rounded-xl text-sm font-semibold tabular-nums transition focus-visible:outline-2 focus-visible:outline-offset-2"
+                    :class="[
+                        cellClass(cell.meta, cell.date === modelValue),
+                        cell.date === todayIso && cell.date !== modelValue ? 'outline-2 outline-offset-1 outline-(--wp-accent)' : '',
+                    ]"
                     :disabled="!cell.meta || !cell.meta.bookable"
                     :title="dayTitle(cell.meta, cell.date || '')"
+                    :aria-pressed="cell.date === modelValue"
+                    :aria-current="cell.date === todayIso ? 'date' : undefined"
                     @click="selectDay(cell.meta)"
                 >
                     {{ cell.dayNum }}
                     <span
                         v-if="cell.meta?.pengajuan && cell.meta.bookable && cell.date !== modelValue"
-                        class="absolute top-1 right-1 size-1.5 rounded-full bg-orange-500"
+                        class="absolute top-1 right-1 size-1.5 rounded-full bg-(--sb-warning)"
+                        aria-hidden="true"
                     />
                 </button>
             </div>
         </template>
 
-        <div class="mt-3 flex flex-wrap gap-3 text-[11px] text-slate-600">
-            <span class="inline-flex items-center gap-1.5"> <span class="size-2.5 rounded-full bg-emerald-400" /> Kosong / tersedia </span>
-            <span class="inline-flex items-center gap-1.5">
-                <span class="size-1.5 rounded-full bg-orange-500" /> Ada pengajuan (masih bisa diajukan)
-            </span>
-            <span class="inline-flex items-center gap-1.5">
-                <span class="size-2.5 rounded-full bg-slate-300" /> Disetujui / dipesan / tutup / lewat
-            </span>
-        </div>
+        <ul class="text-muted-foreground mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs">
+            <li class="inline-flex items-center gap-1.5">
+                <span class="size-3 rounded-sm bg-(--wp-accent-soft) ring-1 ring-(--wp-hairline) ring-inset" aria-hidden="true" />
+                Kosong / tersedia
+            </li>
+            <li class="inline-flex items-center gap-1.5">
+                <span class="size-1.5 rounded-full bg-(--sb-warning)" aria-hidden="true" />
+                Ada pengajuan (masih bisa diajukan)
+            </li>
+            <li class="inline-flex items-center gap-1.5">
+                <span class="bg-muted size-3 rounded-sm" aria-hidden="true" />
+                Disetujui / dipesan / tutup / lewat
+            </li>
+            <li class="inline-flex items-center gap-1.5">
+                <span class="size-3 rounded-sm outline-2 outline-offset-0 outline-(--wp-accent)" aria-hidden="true" />
+                Hari ini
+            </li>
+        </ul>
     </div>
 </template>

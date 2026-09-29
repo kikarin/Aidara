@@ -5,6 +5,8 @@ export type BookingVenueSummary = {
     description: string | null;
     cover_url: string | null;
     areas_count: number;
+    tarifs_count?: number;
+    area_names?: string[];
 };
 
 export type BookingArea = {

@@ -15,12 +15,5 @@ const props = withDefaults(
 </script>
 
 <template>
-    <img
-        :src="src"
-        :alt="alt"
-        :class="class"
-        :loading="lazy ? 'lazy' : 'eager'"
-        decoding="async"
-        fetchpriority="auto"
-    />
+    <img :src="src" :alt="alt" :class="props.class" :loading="lazy ? 'lazy' : 'eager'" decoding="async" fetchpriority="auto" />
 </template>

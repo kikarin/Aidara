@@ -35,12 +35,7 @@ export function buildWebSiteSchema(baseUrl: string): SchemaObject {
     };
 }
 
-export function buildWebPageSchema(options: {
-    baseUrl: string;
-    name: string;
-    description: string;
-    url: string;
-}): SchemaObject {
+export function buildWebPageSchema(options: { baseUrl: string; name: string; description: string; url: string }): SchemaObject {
     return {
         '@context': 'https://schema.org',
         '@type': 'WebPage',
@@ -162,11 +157,7 @@ export function serializeSchema(schema: SchemaObject | SchemaObject[]): string {
     if (Array.isArray(schema)) {
         return JSON.stringify({
             '@context': 'https://schema.org',
-            '@graph': schema.map((item) => {
-                const { '@context': _context, ...rest } = item;
-
-                return rest;
-            }),
+            '@graph': schema.map((item) => Object.fromEntries(Object.entries(item).filter(([key]) => key !== '@context'))),
         });
     }
 

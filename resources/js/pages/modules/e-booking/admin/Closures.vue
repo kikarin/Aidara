@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import RowActionsMenu from '@/components/e-booking/RowActionsMenu.vue';
 import TablePagination from '@/components/e-booking/TablePagination.vue';
-import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
 import TimeField from '@/components/TimeField.vue';
 import SimpleSelect from '@/components/ui/select/SimpleSelect.vue';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
 import { formatTanggalJamIndo } from '@/lib/format-tanggal';
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faCalendarCheck, faCalendarXmark, faCircleNotch, faRepeat, faTrashCan } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { router, useForm } from '@inertiajs/vue3';
-import { CalendarX2, LoaderCircle, Trash2 } from 'lucide-vue-next';
 import { computed, watch } from 'vue';
+
+library.add(faCalendarCheck, faCalendarXmark, faCircleNotch, faRepeat, faTrashCan);
 
 type VenueOpt = { id: number; code: string; name: string };
 type AreaOpt = { id: number; venue_id: number; code: string; name: string };
@@ -188,7 +191,7 @@ const rowActions = (row: ClosureRow) => {
     const items = [
         {
             label: 'Hapus blok',
-            icon: Trash2,
+            icon: 'trash-can',
             variant: 'destructive' as const,
             confirm: {
                 title: 'Hapus blok jadwal ini?',
@@ -203,7 +206,7 @@ const rowActions = (row: ClosureRow) => {
     if (row.batch_id) {
         items.push({
             label: `Hapus seri (${row.batch_size ?? 1})`,
-            icon: CalendarX2,
+            icon: 'calendar-xmark',
             variant: 'destructive' as const,
             confirm: {
                 title: `Hapus seluruh seri (${row.batch_size ?? 1} tanggal)?`,
@@ -217,287 +220,296 @@ const rowActions = (row: ClosureRow) => {
 
     return items;
 };
+
+// Server validates the transformed payload, so some error keys aren't form fields.
+const serverError = (key: string) => (form.errors as Record<string, string | undefined>)[key];
 </script>
 
 <template>
     <SeoHead title="Blok Jadwal E-Booking" />
 
     <AdminLayout active="closures">
-        <h1 class="text-foreground text-2xl font-bold">Blok jadwal</h1>
-        <p class="text-muted-foreground mt-1 text-sm">
-            Tutup slot tanggal/jam per venue atau area — slot tertutup tampil merah di ketersediaan. Bisa sekali atau berulang mingguan (mis. setiap
-            Senin selama 1 bulan).
-        </p>
+        <div class="min-w-0">
+            <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">Blok jadwal</h1>
+            <p class="text-muted-foreground mt-1.5 max-w-2xl text-sm">
+                Tutup tanggal dan jam per venue atau area, sekali atau berulang mingguan. Slot yang ditutup tampil merah di ketersediaan.
+            </p>
+        </div>
 
-        <div class="mt-6 grid gap-6 lg:grid-cols-3">
-            <!-- Daftar blok -->
-            <div class="lg:col-span-2">
-                <div class="flex flex-wrap items-end gap-3">
-                    <div class="min-w-[220px]">
-                        <label class="mb-1.5 block text-sm font-medium">Filter venue</label>
-                        <SimpleSelect
-                            v-model="filterVenueSelect"
-                            :options="filterVenueOptions"
-                            placeholder="Semua venue"
-                            trigger-class="h-10 w-full rounded-lg border-border bg-background px-3 text-sm shadow-none"
-                        />
+        <div class="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
+            <section aria-labelledby="closures-list-title" class="min-w-0">
+                <div class="sb-card">
+                    <div class="flex flex-wrap items-end justify-between gap-3 border-b border-(--wp-hairline) px-5 py-4">
+                        <div>
+                            <h2 id="closures-list-title" class="text-base font-semibold tracking-tight">Daftar blok</h2>
+                            <p class="text-muted-foreground mt-0.5 text-sm tabular-nums">{{ closures.total }} blok tercatat</p>
+                        </div>
+                        <div class="w-full sm:w-56">
+                            <span class="sr-only">Filter venue</span>
+                            <SimpleSelect
+                                v-model="filterVenueSelect"
+                                :options="filterVenueOptions"
+                                placeholder="Semua venue"
+                                trigger-class="h-10 w-full rounded-xl border-0 bg-background px-3.5 text-sm shadow-none ring-1 ring-(--wp-hairline) ring-inset"
+                            />
+                        </div>
+                    </div>
+
+                    <div v-if="closures.data.length === 0" class="flex flex-col items-center px-6 py-14 text-center">
+                        <span class="wp-icon size-12" aria-hidden="true">
+                            <FontAwesomeIcon :icon="['fas', 'calendar-check']" class="size-5" />
+                        </span>
+                        <h3 class="mt-4 text-base font-semibold tracking-tight">Belum ada blok jadwal</h3>
+                        <p class="text-muted-foreground mt-1 max-w-sm text-sm">
+                            Semua slot masih terbuka. Gunakan form di samping untuk menutup tanggal atau jam tertentu.
+                        </p>
+                    </div>
+                    <div v-else class="overflow-x-auto">
+                        <table class="sb-table min-w-[40rem]">
+                            <caption class="sr-only">
+                                Daftar blok jadwal
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Venue / area</th>
+                                    <th scope="col">Mulai</th>
+                                    <th scope="col">Selesai</th>
+                                    <th scope="col">Alasan</th>
+                                    <th scope="col" class="w-12"><span class="sr-only">Aksi</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in closures.data" :key="row.id">
+                                    <td>
+                                        <p class="text-foreground font-medium">{{ row.venue_name }}</p>
+                                        <p class="text-muted-foreground mt-0.5 text-xs">{{ row.area_name || 'Seluruh venue' }}</p>
+                                        <div v-if="row.batch_id || row.is_full_day" class="mt-1.5 flex flex-wrap gap-1.5">
+                                            <span v-if="row.batch_id" class="sb-badge sb-tone-info tabular-nums">
+                                                <FontAwesomeIcon :icon="['fas', 'repeat']" class="size-3" aria-hidden="true" />
+                                                Seri ×{{ row.batch_size ?? 1 }}
+                                            </span>
+                                            <span v-if="row.is_full_day" class="sb-badge sb-tone-danger">Seharian</span>
+                                        </div>
+                                    </td>
+                                    <td class="whitespace-nowrap tabular-nums">{{ formatTanggalJamIndo(row.starts_at) }}</td>
+                                    <td class="whitespace-nowrap tabular-nums">{{ formatTanggalJamIndo(row.ends_at) }}</td>
+                                    <td class="text-muted-foreground">{{ row.reason || '—' }}</td>
+                                    <td class="text-right">
+                                        <RowActionsMenu :items="rowActions(row)" />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
-                <div class="border-border mt-4 overflow-x-auto rounded-xl border bg-white">
-                    <table class="w-full min-w-[640px] text-left text-sm">
-                        <thead class="border-border text-muted-foreground border-b">
-                            <tr>
-                                <th class="py-2 pr-3 pl-3 font-medium">Venue / area</th>
-                                <th class="py-2 pr-3 font-medium">Mulai</th>
-                                <th class="py-2 pr-3 font-medium">Selesai</th>
-                                <th class="py-2 pr-3 font-medium">Alasan</th>
-                                <th class="py-2 pr-3 font-medium"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="row in closures.data" :key="row.id" class="border-border/60 border-b">
-                                <td class="py-3 pr-3 pl-3">
-                                    <p class="font-medium">{{ row.venue_name }}</p>
-                                    <p class="text-muted-foreground text-xs">{{ row.area_name || 'Seluruh venue' }}</p>
-                                    <span
-                                        v-if="row.batch_id"
-                                        class="mt-1 inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700"
-                                    >
-                                        <CalendarX2 class="size-3" />
-                                        Seri ×{{ row.batch_size ?? 1 }}
-                                    </span>
-                                    <span
-                                        v-if="row.is_full_day"
-                                        class="mt-1 inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700"
-                                    >
-                                        Full hari
-                                    </span>
-                                </td>
-                                <td class="py-3 pr-3 whitespace-nowrap">{{ formatTanggalJamIndo(row.starts_at) }}</td>
-                                <td class="py-3 pr-3 whitespace-nowrap">{{ formatTanggalJamIndo(row.ends_at) }}</td>
-                                <td class="text-muted-foreground py-3 pr-3">{{ row.reason || '—' }}</td>
-                                <td class="py-3 pr-3 text-right">
-                                    <RowActionsMenu :items="rowActions(row)" />
-                                </td>
-                            </tr>
-                            <tr v-if="closures.data.length === 0">
-                                <td colspan="5" class="text-muted-foreground py-8 text-center">Belum ada blok jadwal.</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
                 <TablePagination :links="closures.links" :from="closures.from" :to="closures.to" :total="closures.total" label="blok jadwal" />
-            </div>
+            </section>
 
-            <!-- Form blok -->
-            <div class="lg:col-span-1">
-                <form class="border-border grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-2 lg:sticky lg:top-6" @submit.prevent="submit">
+            <aside aria-labelledby="closure-form-title" class="lg:sticky lg:top-32">
+                <form class="sb-card grid gap-4 p-5 sm:grid-cols-2 sm:p-6" @submit.prevent="submit">
                     <div class="sm:col-span-2">
-                        <label class="mb-1.5 block text-sm font-medium">Venue</label>
+                        <h2 id="closure-form-title" class="text-base font-semibold tracking-tight">Tambah blok</h2>
+                        <p class="text-muted-foreground mt-0.5 text-sm">Slot yang diblok tidak bisa dipesan penyewa.</p>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <span class="sb-label">Venue</span>
                         <SimpleSelect
                             v-model="form.venue_id"
                             :options="venueOptions"
                             placeholder="Pilih venue"
                             required
-                            trigger-class="h-10 w-full rounded-lg border-border bg-background px-3 text-sm shadow-none"
+                            trigger-class="h-11 w-full rounded-xl border-0 bg-background px-3.5 text-sm shadow-none ring-1 ring-(--wp-hairline) ring-inset"
                         />
-                        <InputError :message="form.errors.venue_id" />
+                        <p v-if="form.errors.venue_id" class="sb-error">{{ form.errors.venue_id }}</p>
                     </div>
                     <div class="sm:col-span-2">
-                        <label class="mb-1.5 block text-sm font-medium">Area (opsional — kosong = seluruh venue)</label>
+                        <span class="sb-label">Area</span>
                         <SimpleSelect
                             v-model="areaSelectValue"
                             :options="areaOptions"
                             placeholder="Seluruh venue"
-                            trigger-class="h-10 w-full rounded-lg border-border bg-background px-3 text-sm shadow-none"
+                            trigger-class="h-11 w-full rounded-xl border-0 bg-background px-3.5 text-sm shadow-none ring-1 ring-(--wp-hairline) ring-inset"
                         />
+                        <p class="sb-hint">Opsional. Biarkan "Seluruh venue" untuk menutup semua area.</p>
                     </div>
 
-                    <div class="sm:col-span-2">
-                        <label class="mb-1.5 block text-sm font-medium">Jenis blok</label>
+                    <fieldset class="sm:col-span-2">
+                        <legend class="sb-label">Jenis blok</legend>
                         <div class="grid grid-cols-2 gap-2">
                             <button
                                 type="button"
-                                class="rounded-lg border px-3 py-2 text-sm font-semibold transition"
-                                :class="
-                                    form.mode === 'once'
-                                        ? 'border-sky-500 bg-sky-50 text-sky-800'
-                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                                "
+                                class="sb-chip justify-center"
+                                :aria-pressed="form.mode === 'once' ? 'true' : 'false'"
                                 @click="form.mode = 'once'"
                             >
                                 Sekali
                             </button>
                             <button
                                 type="button"
-                                class="rounded-lg border px-3 py-2 text-sm font-semibold transition"
-                                :class="
-                                    form.mode === 'weekly'
-                                        ? 'border-sky-500 bg-sky-50 text-sky-800'
-                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                                "
+                                class="sb-chip justify-center"
+                                :aria-pressed="form.mode === 'weekly' ? 'true' : 'false'"
                                 @click="form.mode = 'weekly'"
                             >
                                 Berulang mingguan
                             </button>
                         </div>
-                    </div>
+                    </fieldset>
 
-                    <div class="sm:col-span-2">
-                        <label class="mb-1.5 block text-sm font-medium">Durasi blok</label>
+                    <fieldset class="sm:col-span-2">
+                        <legend class="sb-label">Durasi blok</legend>
                         <div class="grid grid-cols-2 gap-2">
                             <button
                                 type="button"
-                                class="rounded-lg border px-3 py-2 text-sm font-semibold transition"
-                                :class="
-                                    !form.full_day
-                                        ? 'border-sky-500 bg-sky-50 text-sky-800'
-                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                                "
+                                class="sb-chip justify-center"
+                                :aria-pressed="!form.full_day ? 'true' : 'false'"
                                 @click="form.full_day = false"
                             >
                                 Jam tertentu
                             </button>
                             <button
                                 type="button"
-                                class="rounded-lg border px-3 py-2 text-sm font-semibold transition"
-                                :class="
-                                    form.full_day
-                                        ? 'border-rose-500 bg-rose-50 text-rose-800'
-                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                                "
+                                class="sb-chip justify-center"
+                                :aria-pressed="form.full_day ? 'true' : 'false'"
                                 @click="form.full_day = true"
                             >
-                                Full hari
+                                Seharian
                             </button>
                         </div>
-                        <p class="text-muted-foreground mt-1 text-xs">
-                            Full hari memakai jam operasional venue (buka–tutup) sehingga tanggal tidak bisa dipesan.
-                        </p>
-                    </div>
+                        <p class="sb-hint">Seharian memakai jam operasional venue, sehingga tanggal tersebut tidak bisa dipesan.</p>
+                    </fieldset>
 
                     <template v-if="form.mode === 'weekly'">
-                        <div class="sm:col-span-2">
-                            <label class="mb-1.5 block text-sm font-medium">Hari</label>
+                        <fieldset class="sm:col-span-2">
+                            <legend class="sb-label">Hari</legend>
                             <div class="flex flex-wrap gap-1.5">
                                 <button
                                     v-for="day in weekdayOptions"
                                     :key="day.value"
                                     type="button"
-                                    class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
-                                    :class="
-                                        form.weekdays.includes(day.value)
-                                            ? 'border-sky-500 bg-sky-50 text-sky-800'
-                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                                    "
+                                    class="sb-chip min-w-11 justify-center"
+                                    :aria-pressed="form.weekdays.includes(day.value) ? 'true' : 'false'"
                                     @click="toggleWeekday(day.value)"
                                 >
                                     {{ day.label }}
                                 </button>
                             </div>
-                            <InputError :message="form.errors.weekdays" />
-                        </div>
+                            <p v-if="form.errors.weekdays" class="sb-error">{{ form.errors.weekdays }}</p>
+                        </fieldset>
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium">Tanggal mulai</label>
+                            <label for="closure-start-date" class="sb-label">Tanggal mulai</label>
                             <input
+                                id="closure-start-date"
                                 v-model="form.start_date"
                                 type="date"
-                                class="border-border bg-background w-full rounded-lg border px-3 py-2 text-sm"
+                                class="sb-input tabular-nums"
+                                :aria-invalid="form.errors.start_date ? 'true' : undefined"
                                 required
                             />
-                            <InputError :message="form.errors.start_date" />
+                            <p v-if="form.errors.start_date" class="sb-error">{{ form.errors.start_date }}</p>
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium">Tanggal selesai</label>
+                            <label for="closure-end-date" class="sb-label">Tanggal selesai</label>
                             <input
+                                id="closure-end-date"
                                 v-model="form.end_date"
                                 type="date"
-                                class="border-border bg-background w-full rounded-lg border px-3 py-2 text-sm"
+                                class="sb-input tabular-nums"
+                                :aria-invalid="form.errors.end_date ? 'true' : undefined"
                                 required
                             />
-                            <InputError :message="form.errors.end_date" />
+                            <p v-if="form.errors.end_date" class="sb-error">{{ form.errors.end_date }}</p>
                         </div>
                         <template v-if="!form.full_day">
                             <div>
-                                <label class="mb-1.5 block text-sm font-medium">Jam mulai</label>
+                                <span class="sb-label">Jam mulai</span>
                                 <TimeField v-model="form.start_time" />
-                                <InputError :message="form.errors.start_time" />
+                                <p v-if="form.errors.start_time" class="sb-error">{{ form.errors.start_time }}</p>
                             </div>
                             <div>
-                                <label class="mb-1.5 block text-sm font-medium">Jam selesai</label>
+                                <span class="sb-label">Jam selesai</span>
                                 <TimeField v-model="form.end_time" />
-                                <InputError :message="form.errors.end_time" />
+                                <p v-if="form.errors.end_time" class="sb-error">{{ form.errors.end_time }}</p>
                             </div>
                         </template>
                     </template>
                     <template v-else-if="form.full_day">
                         <div class="sm:col-span-2">
-                            <label class="mb-1.5 block text-sm font-medium">Tanggal</label>
+                            <label for="closure-date" class="sb-label">Tanggal</label>
                             <input
+                                id="closure-date"
                                 v-model="form.date"
                                 type="date"
-                                class="border-border bg-background w-full rounded-lg border px-3 py-2 text-sm"
+                                class="sb-input tabular-nums"
+                                :aria-invalid="form.errors.date ? 'true' : undefined"
                                 required
                             />
-                            <InputError :message="form.errors.date" />
+                            <p v-if="form.errors.date" class="sb-error">{{ form.errors.date }}</p>
                         </div>
                     </template>
                     <template v-else>
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium">Mulai — tanggal</label>
+                            <label for="closure-once-start-date" class="sb-label">Tanggal mulai</label>
                             <input
+                                id="closure-once-start-date"
                                 v-model="form.once_start_date"
                                 type="date"
-                                class="border-border bg-background w-full rounded-lg border px-3 py-2 text-sm"
+                                class="sb-input tabular-nums"
+                                :aria-invalid="serverError('starts_at') ? 'true' : undefined"
                                 required
                             />
-                            <InputError :message="form.errors.starts_at" />
+                            <p v-if="serverError('starts_at')" class="sb-error">{{ serverError('starts_at') }}</p>
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium">Mulai — jam</label>
+                            <span class="sb-label">Jam mulai</span>
                             <TimeField v-model="form.once_start_time" />
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium">Selesai — tanggal</label>
+                            <label for="closure-once-end-date" class="sb-label">Tanggal selesai</label>
                             <input
+                                id="closure-once-end-date"
                                 v-model="form.once_end_date"
                                 type="date"
-                                class="border-border bg-background w-full rounded-lg border px-3 py-2 text-sm"
+                                class="sb-input tabular-nums"
+                                :aria-invalid="serverError('ends_at') ? 'true' : undefined"
                                 required
                             />
-                            <InputError :message="form.errors.ends_at" />
+                            <p v-if="serverError('ends_at')" class="sb-error">{{ serverError('ends_at') }}</p>
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium">Selesai — jam</label>
+                            <span class="sb-label">Jam selesai</span>
                             <TimeField v-model="form.once_end_time" />
                         </div>
                     </template>
 
                     <div class="sm:col-span-2">
-                        <label class="mb-1.5 block text-sm font-medium">Alasan</label>
+                        <label for="closure-reason" class="sb-label">Alasan</label>
                         <input
+                            id="closure-reason"
                             v-model="form.reason"
                             type="text"
                             maxlength="255"
-                            class="border-border bg-background w-full rounded-lg border px-3 py-2 text-sm"
-                            placeholder="Latihan atlet Dispora / libur nasional / maintenance…"
+                            class="sb-input"
+                            :aria-invalid="form.errors.reason ? 'true' : undefined"
+                            placeholder="Latihan atlet, libur nasional, perawatan…"
                         />
-                        <InputError :message="form.errors.reason" />
+                        <p v-if="form.errors.reason" class="sb-error">{{ form.errors.reason }}</p>
                     </div>
                     <div class="sm:col-span-2">
-                        <button
-                            type="submit"
-                            class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--brand-green,#2e7d32)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                            :disabled="form.processing"
-                        >
-                            <LoaderCircle v-if="form.processing" class="size-4 animate-spin" />
+                        <button type="submit" class="wp-btn wp-btn-primary w-full justify-center px-5 py-2.5 text-sm" :disabled="form.processing">
+                            <FontAwesomeIcon
+                                v-if="form.processing"
+                                :icon="['fas', 'circle-notch']"
+                                class="size-3.5 animate-spin"
+                                aria-hidden="true"
+                            />
+                            <FontAwesomeIcon v-else :icon="['fas', 'calendar-xmark']" class="size-3.5" aria-hidden="true" />
                             {{ form.mode === 'weekly' ? 'Tambah blok berulang' : 'Tambah blok' }}
                         </button>
                     </div>
                 </form>
-            </div>
+            </aside>
         </div>
     </AdminLayout>
 </template>

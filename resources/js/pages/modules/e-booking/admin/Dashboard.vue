@@ -1,20 +1,26 @@
 <script setup lang="ts">
 import SeoHead from '@/components/SeoHead.vue';
+import SbStatusBadge from '@/components/sibola/SbStatusBadge.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
-import { Deferred, Link, usePage } from '@inertiajs/vue3';
+import { formatRupiah } from '@/lib/bookingStatus';
+import { library } from '@fortawesome/fontawesome-svg-core';
 import {
-    ArrowRight,
-    BadgeCheck,
-    CalendarOff,
-    CircleAlert,
-    Clock3,
-    FileSearch,
-    Settings2,
-    ShieldCheck,
-    Wallet,
-} from 'lucide-vue-next';
+    faArrowRight,
+    faCalendarXmark,
+    faCircleCheck,
+    faCircleExclamation,
+    faGear,
+    faInbox,
+    faMagnifyingGlass,
+    faShieldHalved,
+    faWallet,
+} from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { Deferred, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+
+library.add(faArrowRight, faCalendarXmark, faCircleCheck, faCircleExclamation, faGear, faInbox, faMagnifyingGlass, faShieldHalved, faWallet);
 
 type DashboardStats = {
     pending_approval: number;
@@ -58,8 +64,7 @@ const greeting = computed(() => {
     return 'Selamat malam';
 });
 
-const formatRp = (n: number) =>
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
+const todayLabel = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
 
 const formatSchedule = (starts: string | null, ends: string | null) => {
     if (!starts) {
@@ -76,42 +81,6 @@ const formatSchedule = (starts: string | null, ends: string | null) => {
     return `${starts} – ${ends}`;
 };
 
-const statusLabel = (status: string) => {
-    const map: Record<string, string> = {
-        menunggu_approval: 'Perlu ditinjau',
-        awaiting_payment: 'Menunggu bayar',
-        approved: 'Disetujui',
-        paid: 'Sudah bayar',
-        confirmed: 'Dikonfirmasi',
-        perlu_klarifikasi: 'Perlu klarifikasi',
-        rejected: 'Ditolak',
-        cancelled: 'Dibatalkan',
-        forfeited: 'Hangus',
-        expired: 'Kedaluwarsa',
-        completed: 'Selesai',
-    };
-
-    return map[status] ?? status;
-};
-
-const statusTone = (status: string) => {
-    const map: Record<string, string> = {
-        menunggu_approval: 'bg-amber-100 text-amber-800',
-        perlu_klarifikasi: 'bg-orange-100 text-orange-800',
-        awaiting_payment: 'bg-sky-100 text-sky-800',
-        approved: 'bg-emerald-100 text-emerald-800',
-        paid: 'bg-emerald-100 text-emerald-800',
-        confirmed: 'bg-emerald-100 text-emerald-800',
-        rejected: 'bg-red-100 text-red-800',
-        cancelled: 'bg-slate-100 text-slate-600',
-        expired: 'bg-slate-100 text-slate-600',
-        forfeited: 'bg-red-100 text-red-800',
-        completed: 'bg-slate-100 text-slate-700',
-    };
-
-    return map[status] ?? 'bg-slate-100 text-slate-700';
-};
-
 const statCards = (stats: DashboardStats) => [
     {
         key: 'pending',
@@ -119,9 +88,8 @@ const statCards = (stats: DashboardStats) => [
         value: stats.pending_approval,
         hint: 'Pengajuan baru / klarifikasi',
         href: route('e-booking.admin.bookings.index', { tab: 'review' }),
-        icon: FileSearch,
-        tone: 'bg-amber-50 text-amber-700 ring-amber-100',
-        accent: stats.pending_approval > 0 ? 'border-amber-200' : 'border-slate-200',
+        icon: 'magnifying-glass',
+        flagged: stats.pending_approval > 0,
     },
     {
         key: 'pay',
@@ -129,9 +97,8 @@ const statCards = (stats: DashboardStats) => [
         value: stats.awaiting_payment,
         hint: 'Sudah disetujui, belum lunas',
         href: route('e-booking.admin.bookings.index', { tab: 'payment' }),
-        icon: Wallet,
-        tone: 'bg-sky-50 text-sky-700 ring-sky-100',
-        accent: stats.awaiting_payment > 0 ? 'border-sky-200' : 'border-slate-200',
+        icon: 'wallet',
+        flagged: false,
     },
     {
         key: 'verify',
@@ -139,9 +106,8 @@ const statCards = (stats: DashboardStats) => [
         value: stats.awaiting_verification,
         hint: 'Transfer menunggu verifikasi',
         href: route('e-booking.admin.bookings.index', { tab: 'verify' }),
-        icon: ShieldCheck,
-        tone: 'bg-violet-50 text-violet-700 ring-violet-100',
-        accent: stats.awaiting_verification > 0 ? 'border-violet-200' : 'border-slate-200',
+        icon: 'shield-halved',
+        flagged: stats.awaiting_verification > 0,
     },
     {
         key: 'today',
@@ -149,120 +115,83 @@ const statCards = (stats: DashboardStats) => [
         value: stats.confirmed_today,
         hint: 'Pesanan yang sudah beres',
         href: route('e-booking.admin.bookings.index', { tab: 'all', status: 'confirmed' }),
-        icon: BadgeCheck,
-        tone: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-        accent: 'border-slate-200',
+        icon: 'circle-check',
+        flagged: false,
     },
 ];
+
+const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-(--wp-accent)';
 </script>
 
 <template>
     <SeoHead title="Ringkasan Pengelola" />
 
     <AdminLayout active="dashboard">
-        <!-- Header -->
-        <section
-            class="overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#0f3d87_0%,#1479d1_55%,#2e7d32_120%)] p-6 text-white shadow-[0_18px_50px_rgba(20,121,209,0.22)] sm:p-8"
-        >
-            <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                <div class="max-w-2xl">
-                    <p class="text-sm font-medium text-white/75">{{ greeting }}, {{ bookingAuth?.name || 'Pengelola' }}</p>
-                    <h1 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Ringkasan kerja hari ini</h1>
-                    <p class="mt-3 text-sm leading-6 text-white/85 sm:text-base">
-                        Pantau pengajuan yang perlu ditindak, cek bukti bayar, lalu konfirmasi pesanan — semua dari satu
-                        halaman.
-                    </p>
-                </div>
-
-                <div class="flex flex-wrap gap-2">
-                    <Link
-                        :href="route('e-booking.admin.bookings.index')"
-                        class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50"
-                    >
-                        Semua pengajuan
-                        <ArrowRight class="size-4" />
-                    </Link>
-                    <Link
-                        :href="route('e-booking.admin.closures.index')"
-                        class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2.5 text-sm font-semibold text-white ring-1 ring-white/30 transition hover:bg-white/25"
-                    >
-                        <CalendarOff class="size-4" />
-                        Blok jadwal
-                    </Link>
-                </div>
+        <header class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <p class="text-muted-foreground text-sm">{{ greeting }}, {{ bookingAuth?.name || 'Pengelola' }}</p>
+                <h1 class="text-foreground mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Ringkasan kerja hari ini</h1>
+                <p class="text-muted-foreground mt-1.5 text-sm">
+                    <time>{{ todayLabel }}</time>
+                </p>
             </div>
-        </section>
+
+            <div class="flex flex-wrap gap-2">
+                <Link :href="route('e-booking.admin.closures.index')" class="wp-btn wp-btn-quiet px-4 py-2 text-sm">
+                    <FontAwesomeIcon :icon="['fas', 'calendar-xmark']" class="size-3.5" aria-hidden="true" />
+                    Blok jadwal
+                </Link>
+                <Link :href="route('e-booking.admin.bookings.index')" class="wp-btn wp-btn-primary wp-link-arrow px-4 py-2 text-sm">
+                    Semua pengajuan
+                    <FontAwesomeIcon :icon="['fas', 'arrow-right']" class="size-3.5" aria-hidden="true" />
+                </Link>
+            </div>
+        </header>
 
         <Deferred :data="['stats', 'recent']">
             <template #fallback>
-                <!-- Skeleton: attention + stats + list -->
-                <div class="mt-6 space-y-6" aria-busy="true" aria-label="Memuat ringkasan">
-                    <div class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="flex items-center gap-4">
-                            <Skeleton class="size-12 rounded-2xl" />
-                            <div class="flex-1 space-y-2">
-                                <Skeleton class="h-4 w-40" />
-                                <Skeleton class="h-3 w-64 max-w-full" />
-                            </div>
-                            <Skeleton class="hidden h-10 w-28 rounded-full sm:block" />
+                <div class="mt-8 space-y-6" aria-busy="true" aria-label="Memuat ringkasan">
+                    <div class="sb-card grid divide-y divide-(--wp-hairline) overflow-hidden sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+                        <div v-for="n in 4" :key="n" class="space-y-3 p-5">
+                            <Skeleton class="h-3.5 w-28" />
+                            <Skeleton class="h-8 w-12" />
+                            <Skeleton class="h-3 w-36 max-w-full" />
                         </div>
                     </div>
 
-                    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                        <div
-                            v-for="n in 4"
-                            :key="n"
-                            class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm"
-                        >
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="space-y-3">
-                                    <Skeleton class="h-3 w-24" />
-                                    <Skeleton class="h-9 w-14" />
-                                    <Skeleton class="h-3 w-32" />
+                    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+                        <div class="sb-card overflow-hidden">
+                            <div class="flex items-center justify-between p-5">
+                                <div class="space-y-2">
+                                    <Skeleton class="h-4 w-32" />
+                                    <Skeleton class="h-3 w-52" />
                                 </div>
-                                <Skeleton class="size-11 rounded-2xl" />
+                                <Skeleton class="h-4 w-16" />
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
-                        <div class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                            <div class="mb-5 flex items-center justify-between">
-                                <Skeleton class="h-5 w-36" />
-                                <Skeleton class="h-4 w-24" />
-                            </div>
-                            <div class="space-y-3">
-                                <div
-                                    v-for="n in 5"
-                                    :key="n"
-                                    class="rounded-2xl border border-slate-100 p-4"
-                                >
-                                    <div class="flex flex-wrap items-start justify-between gap-3">
-                                        <div class="space-y-2">
-                                            <Skeleton class="h-4 w-40" />
-                                            <Skeleton class="h-3 w-56 max-w-full" />
-                                            <Skeleton class="h-3 w-44" />
+                            <div class="divide-y divide-(--wp-hairline) border-t border-(--wp-hairline)">
+                                <div v-for="n in 5" :key="n" class="flex items-center justify-between gap-4 px-5 py-4">
+                                    <div class="space-y-2">
+                                        <div class="flex items-center gap-2">
+                                            <Skeleton class="h-4 w-28" />
+                                            <Skeleton class="h-5 w-24 rounded-lg" />
                                         </div>
-                                        <div class="space-y-2 text-right">
-                                            <Skeleton class="ml-auto h-6 w-24 rounded-full" />
-                                            <Skeleton class="ml-auto h-4 w-20" />
-                                        </div>
+                                        <Skeleton class="h-3 w-56 max-w-full" />
+                                        <Skeleton class="h-3 w-40" />
                                     </div>
+                                    <Skeleton class="h-4 w-20" />
                                 </div>
                             </div>
                         </div>
 
-                        <div class="space-y-4">
-                            <div class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                                <Skeleton class="mb-4 h-5 w-28" />
-                                <div class="space-y-3">
-                                    <Skeleton v-for="n in 3" :key="n" class="h-14 w-full rounded-2xl" />
-                                </div>
+                        <div class="space-y-6">
+                            <div class="sb-card space-y-3 p-5">
+                                <Skeleton class="h-4 w-24" />
+                                <Skeleton v-for="n in 3" :key="n" class="h-11 w-full rounded-xl" />
                             </div>
-                            <div class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                                <Skeleton class="mb-3 h-5 w-32" />
+                            <div class="sb-card space-y-2 p-5">
+                                <Skeleton class="h-4 w-28" />
                                 <Skeleton class="h-3 w-full" />
-                                <Skeleton class="mt-2 h-3 w-4/5" />
+                                <Skeleton class="h-3 w-4/5" />
                             </div>
                         </div>
                     </div>
@@ -270,199 +199,194 @@ const statCards = (stats: DashboardStats) => [
             </template>
 
             <template v-if="stats && recent">
-                <div>
-                <!-- Attention banner -->
-                <div
-                    v-if="stats.needs_attention > 0"
-                    class="mt-6 flex flex-col gap-3 rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                    <div class="flex items-start gap-3">
-                        <div class="rounded-2xl bg-amber-100 p-2.5 text-amber-700">
-                            <CircleAlert class="size-5" />
-                        </div>
-                        <div>
-                            <p class="font-semibold text-amber-950">
-                                {{ stats.needs_attention }} item perlu perhatian Anda
-                            </p>
-                            <p class="mt-0.5 text-sm text-amber-800/80">
-                                Ada pengajuan untuk ditinjau atau bukti transfer yang menunggu dicek.
-                            </p>
-                        </div>
-                    </div>
-                    <Link
-                        :href="route('e-booking.admin.bookings.index', { tab: 'review' })"
-                        class="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700"
-                    >
-                        Kerjakan sekarang
-                        <ArrowRight class="size-4" />
-                    </Link>
-                </div>
-                <div
-                    v-else
-                    class="mt-6 flex items-start gap-3 rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4"
-                >
-                    <div class="rounded-2xl bg-emerald-100 p-2.5 text-emerald-700">
-                        <BadgeCheck class="size-5" />
-                    </div>
-                    <div>
-                        <p class="font-semibold text-emerald-950">Antrian kritis kosong</p>
-                        <p class="mt-0.5 text-sm text-emerald-800/80">
-                            Tidak ada pengajuan mendesak. Anda bisa cek jadwal blokir atau pengaturan.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Stat cards -->
-                <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <Link
-                        v-for="card in statCards(stats)"
-                        :key="card.key"
-                        :href="card.href"
-                        class="group rounded-[24px] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                        :class="card.accent"
-                    >
-                        <div class="flex items-start justify-between gap-3">
-                            <div>
-                                <p class="text-sm font-medium text-slate-500">{{ card.label }}</p>
-                                <p class="mt-2 text-3xl font-bold tracking-tight text-slate-900">{{ card.value }}</p>
-                                <p class="mt-2 text-xs text-slate-500">{{ card.hint }}</p>
-                            </div>
-                            <div class="rounded-2xl p-3 ring-1" :class="card.tone">
-                                <component :is="card.icon" class="size-5" />
-                            </div>
-                        </div>
-                        <p
-                            class="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-sky-700 opacity-0 transition group-hover:opacity-100"
-                        >
-                            Lihat daftar
-                            <ArrowRight class="size-3.5" />
-                        </p>
-                    </Link>
-                </div>
-
-                <div class="mt-6 grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
-                    <!-- Recent queue -->
-                    <section class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                        <div class="mb-5 flex items-center justify-between gap-3">
-                            <div>
-                                <h2 class="text-lg font-bold text-slate-900">Antrian terbaru</h2>
-                                <p class="mt-0.5 text-sm text-slate-500">Pengajuan yang masih perlu diproses</p>
-                            </div>
+                <div class="mt-8 space-y-6">
+                    <section aria-labelledby="kpi-heading" class="sb-card overflow-hidden">
+                        <h2 id="kpi-heading" class="sr-only">Angka utama</h2>
+                        <div class="grid divide-y divide-(--wp-hairline) sm:grid-cols-4 sm:divide-x sm:divide-y-0">
                             <Link
-                                :href="route('e-booking.admin.bookings.index')"
-                                class="text-sm font-semibold text-sky-700 hover:underline"
+                                v-for="card in statCards(stats)"
+                                :key="card.key"
+                                :href="card.href"
+                                class="group hover:bg-muted/50 block p-5 transition-colors"
+                                :class="focusRing"
                             >
-                                Semua →
-                            </Link>
-                        </div>
-
-                        <div
-                            v-if="recent.length === 0"
-                            class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center"
-                        >
-                            <div class="rounded-2xl bg-white p-3 text-slate-400 shadow-sm">
-                                <Clock3 class="size-6" />
-                            </div>
-                            <p class="mt-4 font-semibold text-slate-800">Belum ada antrian</p>
-                            <p class="mt-1 max-w-sm text-sm text-slate-500">
-                                Saat penyewa mengirim pengajuan baru, daftarnya akan muncul di sini.
-                            </p>
-                        </div>
-
-                        <div v-else class="space-y-3">
-                            <Link
-                                v-for="item in recent"
-                                :key="item.id"
-                                :href="route('e-booking.admin.bookings.show', item.id)"
-                                class="block rounded-2xl border border-slate-200 p-4 transition hover:border-sky-200 hover:bg-sky-50/40"
-                            >
-                                <div class="flex flex-wrap items-start justify-between gap-3">
-                                    <div class="min-w-0">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <p class="font-semibold text-slate-900">{{ item.nomor }}</p>
-                                            <span
-                                                class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                                                :class="statusTone(item.status)"
-                                            >
-                                                {{ statusLabel(item.status) }}
-                                            </span>
-                                        </div>
-                                        <p class="mt-1 truncate text-sm text-slate-600">
-                                            {{ item.penyewa || 'Penyewa' }} · {{ item.venue || 'Tempat' }}
-                                        </p>
-                                        <p class="mt-1 text-xs text-slate-500">
-                                            {{ formatSchedule(item.starts_at, item.ends_at) }}
-                                        </p>
-                                    </div>
-                                    <div class="text-right">
-                                        <p class="text-sm font-bold text-slate-900">{{ formatRp(item.grand_total) }}</p>
-                                        <p class="mt-1 text-xs font-medium text-sky-700">Buka detail →</p>
-                                    </div>
-                                </div>
+                                <p class="text-muted-foreground flex items-center gap-2 text-sm">
+                                    <FontAwesomeIcon :icon="['fas', card.icon]" class="size-3.5" aria-hidden="true" />
+                                    {{ card.label }}
+                                    <span v-if="card.flagged" class="size-1.5 rounded-full bg-(--sb-warning)" aria-hidden="true"></span>
+                                </p>
+                                <p class="text-foreground mt-2 text-3xl font-semibold tracking-tight tabular-nums">{{ card.value }}</p>
+                                <p class="text-muted-foreground mt-1 text-xs">{{ card.hint }}</p>
                             </Link>
                         </div>
                     </section>
 
-                    <!-- Side: shortcuts + tips -->
-                    <aside class="space-y-4">
-                        <section class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                            <h2 class="text-lg font-bold text-slate-900">Aksi cepat</h2>
-                            <p class="mt-0.5 text-sm text-slate-500">Jalan pintas yang sering dipakai</p>
-
-                            <div class="mt-4 space-y-2">
+                    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+                        <section aria-labelledby="queue-heading" class="sb-card overflow-hidden">
+                            <div class="flex items-start justify-between gap-3 p-5">
+                                <div>
+                                    <h2 id="queue-heading" class="text-foreground text-base font-semibold tracking-tight">Perlu tindakan</h2>
+                                    <p class="text-muted-foreground mt-0.5 text-sm">Pengajuan yang masih perlu diproses</p>
+                                </div>
                                 <Link
                                     :href="route('e-booking.admin.bookings.index')"
-                                    class="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm transition hover:bg-sky-50"
+                                    class="wp-link-arrow inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-(--wp-accent) hover:text-(--wp-accent-strong) focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
                                 >
-                                    <span class="rounded-xl bg-amber-100 p-2 text-amber-700">
-                                        <FileSearch class="size-4" />
-                                    </span>
-                                    <span class="flex-1 font-medium text-slate-800">Tinjau pengajuan</span>
-                                    <ArrowRight class="size-4 text-slate-400" />
-                                </Link>
-                                <Link
-                                    :href="route('e-booking.admin.closures.index')"
-                                    class="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm transition hover:bg-sky-50"
-                                >
-                                    <span class="rounded-xl bg-rose-100 p-2 text-rose-700">
-                                        <CalendarOff class="size-4" />
-                                    </span>
-                                    <span class="flex-1 font-medium text-slate-800">Blok / buka jadwal</span>
-                                    <ArrowRight class="size-4 text-slate-400" />
-                                </Link>
-                                <Link
-                                    :href="route('e-booking.admin.settings')"
-                                    class="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm transition hover:bg-sky-50"
-                                >
-                                    <span class="rounded-xl bg-slate-200 p-2 text-slate-700">
-                                        <Settings2 class="size-4" />
-                                    </span>
-                                    <span class="flex-1 font-medium text-slate-800">Pengaturan & rekening</span>
-                                    <ArrowRight class="size-4 text-slate-400" />
+                                    Semua
+                                    <FontAwesomeIcon :icon="['fas', 'arrow-right']" class="size-3" aria-hidden="true" />
                                 </Link>
                             </div>
-                        </section>
 
-                        <section class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                            <h2 class="text-lg font-bold text-slate-900">Tips kerja cepat</h2>
-                            <ul class="mt-3 space-y-3 text-sm leading-6 text-slate-600">
-                                <li class="flex gap-2">
-                                    <span class="mt-1 size-1.5 shrink-0 rounded-full bg-amber-500" />
-                                    Prioritaskan kartu <strong class="font-semibold text-slate-800">Perlu ditinjau</strong> dan
-                                    <strong class="font-semibold text-slate-800">Bukti perlu dicek</strong>.
-                                </li>
-                                <li class="flex gap-2">
-                                    <span class="mt-1 size-1.5 shrink-0 rounded-full bg-sky-500" />
-                                    Blok jadwal lebih dulu jika ada maintenance atau event internal.
-                                </li>
-                                <li class="flex gap-2">
-                                    <span class="mt-1 size-1.5 shrink-0 rounded-full bg-emerald-500" />
-                                    Setelah bukti valid, verifikasi agar penyewa mendapat konfirmasi.
+                            <div class="px-5 pb-4">
+                                <div v-if="stats.needs_attention > 0" class="sb-callout sb-tone-warning flex-wrap items-center justify-between">
+                                    <p class="flex items-center gap-2.5">
+                                        <FontAwesomeIcon :icon="['fas', 'circle-exclamation']" class="size-4 shrink-0" aria-hidden="true" />
+                                        <span>
+                                            <span class="font-semibold tabular-nums">{{ stats.needs_attention }} item perlu perhatian Anda.</span>
+                                            <span class="hidden sm:inline">
+                                                Ada pengajuan untuk ditinjau atau bukti transfer yang menunggu dicek.</span
+                                            >
+                                        </span>
+                                    </p>
+                                    <Link
+                                        :href="route('e-booking.admin.bookings.index', { tab: 'review' })"
+                                        class="wp-link-arrow inline-flex shrink-0 items-center gap-1.5 rounded-md font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-current focus-visible:outline-none"
+                                    >
+                                        Kerjakan sekarang
+                                        <FontAwesomeIcon :icon="['fas', 'arrow-right']" class="size-3" aria-hidden="true" />
+                                    </Link>
+                                </div>
+                                <div v-else class="sb-callout sb-tone-success items-center">
+                                    <FontAwesomeIcon :icon="['fas', 'circle-check']" class="size-4 shrink-0" aria-hidden="true" />
+                                    <p>
+                                        <span class="font-semibold">Antrian kritis kosong.</span>
+                                        Tidak ada pengajuan mendesak. Anda bisa cek jadwal blokir atau pengaturan.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div v-if="recent.length === 0" class="flex flex-col items-center border-t border-(--wp-hairline) px-6 py-14 text-center">
+                                <span class="wp-icon size-12">
+                                    <FontAwesomeIcon :icon="['fas', 'inbox']" class="size-5" aria-hidden="true" />
+                                </span>
+                                <h3 class="text-foreground mt-4 text-base font-semibold tracking-tight">Belum ada antrian</h3>
+                                <p class="text-muted-foreground mt-1 max-w-sm text-sm">
+                                    Saat penyewa mengirim pengajuan baru, daftarnya akan muncul di sini.
+                                </p>
+                                <Link :href="route('e-booking.admin.bookings.index')" class="wp-btn wp-btn-quiet mt-5 px-4 py-2 text-sm">
+                                    Buka semua pengajuan
+                                </Link>
+                            </div>
+
+                            <ul v-else class="divide-y divide-(--wp-hairline) border-t border-(--wp-hairline)">
+                                <li v-for="item in recent" :key="item.id">
+                                    <Link
+                                        :href="route('e-booking.admin.bookings.show', item.id)"
+                                        class="group hover:bg-muted/50 flex items-center gap-4 px-5 py-4 transition-colors"
+                                        :class="focusRing"
+                                    >
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <span class="text-foreground font-semibold tabular-nums">{{ item.nomor }}</span>
+                                                <SbStatusBadge :status="item.status" audience="admin" />
+                                            </div>
+                                            <p class="text-muted-foreground mt-1 truncate text-sm">
+                                                {{ item.penyewa || 'Penyewa' }} · {{ item.venue || 'Tempat' }}
+                                            </p>
+                                            <p class="text-muted-foreground mt-0.5 text-xs tabular-nums">
+                                                {{ formatSchedule(item.starts_at, item.ends_at) }}
+                                            </p>
+                                        </div>
+                                        <div class="flex shrink-0 items-center gap-3">
+                                            <span class="text-foreground text-sm font-semibold tabular-nums">{{
+                                                formatRupiah(item.grand_total)
+                                            }}</span>
+                                            <span class="wp-link-arrow text-muted-foreground group-hover:text-(--wp-accent)">
+                                                <FontAwesomeIcon :icon="['fas', 'arrow-right']" class="size-3.5" aria-hidden="true" />
+                                                <span class="sr-only">Buka detail</span>
+                                            </span>
+                                        </div>
+                                    </Link>
                                 </li>
                             </ul>
                         </section>
-                    </aside>
-                </div>
+
+                        <aside class="space-y-6">
+                            <section aria-labelledby="shortcut-heading" class="sb-card p-5">
+                                <h2 id="shortcut-heading" class="text-foreground text-base font-semibold tracking-tight">Aksi cepat</h2>
+                                <p class="text-muted-foreground mt-0.5 text-sm">Jalan pintas yang sering dipakai</p>
+
+                                <nav class="-mx-2 mt-4 space-y-0.5" aria-label="Aksi cepat">
+                                    <Link
+                                        :href="route('e-booking.admin.bookings.index')"
+                                        class="group hover:bg-muted/60 flex items-center gap-3 rounded-xl px-2 py-2 text-sm transition-colors"
+                                        :class="focusRing"
+                                    >
+                                        <span class="wp-icon size-8 rounded-lg">
+                                            <FontAwesomeIcon :icon="['fas', 'magnifying-glass']" class="size-3.5" aria-hidden="true" />
+                                        </span>
+                                        <span class="text-foreground flex-1 font-medium">Tinjau pengajuan</span>
+                                        <FontAwesomeIcon
+                                            :icon="['fas', 'arrow-right']"
+                                            class="text-muted-foreground size-3 transition-transform group-hover:translate-x-0.5"
+                                            aria-hidden="true"
+                                        />
+                                    </Link>
+                                    <Link
+                                        :href="route('e-booking.admin.closures.index')"
+                                        class="group hover:bg-muted/60 flex items-center gap-3 rounded-xl px-2 py-2 text-sm transition-colors"
+                                        :class="focusRing"
+                                    >
+                                        <span class="wp-icon size-8 rounded-lg">
+                                            <FontAwesomeIcon :icon="['fas', 'calendar-xmark']" class="size-3.5" aria-hidden="true" />
+                                        </span>
+                                        <span class="text-foreground flex-1 font-medium">Blok / buka jadwal</span>
+                                        <FontAwesomeIcon
+                                            :icon="['fas', 'arrow-right']"
+                                            class="text-muted-foreground size-3 transition-transform group-hover:translate-x-0.5"
+                                            aria-hidden="true"
+                                        />
+                                    </Link>
+                                    <Link
+                                        :href="route('e-booking.admin.settings')"
+                                        class="group hover:bg-muted/60 flex items-center gap-3 rounded-xl px-2 py-2 text-sm transition-colors"
+                                        :class="focusRing"
+                                    >
+                                        <span class="wp-icon size-8 rounded-lg">
+                                            <FontAwesomeIcon :icon="['fas', 'gear']" class="size-3.5" aria-hidden="true" />
+                                        </span>
+                                        <span class="text-foreground flex-1 font-medium">Pengaturan & rekening</span>
+                                        <FontAwesomeIcon
+                                            :icon="['fas', 'arrow-right']"
+                                            class="text-muted-foreground size-3 transition-transform group-hover:translate-x-0.5"
+                                            aria-hidden="true"
+                                        />
+                                    </Link>
+                                </nav>
+                            </section>
+
+                            <section aria-labelledby="tips-heading" class="sb-card-muted p-5">
+                                <h2 id="tips-heading" class="text-foreground text-base font-semibold tracking-tight">Tips kerja cepat</h2>
+                                <ul class="text-muted-foreground mt-3 space-y-2.5 text-sm leading-6">
+                                    <li class="flex gap-2.5">
+                                        <span class="mt-2.5 size-1.5 shrink-0 rounded-full bg-(--wp-accent)" aria-hidden="true"></span>
+                                        <span>
+                                            Prioritaskan kartu <strong class="text-foreground font-semibold">Perlu ditinjau</strong> dan
+                                            <strong class="text-foreground font-semibold">Bukti perlu dicek</strong>.
+                                        </span>
+                                    </li>
+                                    <li class="flex gap-2.5">
+                                        <span class="mt-2.5 size-1.5 shrink-0 rounded-full bg-(--wp-accent)" aria-hidden="true"></span>
+                                        <span>Blok jadwal lebih dulu jika ada maintenance atau event internal.</span>
+                                    </li>
+                                    <li class="flex gap-2.5">
+                                        <span class="mt-2.5 size-1.5 shrink-0 rounded-full bg-(--wp-accent)" aria-hidden="true"></span>
+                                        <span>Setelah bukti valid, verifikasi agar penyewa mendapat konfirmasi.</span>
+                                    </li>
+                                </ul>
+                            </section>
+                        </aside>
+                    </div>
                 </div>
             </template>
         </Deferred>

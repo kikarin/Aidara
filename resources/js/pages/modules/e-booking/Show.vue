@@ -5,12 +5,49 @@ import FacilityIcon from '@/components/e-booking/FacilityIcon.vue';
 import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
 import SimpleSelect from '@/components/ui/select/SimpleSelect.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 import EBookingLayout from '@/layouts/e-booking/EBookingLayout.vue';
 import { formatJamIndo, formatTanggalIndo, formatTanggalJamIndo } from '@/lib/format-tanggal';
 import type { BookingAddon, BookingAvailability, BookingQuote, BookingTarif } from '@/types/booking';
+import { library } from '@fortawesome/fontawesome-svg-core';
+import {
+    faArrowLeft,
+    faCalendarDays,
+    faCheck,
+    faCircleExclamation,
+    faCircleInfo,
+    faCircleNotch,
+    faHashtag,
+    faImage,
+    faLayerGroup,
+    faPaperPlane,
+    faPlus,
+    faShieldHalved,
+    faWallet,
+    faXmark,
+} from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
-import { CalendarDays, Check, CircleAlert, LoaderCircle, Plus, ShieldCheck, Wallet, X } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
+
+library.add(
+    faArrowLeft,
+    faCalendarDays,
+    faCheck,
+    faCircleExclamation,
+    faCircleInfo,
+    faCircleNotch,
+    faHashtag,
+    faImage,
+    faLayerGroup,
+    faPaperPlane,
+    faPlus,
+    faShieldHalved,
+    faWallet,
+    faXmark,
+);
+
+const selectTriggerClass = 'h-11 w-full rounded-xl border-(--wp-hairline) bg-background px-3.5 text-sm shadow-none';
 
 type VenueDetail = {
     id: number;
@@ -826,7 +863,7 @@ const availabilityCopy = computed(() => {
         return {
             label: 'Ada pengajuan lain di waktu ini',
             detail: 'Anda tetap bisa mengirim pengajuan — pengelola akan meninjau semua pengajuan yang masuk.',
-            tone: 'text-orange-700',
+            tone: 'text-(--sb-warning)',
         };
     }
 
@@ -834,12 +871,12 @@ const availabilityCopy = computed(() => {
         hijau: {
             label: 'Masih tersedia',
             detail: 'Waktu ini bisa diajukan.',
-            tone: 'text-emerald-700',
+            tone: 'text-(--wp-accent-strong)',
         },
         merah: {
             label: 'Belum bisa dipakai',
             detail: 'Pilih waktu lain yang masih tersedia.',
-            tone: 'text-red-700',
+            tone: 'text-(--sb-danger)',
         },
     };
 
@@ -966,13 +1003,13 @@ const submitBooking = () => {
 const slotClass = (slot: DaySlot) => {
     const selected = selectedSlotKey.value === slotKey(slot);
     if (selected) {
-        return 'border-sky-600 bg-sky-600 text-white shadow-sm';
+        return 'bg-(--wp-accent) text-(--wp-accent-contrast)';
     }
     if (slot.status === 'hijau' && slot.bookable) {
-        return 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:border-emerald-400';
+        return 'bg-card text-foreground ring-1 ring-(--wp-hairline) ring-inset hover:bg-(--wp-accent-soft) hover:text-(--wp-accent-strong)';
     }
 
-    return 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400';
+    return 'cursor-not-allowed bg-muted text-muted-foreground';
 };
 
 const slotTitle = (slot: DaySlot) => {
@@ -994,84 +1031,120 @@ const slotTitle = (slot: DaySlot) => {
     <SeoHead :title="venue.name" :description="venue.description || `Sewa ${venue.name}`" />
 
     <EBookingLayout active="catalog">
-        <div v-if="flashError" class="mb-5 rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm">
-            {{ flashError }}
+        <div v-if="flashError" class="sb-callout sb-tone-danger mb-6" role="alert">
+            <FontAwesomeIcon :icon="['fas', 'circle-exclamation']" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <p>{{ flashError }}</p>
         </div>
 
-        <section class="overflow-hidden rounded-[32px] bg-white shadow-sm">
-            <div class="aspect-[16/9] bg-slate-100 sm:aspect-[21/9]">
-                <AppImage v-if="venue.cover_url" :src="venue.cover_url" :alt="venue.name" class="size-full object-cover" />
+        <nav aria-label="Breadcrumb">
+            <ol class="text-muted-foreground flex min-w-0 flex-wrap items-center gap-2 text-sm">
+                <li>
+                    <Link
+                        :href="route('e-booking.catalog')"
+                        class="inline-flex items-center gap-1.5 rounded-md font-medium transition hover:text-(--wp-accent-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--wp-accent)"
+                    >
+                        <FontAwesomeIcon :icon="['fas', 'arrow-left']" class="size-3.5" aria-hidden="true" />
+                        Katalog venue
+                    </Link>
+                </li>
+                <li aria-hidden="true">/</li>
+                <li class="text-foreground min-w-0 truncate" aria-current="page">{{ venue.name }}</li>
+            </ol>
+        </nav>
+
+        <section aria-labelledby="venue-judul" class="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:gap-12">
+            <div class="order-2 lg:order-1 lg:py-4">
+                <p class="wp-eyebrow">Venue Pemkab Bogor</p>
+                <h1 id="venue-judul" class="mt-3 text-3xl font-bold tracking-tight text-balance sm:text-4xl">{{ venue.name }}</h1>
+
+                <ul class="text-muted-foreground mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                    <li class="inline-flex items-center gap-1.5">
+                        <FontAwesomeIcon :icon="['fas', 'hashtag']" class="size-3.5 text-(--wp-accent)" aria-hidden="true" />
+                        <span class="sr-only">Kode venue</span>
+                        <span class="tabular-nums">{{ venue.code }}</span>
+                    </li>
+                    <li v-if="venue.areas.length" class="inline-flex items-center gap-1.5">
+                        <FontAwesomeIcon :icon="['fas', 'layer-group']" class="size-3.5 text-(--wp-accent)" aria-hidden="true" />
+                        <span class="tabular-nums">{{ venue.areas.length }}</span> area
+                    </li>
+                    <li v-if="venue.facilities && venue.facilities.length" class="inline-flex items-center gap-1.5">
+                        <FontAwesomeIcon :icon="['fas', 'check']" class="size-3.5 text-(--wp-accent)" aria-hidden="true" />
+                        <span class="tabular-nums">{{ venue.facilities.length }}</span> fasilitas
+                    </li>
+                </ul>
+
+                <p v-if="venue.description" class="text-muted-foreground mt-5 max-w-prose text-sm leading-relaxed">{{ venue.description }}</p>
+
+                <div v-if="venue.facilities && venue.facilities.length" class="mt-8">
+                    <h2 class="text-sm font-semibold tracking-tight">Fasilitas</h2>
+                    <ul class="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                        <li v-for="facility in venue.facilities" :key="facility.id" class="flex items-center gap-3 text-sm">
+                            <span class="wp-icon size-9 shrink-0">
+                                <FacilityIcon :icon="facility.icon" class="size-4 text-(--wp-accent)" />
+                            </span>
+                            {{ facility.name }}
+                        </li>
+                    </ul>
+                </div>
             </div>
-            <div class="p-6 sm:p-7">
-                <Link :href="route('e-booking.catalog')" class="text-sm font-semibold text-sky-700 hover:underline"> ← Lihat tempat lain </Link>
-                <h1 class="mt-3 text-3xl font-bold tracking-tight text-slate-900">{{ venue.name }}</h1>
 
-                <div class="mt-4 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-                    <div>
-                        <p v-if="venue.description" class="text-sm leading-6 text-slate-600">{{ venue.description }}</p>
-
-                        <div v-if="venue.facilities && venue.facilities.length" class="mt-4">
-                            <p class="text-sm font-semibold text-slate-900">Fasilitas</p>
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                <span
-                                    v-for="facility in venue.facilities"
-                                    :key="facility.id"
-                                    class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700"
-                                >
-                                    <FacilityIcon :icon="facility.icon" class="size-4 text-sky-700" />
-                                    {{ facility.name }}
-                                </span>
-                            </div>
-                        </div>
+            <div class="order-1 space-y-4 lg:order-2">
+                <div class="bg-muted relative aspect-[4/3] overflow-hidden rounded-2xl">
+                    <AppImage v-if="venue.cover_url" :src="venue.cover_url" :alt="venue.name" class="size-full object-cover" />
+                    <div v-else class="flex size-full items-center justify-center">
+                        <span class="wp-icon size-14">
+                            <FontAwesomeIcon :icon="['fas', 'image']" class="size-6" aria-hidden="true" />
+                        </span>
+                        <span class="sr-only">Foto venue belum tersedia</span>
                     </div>
+                </div>
 
-                    <div v-if="termsPoints.length" id="tata-tertib" class="scroll-mt-40 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-                        <div class="flex items-start gap-2">
-                            <ShieldCheck class="mt-0.5 size-5 shrink-0 text-amber-700" />
-                            <div>
-                                <p class="font-semibold text-slate-900">{{ termsTitle || 'Tata tertib' }}</p>
-                                <ul class="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-700">
-                                    <li v-for="(point, index) in termsPoints" :key="index">{{ point }}</li>
-                                </ul>
-                            </div>
+                <div v-if="termsPoints.length" id="tata-tertib" class="sb-card-muted scroll-mt-28 p-5">
+                    <div class="flex items-start gap-3">
+                        <span class="wp-icon size-9 shrink-0">
+                            <FontAwesomeIcon :icon="['fas', 'shield-halved']" class="size-4" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="text-base font-semibold tracking-tight">{{ termsTitle || 'Tata tertib' }}</h2>
+                            <ul class="text-muted-foreground mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed marker:text-(--wp-accent)">
+                                <li v-for="(point, index) in termsPoints" :key="index">{{ point }}</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <div class="mt-8 grid gap-8 lg:grid-cols-[1.35fr_0.85fr]">
-            <div class="space-y-5">
-                <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-                    <div class="mb-5 flex items-start gap-3">
-                        <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">1</div>
+        <div class="mt-12 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_24rem]">
+            <div class="space-y-6">
+                <section aria-labelledby="langkah-area" class="sb-card p-5 sm:p-7">
+                    <header class="mb-6 flex items-start gap-4">
+                        <span
+                            class="flex size-8 shrink-0 items-center justify-center rounded-full bg-(--wp-accent) text-sm font-semibold text-(--wp-accent-contrast) tabular-nums"
+                            aria-hidden="true"
+                            >1</span
+                        >
                         <div>
-                            <h2 class="text-xl font-bold text-slate-900">Pilih area & jenis sewa</h2>
-                            <p class="mt-1 text-sm text-slate-600">Sewa seluruh venue, atau pilih beberapa area sekaligus.</p>
+                            <h2 id="langkah-area" class="text-lg font-semibold tracking-tight">
+                                <span class="sr-only">Langkah 1: </span>Pilih area & jenis sewa
+                            </h2>
+                            <p class="text-muted-foreground mt-1 text-sm leading-relaxed">Sewa seluruh venue, atau pilih beberapa area sekaligus.</p>
                         </div>
-                    </div>
+                    </header>
 
-                    <div class="mb-4 flex flex-wrap gap-2">
+                    <div class="mb-5 flex flex-wrap gap-2" role="group" aria-label="Cakupan sewa">
                         <button
                             type="button"
-                            class="rounded-full border px-4 py-2 text-sm font-semibold transition"
-                            :class="
-                                bookingMode === 'all' || allAreasShortcut
-                                    ? 'border-sky-600 bg-sky-600 text-white shadow-sm'
-                                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                            "
+                            class="sb-chip px-4 py-2"
+                            :aria-pressed="bookingMode === 'all' || allAreasShortcut"
                             @click="setBookingMode('all')"
                         >
                             Seluruh venue
                         </button>
                         <button
                             type="button"
-                            class="rounded-full border px-4 py-2 text-sm font-semibold transition"
-                            :class="
-                                bookingMode === 'areas' && !allAreasShortcut
-                                    ? 'border-sky-600 bg-sky-600 text-white shadow-sm'
-                                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                            "
+                            class="sb-chip px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            :aria-pressed="bookingMode === 'areas' && !allAreasShortcut"
                             :disabled="venue.areas.length === 0"
                             @click="setBookingMode('areas')"
                         >
@@ -1079,68 +1152,81 @@ const slotTitle = (slot: DaySlot) => {
                         </button>
                     </div>
 
-                    <div v-if="allAreasShortcut" class="mb-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800">
-                        Seluruh area venue ini dipilih otomatis karena belum ada tarif khusus "semua area". Harga dihitung per area — silakan
-                        sesuaikan jenis sewa tiap area bila perlu.
+                    <div v-if="allAreasShortcut" class="sb-callout sb-tone-info mb-5">
+                        <FontAwesomeIcon :icon="['fas', 'circle-info']" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                        <p class="text-xs leading-relaxed">
+                            Seluruh area venue ini dipilih otomatis karena belum ada tarif khusus "semua area". Harga dihitung per area — silakan
+                            sesuaikan jenis sewa tiap area bila perlu.
+                        </p>
                     </div>
 
                     <template v-if="bookingMode === 'all'">
-                        <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="grid gap-5 sm:grid-cols-2">
                             <div>
-                                <label class="mb-1.5 block text-sm font-medium text-slate-800">Jenis sewa (seluruh venue)</label>
-                                <SimpleSelect v-model="allTarifId" :options="tarifSelectOptions" placeholder="Pilih jenis sewa" required />
-                            </div>
-                            <div>
-                                <label class="mb-1.5 block text-sm font-medium text-slate-800">Jenis pemohon</label>
-                                <SimpleSelect v-model="form.kategori_tarif" :options="kategoriSelectOptions" placeholder="Pilih jenis pemohon" />
-                                <p class="mt-1 text-xs text-slate-500">Harga menyesuaikan jenis pemohon.</p>
-                            </div>
-                            <div v-if="selectedTarif && needsQty(selectedTarif.satuan)">
-                                <label class="mb-1.5 block text-sm font-medium text-slate-800">{{ qtyLabel }}</label>
-                                <input
-                                    v-model.number="form.qty"
-                                    type="number"
-                                    min="1"
-                                    class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                                <p class="sb-label">Jenis sewa (seluruh venue)</p>
+                                <SimpleSelect
+                                    v-model="allTarifId"
+                                    :options="tarifSelectOptions"
+                                    placeholder="Pilih jenis sewa"
+                                    required
+                                    :trigger-class="selectTriggerClass"
                                 />
                             </div>
+                            <div>
+                                <p class="sb-label">Jenis pemohon</p>
+                                <SimpleSelect
+                                    v-model="form.kategori_tarif"
+                                    :options="kategoriSelectOptions"
+                                    placeholder="Pilih jenis pemohon"
+                                    :trigger-class="selectTriggerClass"
+                                />
+                                <p class="sb-hint">Harga menyesuaikan jenis pemohon.</p>
+                            </div>
+                            <div v-if="selectedTarif && needsQty(selectedTarif.satuan)">
+                                <label for="booking-qty" class="sb-label">{{ qtyLabel }}</label>
+                                <input id="booking-qty" v-model.number="form.qty" type="number" min="1" class="sb-input tabular-nums" />
+                            </div>
                             <div v-if="selectedTarif && needsLuas(selectedTarif.satuan)">
-                                <label class="mb-1.5 block text-sm font-medium text-slate-800">Luas area (m²)</label>
+                                <label for="booking-luas" class="sb-label">Luas area (m²)</label>
                                 <input
+                                    id="booking-luas"
                                     v-model.number="form.luas_m2"
                                     type="number"
                                     min="0.01"
                                     step="0.01"
                                     required
-                                    class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                                    class="sb-input tabular-nums"
                                 />
                             </div>
                         </div>
 
-                        <div v-if="selectedTarif" class="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                            <p class="font-semibold text-slate-900">{{ selectedTarif.uraian }}</p>
-                            <p class="mt-1">Perhitungan: {{ satuanLabel(selectedTarif.satuan) }}</p>
-                            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                                <span v-if="selectedTarif.tarif_pemerintah != null">
-                                    Instansi pemerintah: <strong>{{ formatRp(selectedTarif.tarif_pemerintah) }}</strong>
-                                </span>
-                                <span v-if="selectedTarif.tarif_non_pemerintah != null">
-                                    Umum / non-pemerintah: <strong>{{ formatRp(selectedTarif.tarif_non_pemerintah) }}</strong>
-                                </span>
-                            </div>
+                        <div v-if="selectedTarif" class="sb-card-muted mt-5 p-4 text-sm">
+                            <p class="font-semibold">{{ selectedTarif.uraian }}</p>
+                            <p class="text-muted-foreground mt-1">Perhitungan: {{ satuanLabel(selectedTarif.satuan) }}</p>
+                            <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-xs">
+                                <div v-if="selectedTarif.tarif_pemerintah != null">
+                                    <dt class="text-muted-foreground">Instansi pemerintah</dt>
+                                    <dd class="mt-0.5 text-sm font-semibold tabular-nums">{{ formatRp(selectedTarif.tarif_pemerintah) }}</dd>
+                                </div>
+                                <div v-if="selectedTarif.tarif_non_pemerintah != null">
+                                    <dt class="text-muted-foreground">Umum / non-pemerintah</dt>
+                                    <dd class="mt-0.5 text-sm font-semibold tabular-nums">{{ formatRp(selectedTarif.tarif_non_pemerintah) }}</dd>
+                                </div>
+                            </dl>
                         </div>
                     </template>
 
                     <template v-else>
                         <div class="space-y-3">
-                            <div v-for="row in areaRows" :key="row.uid" class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                            <div v-for="row in areaRows" :key="row.uid" class="sb-card-muted p-4">
                                 <div class="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                                     <div>
-                                        <label class="mb-1.5 block text-sm font-medium text-slate-800">Area</label>
+                                        <p class="sb-label">Area</p>
                                         <SimpleSelect
                                             :model-value="row.area_id"
                                             :options="areaRowOptions(row)"
                                             placeholder="Pilih area"
+                                            :trigger-class="selectTriggerClass"
                                             @update:model-value="
                                                 (val: string | number) => {
                                                     row.area_id = val === '' ? '' : Number(val);
@@ -1150,11 +1236,12 @@ const slotTitle = (slot: DaySlot) => {
                                         />
                                     </div>
                                     <div>
-                                        <label class="mb-1.5 block text-sm font-medium text-slate-800">Jenis sewa</label>
+                                        <p class="sb-label">Jenis sewa</p>
                                         <SimpleSelect
                                             :model-value="row.tarif_id"
                                             :options="tarifRowOptions(row)"
                                             placeholder="Pilih jenis sewa"
+                                            :trigger-class="selectTriggerClass"
                                             @update:model-value="
                                                 (val: string | number) => {
                                                     row.tarif_id = val === '' ? '' : Number(val);
@@ -1165,138 +1252,180 @@ const slotTitle = (slot: DaySlot) => {
                                     <button
                                         v-if="areaRows.length > 1"
                                         type="button"
-                                        class="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-500 transition hover:border-red-200 hover:text-red-600"
+                                        class="bg-card text-muted-foreground inline-flex size-11 items-center justify-center rounded-xl ring-1 ring-(--wp-hairline) transition ring-inset hover:text-(--sb-danger) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--wp-accent)"
                                         title="Hapus area ini"
+                                        aria-label="Hapus area ini"
                                         @click="removeAreaRow(row.uid)"
                                     >
-                                        <X class="size-4" />
+                                        <FontAwesomeIcon :icon="['fas', 'xmark']" class="size-4" aria-hidden="true" />
                                     </button>
                                 </div>
                                 <div class="mt-3 grid gap-3 sm:grid-cols-2">
                                     <div v-if="tarifForRow(row) && needsQty(tarifForRow(row)!.satuan)">
-                                        <label class="mb-1.5 block text-xs font-medium text-slate-600">{{ qtyLabel }}</label>
+                                        <label :for="`row-qty-${row.uid}`" class="sb-label">{{ qtyLabel }}</label>
                                         <input
+                                            :id="`row-qty-${row.uid}`"
                                             v-model.number="row.qty"
                                             type="number"
                                             min="1"
-                                            class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm"
+                                            class="sb-input tabular-nums"
                                         />
                                     </div>
                                     <div v-if="tarifForRow(row) && needsLuas(tarifForRow(row)!.satuan)">
-                                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Luas area (m²)</label>
+                                        <label :for="`row-luas-${row.uid}`" class="sb-label">Luas area (m²)</label>
                                         <input
+                                            :id="`row-luas-${row.uid}`"
                                             v-model.number="row.luas_m2"
                                             type="number"
                                             min="0.01"
                                             step="0.01"
-                                            class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm"
+                                            class="sb-input tabular-nums"
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            <button
-                                v-if="canAddAreaRow"
-                                type="button"
-                                class="inline-flex items-center gap-2 rounded-full border border-dashed border-sky-300 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:border-sky-400"
-                                @click="addAreaRow"
-                            >
-                                <Plus class="size-4" />
+                            <button v-if="canAddAreaRow" type="button" class="wp-btn wp-btn-quiet px-4 py-2 text-sm" @click="addAreaRow">
+                                <FontAwesomeIcon :icon="['fas', 'plus']" class="size-3.5" aria-hidden="true" />
                                 Tambah area
                             </button>
                         </div>
 
-                        <div class="mt-4">
-                            <label class="mb-1.5 block text-sm font-medium text-slate-800">Jenis pemohon</label>
-                            <SimpleSelect v-model="form.kategori_tarif" :options="kategoriSelectOptions" placeholder="Pilih jenis pemohon" />
-                            <p class="mt-1 text-xs text-slate-500">Berlaku untuk semua area — total harga dihitung per area.</p>
+                        <div class="mt-5">
+                            <p class="sb-label">Jenis pemohon</p>
+                            <SimpleSelect
+                                v-model="form.kategori_tarif"
+                                :options="kategoriSelectOptions"
+                                placeholder="Pilih jenis pemohon"
+                                :trigger-class="selectTriggerClass"
+                            />
+                            <p class="sb-hint">Berlaku untuk semua area — total harga dihitung per area.</p>
                         </div>
                     </template>
                 </section>
 
-                <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-                    <div class="mb-5 flex items-start gap-3">
-                        <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">2</div>
+                <section aria-labelledby="langkah-jadwal" class="sb-card p-5 sm:p-7">
+                    <header class="mb-6 flex items-start gap-4">
+                        <span
+                            class="flex size-8 shrink-0 items-center justify-center rounded-full bg-(--wp-accent) text-sm font-semibold text-(--wp-accent-contrast) tabular-nums"
+                            aria-hidden="true"
+                            >2</span
+                        >
                         <div>
-                            <h2 class="text-xl font-bold text-slate-900">{{ scheduleTitle }}</h2>
-                            <p class="mt-1 text-sm text-slate-600">{{ scheduleHint }}</p>
+                            <h2 id="langkah-jadwal" class="text-lg font-semibold tracking-tight">
+                                <span class="sr-only">Langkah 2: </span>{{ scheduleTitle }}
+                            </h2>
+                            <p class="text-muted-foreground mt-1 text-sm leading-relaxed">{{ scheduleHint }}</p>
                         </div>
-                    </div>
+                    </header>
 
-                    <div class="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                    <div class="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
                         <div>
-                            <p class="mb-2 text-sm font-medium text-slate-800">Kalender ketersediaan</p>
+                            <p class="sb-label">Kalender ketersediaan</p>
                             <BookingAvailabilityCalendar v-model="selectedDate" :venue-id="venue.id" :area-ids="selectedAreaIds" />
                         </div>
 
-                        <div class="space-y-4">
+                        <div class="space-y-5">
                             <div>
-                                <label class="mb-1.5 block text-sm font-medium text-slate-800">
+                                <p class="sb-label">
                                     {{ scheduleMode === 'monthly' ? 'Mulai dari tanggal' : 'Tanggal terpilih' }}
-                                </label>
-                                <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900">
+                                </p>
+                                <p class="bg-muted/60 flex items-center gap-2.5 rounded-xl px-3.5 py-3 text-sm font-semibold tabular-nums">
+                                    <FontAwesomeIcon :icon="['fas', 'calendar-days']" class="size-4 text-(--wp-accent)" aria-hidden="true" />
                                     {{ selectedDate ? formatTanggalIndo(selectedDate) : 'Belum dipilih' }}
-                                </div>
+                                </p>
                             </div>
 
                             <div v-if="scheduleMode === 'hourly'">
-                                <label class="mb-1.5 block text-sm font-medium text-slate-800">Lama pakai</label>
-                                <SimpleSelect v-model="durationHours" :options="durationHourOptions" placeholder="Pilih lama" />
+                                <p class="sb-label">Lama pakai</p>
+                                <SimpleSelect
+                                    v-model="durationHours"
+                                    :options="durationHourOptions"
+                                    placeholder="Pilih lama"
+                                    :trigger-class="selectTriggerClass"
+                                />
                             </div>
 
                             <div v-else-if="scheduleMode === 'block3'">
-                                <label class="mb-1.5 block text-sm font-medium text-slate-800">Jumlah blok</label>
-                                <SimpleSelect v-model="durationBlocks" :options="durationBlockSelectOptions" placeholder="Pilih blok" />
+                                <p class="sb-label">Jumlah blok</p>
+                                <SimpleSelect
+                                    v-model="durationBlocks"
+                                    :options="durationBlockSelectOptions"
+                                    placeholder="Pilih blok"
+                                    :trigger-class="selectTriggerClass"
+                                />
                             </div>
 
                             <div v-else-if="scheduleMode === 'daily'">
-                                <label class="mb-1.5 block text-sm font-medium text-slate-800">Lama hari</label>
-                                <SimpleSelect v-model="durationDays" :options="durationDaySelectOptions" placeholder="Pilih lama hari" />
+                                <p class="sb-label">Lama hari</p>
+                                <SimpleSelect
+                                    v-model="durationDays"
+                                    :options="durationDaySelectOptions"
+                                    placeholder="Pilih lama hari"
+                                    :trigger-class="selectTriggerClass"
+                                />
                             </div>
 
                             <div v-else-if="scheduleMode === 'monthly'">
-                                <label class="mb-1.5 block text-sm font-medium text-slate-800">Lama bulan</label>
-                                <SimpleSelect v-model="durationMonths" :options="durationMonthSelectOptions" placeholder="Pilih lama bulan" />
+                                <p class="sb-label">Lama bulan</p>
+                                <SimpleSelect
+                                    v-model="durationMonths"
+                                    :options="durationMonthSelectOptions"
+                                    placeholder="Pilih lama bulan"
+                                    :trigger-class="selectTriggerClass"
+                                />
                             </div>
 
-                            <div v-else class="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            <p v-else class="bg-muted/60 text-muted-foreground rounded-xl px-3.5 py-3 text-sm leading-relaxed">
                                 Sewa dihitung per kegiatan / kunjungan pada tanggal terpilih.
-                            </div>
+                            </p>
                         </div>
                     </div>
 
                     <!-- Slot jam: hanya untuk tarif per jam / blok 3 jam -->
-                    <div v-if="usesHourSlots" class="mt-5">
-                        <div v-if="slotsLoading" class="flex items-center gap-2 text-sm text-slate-500">
-                            <LoaderCircle class="size-4 animate-spin" />
-                            Memuat jadwal…
+                    <div v-if="usesHourSlots" class="mt-7 border-t border-(--wp-hairline) pt-6">
+                        <h3 class="mb-3 text-sm font-semibold tracking-tight">Pilih jam</h3>
+                        <div v-if="slotsLoading" class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4" aria-busy="true">
+                            <span class="sr-only">Memuat jadwal…</span>
+                            <Skeleton v-for="n in 8" :key="n" class="h-16 rounded-xl" />
                         </div>
-                        <p v-else-if="slotsError" class="text-sm text-red-600">{{ slotsError }}</p>
-                        <div v-else-if="dayFullDay" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-800">
-                            <p class="font-semibold">Tanggal penuh</p>
-                            <p class="mt-1">{{ dayFullDayReason || 'Ditutup pengelola' }} — tanggal ini tidak bisa dipesan.</p>
+                        <p v-else-if="slotsError" class="sb-callout sb-tone-danger" role="alert">{{ slotsError }}</p>
+                        <div v-else-if="dayFullDay" class="sb-callout sb-tone-danger">
+                            <FontAwesomeIcon :icon="['fas', 'circle-exclamation']" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                            <div>
+                                <p class="font-semibold">Tanggal penuh</p>
+                                <p class="mt-1">{{ dayFullDayReason || 'Ditutup pengelola' }} — tanggal ini tidak bisa dipesan.</p>
+                            </div>
                         </div>
                         <template v-else>
-                            <p
-                                v-if="dayPartialNotes.length"
-                                class="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
-                            >
+                            <p v-if="dayPartialNotes.length" class="sb-callout sb-tone-warning mb-3 text-xs">
                                 Sebagian jam ditutup: {{ dayPartialNotes.join(', ') }}
                             </p>
-                            <p v-if="daySlots.length === 0" class="text-sm text-slate-500">Belum ada jam yang bisa dipilih untuk tanggal ini.</p>
+                            <div v-if="daySlots.length === 0" class="bg-muted/60 flex items-center gap-3 rounded-xl p-4">
+                                <span class="wp-icon size-9 shrink-0">
+                                    <FontAwesomeIcon :icon="['fas', 'calendar-days']" class="size-4" aria-hidden="true" />
+                                </span>
+                                <p class="text-muted-foreground text-sm">Belum ada jam yang bisa dipilih untuk tanggal ini.</p>
+                            </div>
                             <div v-else class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                                 <button
                                     v-for="slot in daySlots"
                                     :key="slotKey(slot)"
                                     type="button"
-                                    class="relative rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition"
+                                    class="relative rounded-xl px-3 py-3 text-left text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--wp-accent)"
                                     :class="slotClass(slot)"
                                     :disabled="!slot.bookable"
                                     :title="slotTitle(slot)"
+                                    :aria-pressed="selectedSlotKey === slotKey(slot)"
                                     @click="selectSlot(slot)"
                                 >
-                                    <span class="block">{{ slot.label }}</span>
-                                    <span class="mt-1 block text-[11px] font-medium opacity-80">
+                                    <span class="block tabular-nums" :class="{ 'line-through': !slot.bookable }">{{ slot.label }}</span>
+                                    <span class="mt-1 flex items-center gap-1.5 text-xs font-medium opacity-80">
+                                        <span
+                                            v-if="slot.bookable && slot.pengajuan && selectedSlotKey !== slotKey(slot)"
+                                            class="size-1.5 shrink-0 rounded-full bg-(--sb-warning)"
+                                            aria-hidden="true"
+                                        />
                                         <template v-if="slot.bookable && slot.pengajuan">Ada pengajuan</template>
                                         <template v-else-if="slot.bookable">Tersedia</template>
                                         <template v-else>{{ slot.reason || 'Penuh' }}</template>
@@ -1307,115 +1436,145 @@ const slotTitle = (slot: DaySlot) => {
                     </div>
 
                     <!-- Ringkas periode untuk tarif harian / bulanan / kegiatan -->
-                    <div v-else class="mt-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-4 text-sm text-slate-700">
+                    <div v-else class="sb-card-muted mt-7 p-4 text-sm" aria-live="polite">
                         <template v-if="quoteLoading">
-                            <span class="inline-flex items-center gap-2 text-slate-500">
-                                <LoaderCircle class="size-4 animate-spin" />
+                            <span class="text-muted-foreground inline-flex items-center gap-2">
+                                <FontAwesomeIcon :icon="['fas', 'circle-notch']" class="size-4 animate-spin" aria-hidden="true" />
                                 Mengecek ketersediaan…
                             </span>
                         </template>
                         <template v-else-if="form.starts_at && form.ends_at">
-                            <p class="font-semibold text-slate-900">Periode terpilih</p>
-                            <p class="mt-1">
+                            <p class="font-semibold">Periode terpilih</p>
+                            <p class="mt-1 tabular-nums">
                                 {{ selectedDate ? formatTanggalIndo(selectedDate) : '' }}
                                 <template v-if="endDate && endDate !== selectedDate"> — {{ formatTanggalIndo(endDate) }}</template>
                             </p>
-                            <p class="mt-1 text-xs text-slate-500">Jam operasional {{ operatingHours.start }}–{{ operatingHours.end }}</p>
+                            <p class="text-muted-foreground mt-1 text-xs tabular-nums">
+                                Jam operasional {{ operatingHours.start }}–{{ operatingHours.end }}
+                            </p>
                         </template>
-                        <template v-else> Pilih tanggal di atas. Harga dan ketersediaan dihitung otomatis. </template>
+                        <template v-else>
+                            <span class="text-muted-foreground">Pilih tanggal di atas. Harga dan ketersediaan dihitung otomatis.</span>
+                        </template>
                     </div>
 
                     <InputError :message="form.errors.starts_at || form.errors.ends_at" />
                 </section>
 
-                <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-                    <div class="mb-5 flex items-start gap-3">
-                        <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">3</div>
+                <section aria-labelledby="langkah-data" class="sb-card p-5 sm:p-7">
+                    <header class="mb-6 flex items-start gap-4">
+                        <span
+                            class="flex size-8 shrink-0 items-center justify-center rounded-full bg-(--wp-accent) text-sm font-semibold text-(--wp-accent-contrast) tabular-nums"
+                            aria-hidden="true"
+                            >3</span
+                        >
                         <div>
-                            <h2 class="text-xl font-bold text-slate-900">Lengkapi pengajuan</h2>
-                            <p class="mt-1 text-sm text-slate-600">Isi keperluan dan tambahan layanan bila perlu.</p>
-                            <p class="mt-2 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-800">
-                                Pengajuan diproses maksimal {{ slaHariKerja }} hari kerja. Setelah disetujui, selesaikan pembayaran sebelum batas
-                                waktu — jika terlewat, booking otomatis batal dan harus diajukan ulang.
-                            </p>
+                            <h2 id="langkah-data" class="text-lg font-semibold tracking-tight">
+                                <span class="sr-only">Langkah 3: </span>Lengkapi pengajuan
+                            </h2>
+                            <p class="text-muted-foreground mt-1 text-sm leading-relaxed">Isi keperluan dan tambahan layanan bila perlu.</p>
                         </div>
+                    </header>
+
+                    <div class="sb-callout sb-tone-info mb-6">
+                        <FontAwesomeIcon :icon="['fas', 'circle-info']" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                        <p class="text-xs leading-relaxed">
+                            Pengajuan diproses maksimal <span class="tabular-nums">{{ slaHariKerja }}</span> hari kerja. Setelah disetujui, selesaikan
+                            pembayaran sebelum batas waktu — jika terlewat, booking otomatis batal dan harus diajukan ulang.
+                        </p>
                     </div>
 
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium text-slate-800">Dipakai untuk apa?</label>
+                        <label for="booking-tujuan" class="sb-label">Dipakai untuk apa?</label>
                         <input
+                            id="booking-tujuan"
                             v-model="form.tujuan"
                             type="text"
                             required
                             maxlength="255"
-                            class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                            class="sb-input"
+                            :aria-invalid="form.errors.tujuan ? 'true' : undefined"
                             placeholder="Contoh: latihan klub, sparring, kegiatan komunitas"
                         />
                         <InputError :message="form.errors.tujuan" />
                     </div>
 
-                    <div v-if="addons.length" class="mt-5 space-y-3">
-                        <p class="text-sm font-medium text-slate-800">Tambahan layanan (opsional)</p>
-                        <div class="grid gap-3 sm:grid-cols-2">
+                    <fieldset v-if="addons.length" class="mt-6">
+                        <legend class="sb-label">Tambahan layanan (opsional)</legend>
+                        <div class="mt-1 grid gap-3 sm:grid-cols-2">
                             <button
                                 v-for="addon in addons"
                                 :key="addon.id"
                                 type="button"
-                                class="flex items-start justify-between gap-3 rounded-2xl border p-4 text-left text-sm transition"
+                                class="flex items-start justify-between gap-3 rounded-xl p-4 text-left text-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--wp-accent)"
                                 :class="
                                     selectedAddonIds.includes(addon.id)
-                                        ? 'border-sky-500 bg-sky-50'
-                                        : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                                        ? 'bg-(--wp-accent-soft) ring-2 ring-(--wp-accent) ring-inset'
+                                        : 'bg-card hover:bg-muted/60 ring-1 ring-(--wp-hairline) ring-inset'
                                 "
+                                :aria-pressed="selectedAddonIds.includes(addon.id)"
                                 @click="toggleAddon(addon.id)"
                             >
                                 <span>
-                                    <span class="block font-medium" :class="selectedAddonIds.includes(addon.id) ? 'text-sky-800' : 'text-slate-900'">
+                                    <span
+                                        class="block font-medium"
+                                        :class="selectedAddonIds.includes(addon.id) ? 'text-(--wp-accent-strong)' : 'text-foreground'"
+                                    >
                                         {{ addon.name }}
                                     </span>
-                                    <span v-if="addon.harga != null" class="mt-1 block text-xs font-semibold text-slate-700">
+                                    <span v-if="addon.harga != null" class="text-muted-foreground mt-1 block text-xs font-semibold tabular-nums">
                                         {{ formatRp(addon.harga) }}
                                     </span>
                                 </span>
-                                <Check v-if="selectedAddonIds.includes(addon.id)" class="mt-0.5 size-4 shrink-0 text-sky-600" />
+                                <span
+                                    class="flex size-5 shrink-0 items-center justify-center rounded-md transition"
+                                    :class="
+                                        selectedAddonIds.includes(addon.id)
+                                            ? 'bg-(--wp-accent) text-(--wp-accent-contrast)'
+                                            : 'ring-1 ring-(--wp-hairline) ring-inset'
+                                    "
+                                    aria-hidden="true"
+                                >
+                                    <FontAwesomeIcon v-if="selectedAddonIds.includes(addon.id)" :icon="['fas', 'check']" class="size-3" />
+                                </span>
                             </button>
                         </div>
-                    </div>
+                    </fieldset>
                 </section>
             </div>
 
-            <aside class="space-y-5 lg:sticky lg:top-36 lg:self-start">
-                <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+            <aside class="space-y-5 lg:sticky lg:top-24 lg:self-start" aria-labelledby="ringkasan-judul">
+                <section class="sb-card p-5 sm:p-6">
                     <div class="flex items-start justify-between gap-3">
                         <div>
-                            <h2 class="text-xl font-bold text-slate-900">Ringkasan</h2>
-                            <p class="mt-1 text-sm text-slate-500">Cek dulu sebelum mengirim.</p>
+                            <h2 id="ringkasan-judul" class="text-lg font-semibold tracking-tight">Ringkasan</h2>
+                            <p class="text-muted-foreground mt-1 text-sm">Cek dulu sebelum mengirim.</p>
                         </div>
-                        <div class="rounded-2xl bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                        <span class="sb-badge sb-tone-success max-w-40 truncate" :title="selectedAreaName">
                             {{ selectedAreaName }}
-                        </div>
+                        </span>
                     </div>
 
-                    <div class="mt-5 space-y-3 text-sm">
-                        <div class="flex justify-between gap-3">
-                            <span class="text-slate-500">Tempat</span>
-                            <span class="text-right font-medium text-slate-900">{{ venue.name }}</span>
+                    <dl class="mt-5 divide-y divide-(--wp-hairline) text-sm">
+                        <div class="flex justify-between gap-4 py-2.5">
+                            <dt class="text-muted-foreground shrink-0">Tempat</dt>
+                            <dd class="text-right font-medium">{{ venue.name }}</dd>
                         </div>
-                        <div class="flex justify-between gap-3">
-                            <span class="text-slate-500">Area</span>
-                            <span class="text-right text-slate-900">{{ selectedAreaName }}</span>
+                        <div class="flex justify-between gap-4 py-2.5">
+                            <dt class="text-muted-foreground shrink-0">Area</dt>
+                            <dd class="text-right">{{ selectedAreaName }}</dd>
                         </div>
-                        <div class="flex justify-between gap-3">
-                            <span class="text-slate-500">Jenis sewa</span>
-                            <span class="text-right text-slate-900">{{ selectedTarifNames }}</span>
+                        <div class="flex justify-between gap-4 py-2.5">
+                            <dt class="text-muted-foreground shrink-0">Jenis sewa</dt>
+                            <dd class="text-right">{{ selectedTarifNames }}</dd>
                         </div>
-                        <div class="flex justify-between gap-3">
-                            <span class="text-slate-500">Jenis pemohon</span>
-                            <span class="text-right text-slate-900">{{ jenisPemohonLabel(form.kategori_tarif) }}</span>
+                        <div class="flex justify-between gap-4 py-2.5">
+                            <dt class="text-muted-foreground shrink-0">Jenis pemohon</dt>
+                            <dd class="text-right">{{ jenisPemohonLabel(form.kategori_tarif) }}</dd>
                         </div>
-                        <div class="flex justify-between gap-3">
-                            <span class="text-slate-500">Jadwal</span>
-                            <span class="text-right text-slate-900">
+                        <div class="flex justify-between gap-4 py-2.5">
+                            <dt class="text-muted-foreground shrink-0">Jadwal</dt>
+                            <dd class="text-right tabular-nums">
                                 <template v-if="form.starts_at && form.ends_at">
                                     <template v-if="usesHourSlots">
                                         {{ formatTanggalJamIndo(form.starts_at) }} — {{ formatJamIndo(form.ends_at) }}
@@ -1425,62 +1584,89 @@ const slotTitle = (slot: DaySlot) => {
                                         <template v-if="endDate && endDate !== selectedDate"> — {{ formatTanggalIndo(endDate) }}</template>
                                     </template>
                                 </template>
-                                <template v-else>Belum dipilih</template>
-                            </span>
+                                <span v-else class="text-muted-foreground">Belum dipilih</span>
+                            </dd>
                         </div>
-                    </div>
+                    </dl>
 
                     <div
                         v-if="localAvailability && availabilityCopy"
-                        class="mt-5 rounded-2xl border px-4 py-4 text-sm"
+                        class="sb-callout mt-4"
                         :class="{
-                            'border-emerald-200 bg-emerald-50': localAvailability.status === 'hijau' && !localAvailability.pengajuan,
-                            'border-orange-200 bg-orange-50': localAvailability.status === 'hijau' && localAvailability.pengajuan,
-                            'border-red-200 bg-red-50': localAvailability.status === 'merah',
+                            'sb-tone-success': localAvailability.status === 'hijau' && !localAvailability.pengajuan,
+                            'sb-tone-warning': localAvailability.status === 'hijau' && localAvailability.pengajuan,
+                            'sb-tone-danger': localAvailability.status === 'merah',
                         }"
+                        role="status"
                     >
-                        <p class="font-semibold" :class="availabilityCopy.tone">{{ availabilityCopy.label }}</p>
-                        <p class="mt-1 text-slate-600">{{ availabilityCopy.detail }}</p>
+                        <div>
+                            <p class="font-semibold" :class="availabilityCopy.tone">{{ availabilityCopy.label }}</p>
+                            <p class="text-foreground/80 mt-1">{{ availabilityCopy.detail }}</p>
+                        </div>
                     </div>
 
-                    <div v-if="quoteLoading" class="mt-5 flex items-center gap-2 text-sm text-slate-500">
-                        <LoaderCircle class="size-4 animate-spin" />
-                        Menghitung harga…
-                    </div>
-                    <p v-else-if="quoteError" class="mt-5 text-sm text-red-600">{{ quoteError }}</p>
-                    <div v-else-if="localQuote" class="mt-5 space-y-3 rounded-2xl bg-slate-50 p-4 text-sm">
-                        <div v-for="(line, index) in localQuote.lines" :key="index" class="flex justify-between gap-3">
-                            <span class="text-slate-600">
-                                {{ line.uraian }}<template v-if="line.area"> · {{ line.area.name }}</template>
-                                <span v-if="line.duration_label" class="block text-xs text-slate-500">{{ line.duration_label }}</span>
-                            </span>
-                            <span class="font-medium text-slate-900">{{ formatRp(line.line_total) }}</span>
+                    <div v-if="quoteLoading" class="bg-muted/60 mt-5 space-y-3 rounded-2xl p-4" aria-busy="true">
+                        <span class="sr-only">Menghitung harga…</span>
+                        <div class="flex justify-between gap-3">
+                            <Skeleton class="h-4 w-32" />
+                            <Skeleton class="h-4 w-20" />
                         </div>
-                        <div v-if="localQuote.addons?.length" class="border-t border-slate-200 pt-3">
-                            <div v-for="(addon, index) in localQuote.addons" :key="index" class="mt-2 flex justify-between gap-3">
-                                <span class="text-slate-600">{{ addon.name }}</span>
-                                <span class="font-medium text-slate-900">{{ formatRp(addon.line_total) }}</span>
-                            </div>
+                        <div class="flex justify-between gap-3">
+                            <Skeleton class="h-4 w-24" />
+                            <Skeleton class="h-4 w-16" />
                         </div>
-                        <div class="border-t border-slate-200 pt-3">
-                            <div class="flex justify-between gap-3 text-base font-bold text-slate-900">
-                                <span>Perkiraan total</span>
-                                <span>{{ formatRp(localQuote.grand_total) }}</span>
-                            </div>
+                        <div class="flex justify-between gap-3 border-t border-(--wp-hairline) pt-3">
+                            <Skeleton class="h-5 w-28" />
+                            <Skeleton class="h-5 w-24" />
                         </div>
                     </div>
-                    <p v-else class="mt-5 text-sm text-slate-500">
-                        {{ usesHourSlots ? 'Pilih jam di sebelah kiri untuk melihat harga.' : 'Pilih tanggal di sebelah kiri untuk melihat harga.' }}
-                    </p>
+                    <p v-else-if="quoteError" class="sb-callout sb-tone-danger mt-5" role="alert">{{ quoteError }}</p>
+                    <div v-else-if="localQuote" class="bg-muted/60 mt-5 rounded-2xl p-4">
+                        <h3 class="text-muted-foreground text-xs font-medium">Rincian harga</h3>
+                        <dl class="mt-3 space-y-2.5 text-sm">
+                            <div v-for="(line, index) in localQuote.lines" :key="`line-${index}`" class="flex justify-between gap-3">
+                                <dt class="text-muted-foreground">
+                                    {{ line.uraian }}<template v-if="line.area"> · {{ line.area.name }}</template>
+                                    <span v-if="line.duration_label" class="block text-xs tabular-nums">{{ line.duration_label }}</span>
+                                </dt>
+                                <dd class="shrink-0 font-medium tabular-nums">{{ formatRp(line.line_total) }}</dd>
+                            </div>
+                            <div
+                                v-for="(addon, index) in localQuote.addons ?? []"
+                                :key="`addon-${index}`"
+                                class="flex justify-between gap-3"
+                                :class="index === 0 ? 'border-t border-(--wp-hairline) pt-2.5' : ''"
+                            >
+                                <dt class="text-muted-foreground">{{ addon.name }}</dt>
+                                <dd class="shrink-0 font-medium tabular-nums">{{ formatRp(addon.line_total) }}</dd>
+                            </div>
+                            <div class="flex items-baseline justify-between gap-3 border-t border-(--wp-hairline) pt-3">
+                                <dt class="font-semibold">Perkiraan total</dt>
+                                <dd class="text-xl font-bold tracking-tight tabular-nums">{{ formatRp(localQuote.grand_total) }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+                    <div v-else class="bg-muted/60 mt-5 flex items-center gap-3 rounded-2xl p-4">
+                        <span class="wp-icon size-9 shrink-0">
+                            <FontAwesomeIcon :icon="['fas', 'wallet']" class="size-4" aria-hidden="true" />
+                        </span>
+                        <p class="text-muted-foreground text-sm">
+                            {{
+                                usesHourSlots
+                                    ? 'Pilih jam di sebelah kiri untuk melihat harga.'
+                                    : 'Pilih tanggal di sebelah kiri untuk melihat harga.'
+                            }}
+                        </p>
+                    </div>
 
-                    <label class="mt-5 flex items-start gap-3 rounded-2xl bg-slate-50 p-4 text-sm">
-                        <input v-model="form.tata_tertib_accepted" type="checkbox" class="mt-1" />
-                        <span class="text-slate-600">
+                    <label class="hover:bg-muted/60 mt-5 flex cursor-pointer items-start gap-3 rounded-xl p-3 text-sm transition">
+                        <input v-model="form.tata_tertib_accepted" type="checkbox" class="mt-0.5 size-4 shrink-0 accent-(--wp-accent)" />
+                        <span class="text-muted-foreground leading-relaxed">
                             Saya sudah membaca
                             <a
                                 v-if="termsPoints.length"
                                 href="#tata-tertib"
-                                class="font-semibold text-sky-700 underline decoration-sky-300 underline-offset-2 hover:text-sky-900"
+                                class="rounded-sm font-semibold text-(--wp-accent-strong) underline underline-offset-2 hover:text-(--wp-accent) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--wp-accent)"
                             >
                                 tata tertib
                             </a>
@@ -1490,69 +1676,74 @@ const slotTitle = (slot: DaySlot) => {
                     </label>
                     <InputError :message="form.errors.tata_tertib_accepted" />
 
-                    <label class="mt-3 flex items-start gap-3 rounded-2xl bg-slate-50 p-4 text-sm">
-                        <input v-model="form.terms_accepted" type="checkbox" class="mt-1" />
-                        <span class="text-slate-600">{{ termsText }}</span>
+                    <label class="hover:bg-muted/60 mt-1 flex cursor-pointer items-start gap-3 rounded-xl p-3 text-sm transition">
+                        <input v-model="form.terms_accepted" type="checkbox" class="mt-0.5 size-4 shrink-0 accent-(--wp-accent)" />
+                        <span class="text-muted-foreground leading-relaxed">{{ termsText }}</span>
                     </label>
                     <InputError :message="form.errors.terms_accepted" />
 
                     <button
                         v-if="bookingAuth"
                         type="button"
-                        class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--brand-green,#2e7d32)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="wp-btn wp-btn-primary mt-5 w-full justify-center px-5 py-3 text-sm"
                         :disabled="!canSubmit"
                         @click="submitBooking"
                     >
-                        <LoaderCircle v-if="form.processing" class="size-4 animate-spin" />
+                        <FontAwesomeIcon v-if="form.processing" :icon="['fas', 'circle-notch']" class="size-4 animate-spin" aria-hidden="true" />
+                        <FontAwesomeIcon v-else :icon="['fas', 'paper-plane']" class="size-4" aria-hidden="true" />
                         Kirim pengajuan
                     </button>
-                    <p v-if="bookingAuth && submitHint" class="mt-2 text-center text-xs text-amber-700">
+                    <p v-if="bookingAuth && submitHint" class="mt-2.5 text-center text-xs text-(--sb-warning)" aria-live="polite">
                         {{ submitHint }}
                     </p>
 
-                    <div v-else class="mt-5 space-y-3">
-                        <Link
-                            :href="route('e-booking.login')"
-                            class="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
-                        >
+                    <div v-if="!bookingAuth" class="mt-5 space-y-2.5">
+                        <Link :href="route('e-booking.login')" class="wp-btn wp-btn-primary w-full justify-center px-5 py-3 text-sm">
                             Masuk untuk lanjut
                         </Link>
-                        <Link
-                            :href="route('e-booking.register')"
-                            class="inline-flex w-full items-center justify-center rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-800"
-                        >
+                        <Link :href="route('e-booking.register')" class="wp-btn wp-btn-quiet w-full justify-center px-5 py-3 text-sm">
                             Buat akun baru
                         </Link>
-                        <p class="text-center text-xs text-slate-500">Anda tetap bisa cek jadwal dan harga tanpa masuk.</p>
+                        <p class="text-muted-foreground text-center text-xs">Anda tetap bisa cek jadwal dan harga tanpa masuk.</p>
                     </div>
                 </section>
 
-                <section class="rounded-[32px] border border-slate-200 bg-white p-5 shadow-sm">
+                <section class="sb-card-muted p-5" aria-labelledby="setelah-dikirim">
                     <div class="flex items-start gap-3">
-                        <CircleAlert class="mt-0.5 size-5 text-amber-600" />
+                        <span class="wp-icon size-9 shrink-0">
+                            <FontAwesomeIcon :icon="['fas', 'circle-exclamation']" class="size-4" aria-hidden="true" />
+                        </span>
                         <div>
-                            <h2 class="font-semibold text-slate-900">Setelah dikirim</h2>
-                            <p class="mt-1 text-sm leading-6 text-slate-600">
+                            <h2 id="setelah-dikirim" class="text-sm font-semibold tracking-tight">Setelah dikirim</h2>
+                            <p class="text-muted-foreground mt-1 text-sm leading-relaxed">
                                 Pengelola akan meninjau. Jika disetujui, petunjuk pembayaran muncul di halaman pesanan.
                             </p>
                         </div>
                     </div>
-                </section>
 
-                <div class="grid gap-3 text-sm text-slate-600">
-                    <div class="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 shadow-sm">
-                        <CalendarDays class="size-4 text-sky-700" />
-                        {{ usesHourSlots ? 'Pilih jam dari daftar yang tersedia' : 'Jadwal menyesuaikan satuan tarif (hari / bulan / kegiatan)' }}
-                    </div>
-                    <div class="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 shadow-sm">
-                        <Wallet class="size-4 text-emerald-700" />
-                        Harga muncul otomatis setelah jadwal dipilih
-                    </div>
-                    <div class="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 shadow-sm">
-                        <ShieldCheck class="size-4 text-amber-700" />
-                        Kirim pengajuan hanya jika jadwal masih terbuka
-                    </div>
-                </div>
+                    <ul class="text-muted-foreground mt-4 space-y-2.5 border-t border-(--wp-hairline) pt-4 text-sm">
+                        <li class="flex items-start gap-2.5">
+                            <FontAwesomeIcon
+                                :icon="['fas', 'calendar-days']"
+                                class="mt-0.5 size-3.5 shrink-0 text-(--wp-accent)"
+                                aria-hidden="true"
+                            />
+                            {{ usesHourSlots ? 'Pilih jam dari daftar yang tersedia' : 'Jadwal menyesuaikan satuan tarif (hari / bulan / kegiatan)' }}
+                        </li>
+                        <li class="flex items-start gap-2.5">
+                            <FontAwesomeIcon :icon="['fas', 'wallet']" class="mt-0.5 size-3.5 shrink-0 text-(--wp-accent)" aria-hidden="true" />
+                            Harga muncul otomatis setelah jadwal dipilih
+                        </li>
+                        <li class="flex items-start gap-2.5">
+                            <FontAwesomeIcon
+                                :icon="['fas', 'shield-halved']"
+                                class="mt-0.5 size-3.5 shrink-0 text-(--wp-accent)"
+                                aria-hidden="true"
+                            />
+                            Kirim pengajuan hanya jika jadwal masih terbuka
+                        </li>
+                    </ul>
+                </section>
             </aside>
         </div>
     </EBookingLayout>

@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import RowActionsMenu from '@/components/e-booking/RowActionsMenu.vue';
 import TablePagination from '@/components/e-booking/TablePagination.vue';
-import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faCircleNotch, faListOl, faPen, faPlus, faPowerOff } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { router, useForm } from '@inertiajs/vue3';
-import { ListOrdered, LoaderCircle, Pencil, Plus, Power } from 'lucide-vue-next';
 import { ref } from 'vue';
+
+library.add(faCircleNotch, faListOl, faPen, faPlus, faPowerOff);
 
 type RuleRow = {
     id: number;
@@ -99,10 +98,10 @@ const toggle = (row: RuleRow) => {
 };
 
 const rowActions = (row: RuleRow) => [
-    { label: 'Edit', icon: Pencil, onClick: () => openEdit(row) },
+    { label: 'Edit', icon: 'pen', onClick: () => openEdit(row) },
     {
         label: row.is_active ? 'Nonaktifkan' : 'Aktifkan',
-        icon: Power,
+        icon: 'power-off',
         variant: row.is_active ? ('destructive' as const) : ('default' as const),
         confirm: row.is_active
             ? {
@@ -121,105 +120,111 @@ const rowActions = (row: RuleRow) => [
     <SeoHead title="Prioritas Konflik E-Booking" />
 
     <AdminLayout active="priority-rules">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h1 class="text-foreground text-2xl font-bold">Prioritas konflik</h1>
-                <p class="text-muted-foreground mt-1 text-sm">Urutan prioritas saat jadwal bentrok. Angka lebih kecil = prioritas lebih tinggi.</p>
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">Prioritas konflik</h1>
+                <p class="text-muted-foreground mt-1.5 max-w-2xl text-sm">
+                    Urutan prioritas saat jadwal bentrok. Angka yang lebih kecil berarti prioritas lebih tinggi.
+                </p>
             </div>
-            <Button @click="openCreate">
-                <Plus class="size-4" />
+            <button type="button" class="wp-btn wp-btn-primary px-5 py-2.5 text-sm" @click="openCreate">
+                <FontAwesomeIcon :icon="['fas', 'plus']" class="size-3.5" aria-hidden="true" />
                 Tambah prioritas
-            </Button>
+            </button>
         </div>
 
-        <Table class="mt-6 min-w-[640px]">
-            <TableHeader>
-                <TableRow>
-                    <TableHead>Urutan</TableHead>
-                    <TableHead>Nama</TableHead>
-                    <TableHead>Kode</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead></TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                <TableRow v-for="row in rules.data" :key="row.id">
-                    <TableCell>
-                        <span class="bg-muted inline-flex size-7 items-center justify-center rounded-full text-xs font-bold">{{
-                            row.priority_order
-                        }}</span>
-                    </TableCell>
-                    <TableCell>
-                        <p class="font-medium">{{ row.name }}</p>
-                        <p class="text-muted-foreground text-xs">{{ row.description || '—' }}</p>
-                    </TableCell>
-                    <TableCell>
-                        <code class="text-xs">{{ row.code }}</code>
-                    </TableCell>
-                    <TableCell>
-                        <Badge :variant="row.is_active ? 'default' : 'secondary'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
-                    </TableCell>
-                    <TableCell class="text-right">
-                        <RowActionsMenu :items="rowActions(row)" />
-                    </TableCell>
-                </TableRow>
-                <TableRow v-if="rules.data.length === 0">
-                    <TableCell colspan="5">
-                        <div class="flex flex-col items-center gap-2 py-8 text-center">
-                            <ListOrdered class="text-muted-foreground size-8" />
-                            <p class="text-muted-foreground text-sm">Belum ada prioritas konflik.</p>
+        <section class="sb-card mt-6" aria-labelledby="priority-list-title">
+            <h2 id="priority-list-title" class="sr-only">Daftar prioritas</h2>
+            <div v-if="rules.data.length === 0" class="flex flex-col items-center px-6 py-14 text-center">
+                <span class="wp-icon size-12" aria-hidden="true">
+                    <FontAwesomeIcon :icon="['fas', 'list-ol']" class="size-5" />
+                </span>
+                <h3 class="mt-4 text-base font-semibold tracking-tight">Belum ada prioritas konflik</h3>
+                <p class="text-muted-foreground mt-1 max-w-sm text-sm">Susun urutan kelompok penyewa yang didahulukan saat jadwal bentrok.</p>
+                <button type="button" class="wp-btn wp-btn-quiet mt-5 px-4 py-2 text-sm" @click="openCreate">
+                    <FontAwesomeIcon :icon="['fas', 'plus']" class="size-3.5" aria-hidden="true" />
+                    Tambah prioritas
+                </button>
+            </div>
+            <ol v-else class="divide-y divide-(--wp-hairline)">
+                <li
+                    v-for="row in rules.data"
+                    :key="row.id"
+                    class="hover:bg-muted/40 flex items-start gap-4 px-4 py-4 transition-colors first:rounded-t-3xl last:rounded-b-3xl sm:px-5"
+                    :class="row.is_active ? '' : 'opacity-70'"
+                >
+                    <span class="wp-icon size-8 shrink-0 text-sm font-bold tabular-nums">
+                        <span class="sr-only">Urutan</span>
+                        {{ row.priority_order }}
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                            <p class="text-foreground font-medium">{{ row.name }}</p>
+                            <code class="bg-muted text-muted-foreground rounded-md px-1.5 py-0.5 font-mono text-xs">{{ row.code }}</code>
                         </div>
-                    </TableCell>
-                </TableRow>
-            </TableBody>
-        </Table>
+                        <p class="text-muted-foreground mt-1 text-sm">{{ row.description || 'Tanpa deskripsi.' }}</p>
+                    </div>
+                    <span class="sb-badge mt-1 shrink-0" :class="row.is_active ? 'sb-tone-success' : 'sb-tone-neutral'">
+                        {{ row.is_active ? 'Aktif' : 'Nonaktif' }}
+                    </span>
+                    <div class="shrink-0">
+                        <RowActionsMenu :items="rowActions(row)" />
+                    </div>
+                </li>
+            </ol>
+        </section>
 
         <TablePagination :links="rules.links" :from="rules.from" :to="rules.to" :total="rules.total" label="prioritas" />
 
         <Dialog v-model:open="dialogOpen">
-            <DialogContent class="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>{{ editingId ? 'Ubah prioritas' : 'Tambah prioritas' }}</DialogTitle>
-                    <DialogDescription>Urutan prioritas saat jadwal bentrok.</DialogDescription>
+            <DialogContent class="bg-card rounded-3xl border-(--wp-hairline) p-6 sm:max-w-lg">
+                <DialogHeader class="gap-1.5">
+                    <DialogTitle class="text-lg font-semibold tracking-tight">{{ editingId ? 'Ubah prioritas' : 'Tambah prioritas' }}</DialogTitle>
+                    <DialogDescription class="text-muted-foreground text-sm">Urutan prioritas saat jadwal bentrok.</DialogDescription>
                 </DialogHeader>
 
-                <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="submit">
+                <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="submit">
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium">Kode</label>
-                        <Input v-model="form.code" type="text" maxlength="64" placeholder="umum_komersial" />
-                        <InputError :message="form.errors.code" />
+                        <label for="priority-code" class="sb-label">Kode</label>
+                        <input id="priority-code" v-model="form.code" type="text" maxlength="64" placeholder="umum_komersial" class="sb-input" />
+                        <p v-if="form.errors.code" class="text-destructive mt-1.5 text-xs font-medium">{{ form.errors.code }}</p>
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium">Nama</label>
-                        <Input v-model="form.name" type="text" maxlength="150" placeholder="Umum / komersial" />
-                        <InputError :message="form.errors.name" />
+                        <label for="priority-name" class="sb-label">Nama</label>
+                        <input id="priority-name" v-model="form.name" type="text" maxlength="150" placeholder="Umum / komersial" class="sb-input" />
+                        <p v-if="form.errors.name" class="text-destructive mt-1.5 text-xs font-medium">{{ form.errors.name }}</p>
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium">Urutan prioritas</label>
-                        <Input v-model="form.priority_order" type="number" min="1" />
-                        <InputError :message="form.errors.priority_order" />
+                        <label for="priority-order" class="sb-label">Urutan prioritas</label>
+                        <input id="priority-order" v-model="form.priority_order" type="number" min="1" class="sb-input tabular-nums" />
+                        <p v-if="form.errors.priority_order" class="text-destructive mt-1.5 text-xs font-medium">{{ form.errors.priority_order }}</p>
                     </div>
-                    <div class="flex items-center gap-2 pt-6">
-                        <Checkbox id="priority-active" v-model="form.is_active" />
+                    <div class="flex items-center gap-2.5 sm:pt-7">
+                        <Checkbox
+                            id="priority-active"
+                            v-model="form.is_active"
+                            class="data-[state=checked]:border-(--wp-accent) data-[state=checked]:bg-(--wp-accent) data-[state=checked]:text-(--wp-accent-contrast)"
+                        />
                         <label for="priority-active" class="text-sm font-medium">Aktif</label>
                     </div>
                     <div class="sm:col-span-2">
-                        <label class="mb-1.5 block text-sm font-medium">Deskripsi</label>
-                        <textarea
-                            v-model="form.description"
-                            rows="2"
-                            class="border-border bg-background w-full rounded-lg border px-3 py-2 text-sm"
-                        ></textarea>
-                        <InputError :message="form.errors.description" />
+                        <label for="priority-description" class="sb-label">Deskripsi</label>
+                        <textarea id="priority-description" v-model="form.description" rows="2" class="sb-input resize-y"></textarea>
+                        <p v-if="form.errors.description" class="text-destructive mt-1.5 text-xs font-medium">{{ form.errors.description }}</p>
                     </div>
                 </form>
 
-                <DialogFooter>
-                    <Button variant="ghost" type="button" @click="dialogOpen = false">Batal</Button>
-                    <Button type="button" :disabled="form.processing" @click="submit">
-                        <LoaderCircle v-if="form.processing" class="size-4 animate-spin" />
+                <DialogFooter class="mt-2 gap-2">
+                    <button type="button" class="wp-btn wp-btn-quiet justify-center px-4 py-2 text-sm" @click="dialogOpen = false">Batal</button>
+                    <button
+                        type="button"
+                        class="wp-btn wp-btn-primary justify-center px-5 py-2.5 text-sm"
+                        :disabled="form.processing"
+                        @click="submit"
+                    >
+                        <FontAwesomeIcon v-if="form.processing" :icon="['fas', 'circle-notch']" class="size-3.5 animate-spin" aria-hidden="true" />
                         Simpan
-                    </Button>
+                    </button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

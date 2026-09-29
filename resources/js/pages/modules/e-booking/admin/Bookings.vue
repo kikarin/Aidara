@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import SeoHead from '@/components/SeoHead.vue';
-import { Skeleton } from '@/components/ui/skeleton';
+import SbStatusBadge from '@/components/sibola/SbStatusBadge.vue';
 import SimpleSelect from '@/components/ui/select/SimpleSelect.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
+import { bookingStatusLabel, formatRupiah } from '@/lib/bookingStatus';
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faArrowRight, faClipboardList, faMagnifyingGlass, faShieldHalved, faWallet } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { Deferred, Link, router } from '@inertiajs/vue3';
-import { ArrowRight, ClipboardList, FileSearch, ShieldCheck, Wallet } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+
+library.add(faArrowRight, faClipboardList, faMagnifyingGlass, faShieldHalved, faWallet);
 
 type Row = {
     id: number;
@@ -55,57 +61,17 @@ watch(
     },
 );
 
-const formatRp = (n: number) =>
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
-
-const statusLabel = (status: string) => {
-    const map: Record<string, string> = {
-        menunggu_approval: 'Perlu ditinjau',
-        awaiting_payment: 'Menunggu bayar',
-        awaiting_verification: 'Bukti perlu dicek',
-        approved: 'Disetujui',
-        paid: 'Sudah bayar',
-        confirmed: 'Dikonfirmasi',
-        perlu_klarifikasi: 'Perlu klarifikasi',
-        rejected: 'Ditolak',
-        cancelled: 'Dibatalkan',
-        forfeited: 'Hangus',
-        expired: 'Kedaluwarsa',
-        completed: 'Selesai',
-        draft: 'Draf',
-    };
-
-    return map[status] ?? status;
-};
-
-const statusTone = (status: string, needsVerify = false) => {
-    if (needsVerify) {
-        return 'bg-violet-100 text-violet-800';
-    }
-    const map: Record<string, string> = {
-        menunggu_approval: 'bg-amber-100 text-amber-800',
-        perlu_klarifikasi: 'bg-orange-100 text-orange-800',
-        awaiting_payment: 'bg-sky-100 text-sky-800',
-        approved: 'bg-emerald-100 text-emerald-800',
-        confirmed: 'bg-emerald-100 text-emerald-800',
-        rejected: 'bg-red-100 text-red-800',
-        cancelled: 'bg-slate-100 text-slate-600',
-        expired: 'bg-slate-100 text-slate-600',
-        completed: 'bg-slate-100 text-slate-700',
-    };
-
-    return map[status] ?? 'bg-slate-100 text-slate-700';
-};
+const statusLabel = (status: string) => bookingStatusLabel(status, 'admin');
 
 const actionToneClass = (tone: string) => {
     const map: Record<string, string> = {
-        amber: 'text-amber-700',
-        violet: 'text-violet-700',
-        sky: 'text-sky-700',
-        slate: 'text-slate-600',
+        amber: 'text-(--sb-warning)',
+        violet: 'text-(--sb-info)',
+        sky: 'text-(--wp-accent)',
+        slate: 'text-muted-foreground',
     };
 
-    return map[tone] ?? 'text-sky-700';
+    return map[tone] ?? 'text-(--wp-accent)';
 };
 
 const formatSchedule = (starts: string | null, ends: string | null) => {
@@ -123,11 +89,11 @@ const formatSchedule = (starts: string | null, ends: string | null) => {
 };
 
 const tabs = computed(() => [
-    { key: 'active', label: 'Antrian aktif', hint: 'Semua yang masih proses', icon: ClipboardList },
-    { key: 'review', label: 'Perlu ditinjau', hint: 'Setujui / klarifikasi', icon: FileSearch },
-    { key: 'payment', label: 'Menunggu bayar', hint: 'Sudah disetujui', icon: Wallet },
-    { key: 'verify', label: 'Cek bukti', hint: 'Transfer masuk', icon: ShieldCheck },
-    { key: 'all', label: 'Semua', hint: 'Termasuk selesai', icon: ClipboardList },
+    { key: 'active', label: 'Antrian aktif', hint: 'Semua yang masih proses', icon: 'clipboard-list' },
+    { key: 'review', label: 'Perlu ditinjau', hint: 'Setujui / klarifikasi', icon: 'magnifying-glass' },
+    { key: 'payment', label: 'Menunggu bayar', hint: 'Sudah disetujui', icon: 'wallet' },
+    { key: 'verify', label: 'Cek bukti', hint: 'Transfer masuk', icon: 'shield-halved' },
+    { key: 'all', label: 'Semua', hint: 'Termasuk selesai', icon: 'clipboard-list' },
 ]);
 
 const emptyCopy = computed(() => {
@@ -196,11 +162,7 @@ const statusFilterSelect = computed({
     },
 });
 
-const pageLinks = computed(() =>
-    (props.bookings?.links ?? []).filter(
-        (l) => l.label !== '&laquo; Previous' && l.label !== 'Next &raquo;',
-    ),
-);
+const pageLinks = computed(() => (props.bookings?.links ?? []).filter((l) => l.label !== '&laquo; Previous' && l.label !== 'Next &raquo;'));
 
 const currentPage = computed(() => props.bookings?.current_page ?? 1);
 
@@ -223,190 +185,180 @@ const displayStatus = (item: Row) => {
 
     return statusLabel(item.status);
 };
+
+const activeTabLabel = computed(() => tabs.value.find((t) => t.key === activeTab.value)?.label ?? 'Pengajuan');
 </script>
 
 <template>
     <SeoHead title="Pengajuan Sewa" />
 
     <AdminLayout active="bookings">
-        <section class="mb-6">
-            <h1 class="text-3xl font-bold tracking-tight text-slate-900">Pengajuan sewa</h1>
-            <p class="mt-1 max-w-2xl text-sm text-slate-600">
-                Pilih tab sesuai pekerjaan Anda. Kartu menampilkan apa yang perlu dilakukan berikutnya.
+        <header class="mb-6">
+            <h1 class="text-foreground text-2xl font-bold tracking-tight sm:text-3xl">Pengajuan sewa</h1>
+            <p class="text-muted-foreground mt-1.5 max-w-2xl text-sm">
+                Pilih tab sesuai pekerjaan Anda. Setiap baris menampilkan apa yang perlu dilakukan berikutnya.
             </p>
-        </section>
+        </header>
 
-        <!-- Tabs -->
-        <div class="mb-5 flex gap-2 overflow-x-auto pb-1">
-            <button
-                v-for="tab in tabs"
-                :key="tab.key"
-                type="button"
-                class="inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-sm transition"
-                :class="
-                    activeTab === tab.key
-                        ? 'bg-slate-900 font-semibold text-white shadow-sm'
-                        : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
-                "
-                @click="applyTab(tab.key)"
-            >
-                <component :is="tab.icon" class="size-3.5 opacity-80" />
-                {{ tab.label }}
-                <span
-                    v-if="counts"
-                    class="rounded-full px-1.5 py-0.5 text-[11px] font-semibold"
-                    :class="activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'"
+        <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="-mx-1 flex gap-2 overflow-x-auto px-1 py-1" role="group" aria-label="Saring antrian">
+                <button
+                    v-for="tab in tabs"
+                    :key="tab.key"
+                    type="button"
+                    class="sb-chip shrink-0"
+                    :aria-pressed="activeTab === tab.key ? 'true' : 'false'"
+                    :title="tab.hint"
+                    @click="applyTab(tab.key)"
                 >
-                    {{ counts[tab.key as keyof Counts] }}
-                </span>
-                <Skeleton v-else class="h-4 w-5 rounded-full" />
-            </button>
-        </div>
+                    <FontAwesomeIcon :icon="['fas', tab.icon]" class="size-3 opacity-80" aria-hidden="true" />
+                    {{ tab.label }}
+                    <span v-if="counts" class="text-xs tabular-nums opacity-75">{{ counts[tab.key as keyof Counts] }}</span>
+                    <Skeleton v-else class="h-3.5 w-4 rounded" />
+                </button>
+            </div>
 
-        <div
-            v-if="activeTab === 'all'"
-            class="mb-5 flex flex-col gap-2 rounded-[20px] border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
-        >
-            <p class="text-sm text-slate-600">Saring status spesifik (opsional)</p>
-            <SimpleSelect
-                v-model="statusFilterSelect"
-                :options="statusFilterOptions"
-                placeholder="Semua status"
-                trigger-class="h-10 w-[220px] rounded-xl border-slate-200 bg-slate-50 px-3 text-sm shadow-none"
-            />
+            <div v-if="activeTab === 'all'" class="flex items-center gap-2">
+                <span class="text-muted-foreground shrink-0 text-sm">Status</span>
+                <SimpleSelect
+                    v-model="statusFilterSelect"
+                    :options="statusFilterOptions"
+                    placeholder="Semua status"
+                    trigger-class="h-9 w-[220px] rounded-xl border-(--wp-hairline) bg-card px-3 text-sm shadow-none"
+                />
+            </div>
         </div>
 
         <Deferred :data="['bookings', 'counts']">
             <template #fallback>
-                <div class="space-y-3" aria-busy="true" aria-label="Memuat pengajuan">
-                    <div
-                        v-for="n in 5"
-                        :key="n"
-                        class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm"
-                    >
-                        <div class="flex flex-wrap items-start justify-between gap-4">
-                            <div class="space-y-2">
-                                <Skeleton class="h-5 w-40" />
-                                <Skeleton class="h-4 w-56" />
-                                <Skeleton class="h-3 w-44" />
+                <div class="sb-card overflow-hidden" aria-busy="true" aria-label="Memuat pengajuan">
+                    <div class="flex gap-6 border-b border-(--wp-hairline) px-4 py-3">
+                        <Skeleton v-for="n in 5" :key="n" class="h-3 w-16" />
+                    </div>
+                    <div class="divide-y divide-(--wp-hairline)">
+                        <div v-for="n in 6" :key="n" class="flex items-center gap-6 px-4 py-4">
+                            <Skeleton class="h-4 w-28" />
+                            <div class="flex-1 space-y-2">
+                                <Skeleton class="h-4 w-48 max-w-full" />
+                                <Skeleton class="h-3 w-32" />
                             </div>
-                            <div class="space-y-2 text-right">
-                                <Skeleton class="ml-auto h-6 w-28 rounded-full" />
-                                <Skeleton class="ml-auto h-4 w-24" />
-                                <Skeleton class="ml-auto h-4 w-20" />
-                            </div>
+                            <Skeleton class="hidden h-3 w-36 md:block" />
+                            <Skeleton class="h-5 w-24 rounded-lg" />
+                            <Skeleton class="hidden h-4 w-20 sm:block" />
                         </div>
                     </div>
                 </div>
             </template>
 
             <div v-if="bookings">
-                <div
-                    v-if="bookings.data.length === 0"
-                    class="flex flex-col items-center rounded-[24px] border border-dashed border-slate-200 bg-white px-6 py-14 text-center shadow-sm"
-                >
-                    <div class="rounded-2xl bg-slate-50 p-3 text-slate-400">
-                        <ClipboardList class="size-6" />
-                    </div>
-                    <p class="mt-4 font-semibold text-slate-800">{{ emptyCopy.title }}</p>
-                    <p class="mt-1 max-w-md text-sm text-slate-500">{{ emptyCopy.detail }}</p>
+                <div v-if="bookings.data.length === 0" class="sb-card flex flex-col items-center px-6 py-16 text-center">
+                    <span class="wp-icon size-12">
+                        <FontAwesomeIcon :icon="['fas', 'clipboard-list']" class="size-5" aria-hidden="true" />
+                    </span>
+                    <h2 class="text-foreground mt-4 text-base font-semibold tracking-tight">{{ emptyCopy.title }}</h2>
+                    <p class="text-muted-foreground mt-1 max-w-md text-sm">{{ emptyCopy.detail }}</p>
+                    <button v-if="activeTab !== 'all'" type="button" class="wp-btn wp-btn-quiet mt-5 px-4 py-2 text-sm" @click="applyTab('all')">
+                        Lihat semua pengajuan
+                    </button>
                 </div>
 
-                <div v-else class="space-y-3">
-                    <Link
-                        v-for="item in bookings.data"
-                        :key="item.id"
-                        :href="route('e-booking.admin.bookings.show', item.id)"
-                        class="group block rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm transition hover:border-sky-200 hover:shadow-md"
-                    >
-                        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                            <div class="min-w-0">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <p class="font-bold text-slate-900">{{ item.nomor }}</p>
-                                    <span
-                                        class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                                        :class="statusTone(item.status, item.needs_verify)"
+                <div v-else class="sb-card overflow-x-auto">
+                    <table class="sb-table">
+                        <caption class="sr-only">
+                            Daftar pengajuan sewa ·
+                            {{
+                                activeTabLabel
+                            }}
+                        </caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Kode</th>
+                                <th scope="col">Penyewa &amp; tempat</th>
+                                <th scope="col">Jadwal</th>
+                                <th scope="col">Status</th>
+                                <th scope="col" class="text-right">Total</th>
+                                <th scope="col" class="text-right">Tindakan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="item in bookings.data" :key="item.id">
+                                <td class="whitespace-nowrap">
+                                    <Link
+                                        :href="route('e-booking.admin.bookings.show', item.id)"
+                                        class="text-foreground rounded-sm font-semibold tabular-nums hover:text-(--wp-accent) focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
                                     >
-                                        {{ displayStatus(item) }}
-                                    </span>
-                                </div>
-                                <p class="mt-1.5 text-sm text-slate-700">
-                                    <span class="font-medium">{{ item.penyewa || 'Penyewa' }}</span>
-                                    <span class="text-slate-400"> · </span>
-                                    {{ item.venue || 'Tempat' }}
-                                    <template v-if="item.area">
-                                        <span class="text-slate-400"> · </span>{{ item.area }}
-                                    </template>
-                                </p>
-                                <p class="mt-1 text-xs text-slate-500">{{ formatSchedule(item.starts_at, item.ends_at) }}</p>
-                            </div>
-
-                            <div class="flex shrink-0 flex-col items-start gap-1 sm:items-end">
-                                <p class="text-base font-bold text-slate-900">{{ formatRp(item.grand_total) }}</p>
-                                <p
-                                    class="inline-flex items-center gap-1 text-sm font-semibold"
-                                    :class="actionToneClass(item.action_tone)"
-                                >
-                                    {{ item.action_label }}
-                                    <ArrowRight class="size-3.5 transition group-hover:translate-x-0.5" />
-                                </p>
-                            </div>
-                        </div>
-                    </Link>
+                                        {{ item.nomor }}
+                                    </Link>
+                                </td>
+                                <td class="min-w-56">
+                                    <p class="text-foreground font-medium">{{ item.penyewa || 'Penyewa' }}</p>
+                                    <p class="text-muted-foreground mt-0.5 text-xs">
+                                        {{ item.venue || 'Tempat' }}<template v-if="item.area"> · {{ item.area }}</template>
+                                    </p>
+                                </td>
+                                <td class="text-muted-foreground min-w-44 text-xs tabular-nums">
+                                    {{ formatSchedule(item.starts_at, item.ends_at) }}
+                                </td>
+                                <td>
+                                    <SbStatusBadge
+                                        :status="item.status"
+                                        audience="admin"
+                                        :label="displayStatus(item)"
+                                        :tone="item.needs_verify ? 'info' : undefined"
+                                    />
+                                </td>
+                                <td class="text-foreground text-right font-semibold whitespace-nowrap tabular-nums">
+                                    {{ formatRupiah(item.grand_total) }}
+                                </td>
+                                <td class="text-right whitespace-nowrap">
+                                    <Link
+                                        :href="route('e-booking.admin.bookings.show', item.id)"
+                                        class="wp-link-arrow inline-flex items-center gap-1.5 rounded-sm text-sm font-medium hover:underline focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
+                                        :class="actionToneClass(item.action_tone)"
+                                    >
+                                        {{ item.action_label }}
+                                        <FontAwesomeIcon :icon="['fas', 'arrow-right']" class="size-3" aria-hidden="true" />
+                                        <span class="sr-only"> · {{ item.nomor }}</span>
+                                    </Link>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
-                <nav
-                    v-if="(props.bookings?.last_page ?? 0) > 1"
-                    class="mt-6 flex flex-wrap items-center justify-center gap-2"
-                    aria-label="Pagination"
-                >
-                    <button
-                        type="button"
-                        class="rounded-full border px-3.5 py-1.5 text-sm transition disabled:opacity-40"
-                        :class="
-                            currentPage <= 1
-                                ? 'border-slate-100 bg-white text-slate-300'
-                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                        "
-                        :disabled="currentPage <= 1"
-                        @click="currentPage > 1 && applyPage(currentPage - 1)"
-                    >
-                        Sebelumnya
-                    </button>
+                <div v-if="(props.bookings?.last_page ?? 0) > 1" class="mt-5 flex flex-col items-center justify-between gap-3 sm:flex-row">
+                    <p class="text-muted-foreground text-sm tabular-nums">Halaman {{ currentPage }} dari {{ props.bookings?.last_page }}</p>
+                    <nav class="flex flex-wrap items-center gap-1.5" aria-label="Pagination">
+                        <button
+                            type="button"
+                            class="wp-btn wp-btn-quiet px-3.5 py-1.5 text-sm"
+                            :disabled="currentPage <= 1"
+                            @click="currentPage > 1 && applyPage(currentPage - 1)"
+                        >
+                            Sebelumnya
+                        </button>
 
-                    <button
-                        v-for="(link, idx) in pageLinks"
-                        :key="idx"
-                        type="button"
-                        class="rounded-full border px-3 py-1.5 text-sm transition"
-                        :class="
-                            link.active
-                                ? 'border-transparent bg-[var(--brand-green,#2e7d32)] font-semibold text-white'
-                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                        "
-                        @click="applyPage(Number(link.label))"
-                    >
-                        {{ link.label }}
-                    </button>
+                        <button
+                            v-for="(link, idx) in pageLinks"
+                            :key="idx"
+                            type="button"
+                            class="sb-chip min-w-9 justify-center tabular-nums"
+                            :aria-current="link.active ? 'page' : undefined"
+                            @click="applyPage(Number(link.label))"
+                        >
+                            {{ link.label }}
+                        </button>
 
-                    <button
-                        type="button"
-                        class="rounded-full border px-3.5 py-1.5 text-sm transition disabled:opacity-40"
-                        :class="
-                            currentPage >= (props.bookings?.last_page ?? 1)
-                                ? 'border-slate-100 bg-white text-slate-300'
-                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                        "
-                        :disabled="currentPage >= (props.bookings?.last_page ?? 1)"
-                        @click="currentPage < (props.bookings?.last_page ?? 1) && applyPage(currentPage + 1)"
-                    >
-                        Berikutnya
-                    </button>
-                </nav>
-
-                <p v-if="(props.bookings?.last_page ?? 0) > 1" class="mt-3 text-center text-xs text-slate-500">
-                    Halaman {{ currentPage }} dari {{ props.bookings?.last_page }}
-                </p>
+                        <button
+                            type="button"
+                            class="wp-btn wp-btn-quiet px-3.5 py-1.5 text-sm"
+                            :disabled="currentPage >= (props.bookings?.last_page ?? 1)"
+                            @click="currentPage < (props.bookings?.last_page ?? 1) && applyPage(currentPage + 1)"
+                        >
+                            Berikutnya
+                        </button>
+                    </nav>
+                </div>
             </div>
         </Deferred>
     </AdminLayout>

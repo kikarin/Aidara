@@ -4,7 +4,7 @@ export type ResolvedTheme = 'light' | 'slate' | 'warm' | 'sport' | 'dispora' | '
 export const APPEARANCE_OPTIONS: Appearance[] = ['light', 'slate', 'warm', 'sport', 'dispora', 'dark', 'system'];
 export const RESOLVED_THEMES: ResolvedTheme[] = ['light', 'slate', 'warm', 'sport', 'dispora', 'dark'];
 
-export const DEFAULT_APPEARANCE: Appearance = 'dispora';
+export const DEFAULT_APPEARANCE: Appearance = 'slate';
 
 /** Migrasi pilihan lama (default / pure-white light) ke skema baru */
 export function migrateAppearance(stored: string | null): Appearance {
@@ -26,17 +26,17 @@ export function migrateAppearance(stored: string | null): Appearance {
 export function resolveTheme(appearance: Appearance): ResolvedTheme {
     if (appearance === 'system') {
         if (typeof window === 'undefined') {
-            return 'dispora';
+            return 'slate';
         }
 
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'dispora';
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'slate';
     }
 
     if (RESOLVED_THEMES.includes(appearance as ResolvedTheme)) {
         return appearance as ResolvedTheme;
     }
 
-    return 'dispora';
+    return 'slate';
 }
 
 export function applyResolvedTheme(resolved: ResolvedTheme): void {
