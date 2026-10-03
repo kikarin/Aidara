@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import SeoHead from '@/components/SeoHead.vue';
+import SbPitchLines from '@/components/sibola/SbPitchLines.vue';
 import SbStatusBadge from '@/components/sibola/SbStatusBadge.vue';
 import SimpleSelect from '@/components/ui/select/SimpleSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
@@ -11,35 +12,45 @@ import {
     faArrowRight,
     faArrowUpRightFromSquare,
     faCheck,
+    faChevronDown,
     faCircleCheck,
     faCircleInfo,
     faCircleNotch,
     faCircleXmark,
     faClockRotateLeft,
     faCommentDots,
+    faCopy,
     faEnvelope,
     faFileArrowDown,
     faFileLines,
+    faLocationDot,
+    faPlus,
+    faReceipt,
     faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { Link, useForm } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 
 library.add(
     faArrowLeft,
     faArrowRight,
     faArrowUpRightFromSquare,
     faCheck,
+    faChevronDown,
     faCircleCheck,
     faCircleInfo,
     faCircleNotch,
     faCircleXmark,
     faClockRotateLeft,
     faCommentDots,
+    faCopy,
     faEnvelope,
     faFileArrowDown,
     faFileLines,
+    faLocationDot,
+    faPlus,
+    faReceipt,
     faTriangleExclamation,
 );
 
@@ -251,9 +262,13 @@ const rejectChips = [
 
 const activeDecision = ref<'' | 'klarifikasi' | 'tolak'>('');
 
-const toggleDecision = (target: 'klarifikasi' | 'tolak') => {
-    activeDecision.value = activeDecision.value === target ? '' : target;
-};
+const decisionTabs = [
+    { value: '', label: 'Setujui', icon: 'check' },
+    { value: 'klarifikasi', label: 'Klarifikasi', icon: 'comment-dots' },
+    { value: 'tolak', label: 'Tolak', icon: 'circle-xmark' },
+] as const;
+
+const rejectPayOpen = ref(false);
 
 const adaBenturan = computed(() => Boolean(props.conflict?.conflicts?.length));
 
@@ -425,68 +440,135 @@ const whatsappForm = useForm({});
 const kirimWhatsappSurat = (suratId: number) => {
     whatsappForm.post(route('e-booking.admin.bookings.surat.whatsapp', suratId), { preserveScroll: true });
 };
+
+const showSuratForm = ref(props.booking.surats.length === 0);
+
+const penyewaNama = computed(() => props.booking.penyewa?.nama || props.booking.user?.name || '-');
+
+const whatsappUrl = computed(() => {
+    const digits = (props.booking.penyewa?.no_hp ?? '').replace(/\D/g, '');
+    if (!digits) return null;
+
+    return `https://wa.me/${digits.startsWith('0') ? `62${digits.slice(1)}` : digits}`;
+});
+
+const kategoriLabel = computed(() => (props.booking.kategori_tarif === 'pemerintah' ? 'Instansi pemerintah' : 'Umum / non pemerintah'));
+
+const copied = ref(false);
+let copyTimer: ReturnType<typeof setTimeout> | null = null;
+
+const copyNomor = async () => {
+    try {
+        await navigator.clipboard.writeText(props.booking.nomor);
+        copied.value = true;
+        if (copyTimer) clearTimeout(copyTimer);
+        copyTimer = setTimeout(() => (copied.value = false), 2000);
+    } catch {
+        copied.value = false;
+    }
+};
+
+onUnmounted(() => {
+    if (copyTimer) clearTimeout(copyTimer);
+});
 </script>
 
 <template>
     <SeoHead :title="`Admin ${booking.nomor}`" />
 
     <AdminLayout active="bookings">
-        <header class="mb-8">
-            <Link
-                :href="route('e-booking.admin.bookings.index')"
-                class="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 rounded-md text-sm transition-colors focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
-            >
-                <FontAwesomeIcon :icon="['fas', 'arrow-left']" class="size-3" aria-hidden="true" />
-                Pengajuan
-            </Link>
-            <div class="mt-4 flex flex-wrap items-center gap-3">
-                <h1 class="text-foreground text-2xl font-bold tracking-tight tabular-nums sm:text-3xl">{{ booking.nomor }}</h1>
-                <SbStatusBadge :status="booking.status" audience="admin" />
+        <Link
+            :href="route('e-booking.admin.bookings.index')"
+            class="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 rounded-md text-sm transition-colors focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
+        >
+            <FontAwesomeIcon :icon="['fas', 'arrow-left']" class="size-3" aria-hidden="true" />
+            Pengajuan
+        </Link>
+
+        <header class="sb-card relative isolate mt-4 mb-6 overflow-hidden">
+            <div class="sb-mow absolute inset-0 -z-20" aria-hidden="true"></div>
+            <SbPitchLines variant="half" class="absolute inset-y-0 right-0 -z-10 h-full w-2/3 text-(--wp-accent) opacity-[0.12]" />
+
+            <div class="flex flex-wrap items-start justify-between gap-6 p-5 sm:p-7">
+                <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-lg bg-(--wp-accent-soft) px-2.5 py-1 font-mono text-sm font-semibold text-(--wp-accent-strong) tabular-nums transition hover:brightness-95 focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
+                            :aria-label="`Salin nomor pengajuan ${booking.nomor}`"
+                            @click="copyNomor"
+                        >
+                            {{ booking.nomor }}
+                            <FontAwesomeIcon :icon="['fas', copied ? 'check' : 'copy']" class="size-3 opacity-70" aria-hidden="true" />
+                        </button>
+                        <span class="sr-only" aria-live="polite">{{ copied ? 'Nomor pengajuan disalin' : '' }}</span>
+                        <SbStatusBadge :status="booking.status" audience="admin" />
+                        <span v-if="booking.priority_flag" class="sb-badge sb-tone-neutral">Prioritas {{ booking.priority_flag }}</span>
+                    </div>
+                    <h1 class="text-foreground mt-3 text-2xl font-bold tracking-tight text-balance sm:text-3xl">
+                        {{ booking.venue?.name ?? booking.nomor }}
+                    </h1>
+                    <p v-if="booking.areas?.length" class="text-muted-foreground mt-1.5 flex items-start gap-2 text-sm">
+                        <FontAwesomeIcon :icon="['fas', 'location-dot']" class="mt-1 size-3 shrink-0 text-(--wp-accent)" aria-hidden="true" />
+                        {{ booking.areas.map((a) => a.name).join(', ') }}
+                    </p>
+                </div>
+                <div class="text-right">
+                    <p class="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Total</p>
+                    <p class="text-foreground mt-0.5 text-2xl font-bold tracking-tight tabular-nums sm:text-3xl">
+                        {{ formatRupiah(booking.grand_total) }}
+                    </p>
+                </div>
             </div>
-            <p class="text-muted-foreground mt-1.5 text-sm">
-                {{ booking.venue?.name }}
-                <template v-if="booking.priority_flag"> · prioritas {{ booking.priority_flag }}</template>
-            </p>
+
+            <dl
+                class="grid border-t border-dashed border-(--wp-hairline) text-sm sm:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1.2fr)_minmax(0,1fr)]"
+            >
+                <div class="flex items-start gap-3 p-5 sm:px-7">
+                    <span class="wp-icon size-9 shrink-0 text-sm font-bold" aria-hidden="true">{{ penyewaNama.charAt(0).toUpperCase() }}</span>
+                    <div class="min-w-0 flex-1">
+                        <dt class="text-muted-foreground text-xs">Penyewa</dt>
+                        <dd class="text-foreground mt-0.5 truncate font-semibold">{{ penyewaNama }}</dd>
+                        <dd v-if="booking.penyewa?.instansi" class="text-muted-foreground truncate text-xs">{{ booking.penyewa.instansi }}</dd>
+                        <dd class="mt-2 flex flex-wrap gap-1.5">
+                            <a
+                                v-if="whatsappUrl"
+                                :href="whatsappUrl"
+                                target="_blank"
+                                rel="noopener"
+                                class="wp-btn wp-btn-quiet bg-card px-2.5 py-1 text-xs tabular-nums"
+                                :aria-label="`Chat WhatsApp ${booking.penyewa?.no_hp}`"
+                            >
+                                <FontAwesomeIcon :icon="['fas', 'comment-dots']" class="size-3" aria-hidden="true" />
+                                {{ booking.penyewa?.no_hp }}
+                            </a>
+                            <a
+                                v-if="booking.user?.email"
+                                :href="`mailto:${booking.user.email}`"
+                                class="wp-btn wp-btn-quiet bg-card max-w-full px-2.5 py-1 text-xs"
+                                :aria-label="`Kirim email ke ${booking.user.email}`"
+                            >
+                                <FontAwesomeIcon :icon="['fas', 'envelope']" class="size-3" aria-hidden="true" />
+                                <span class="truncate">{{ booking.user.email }}</span>
+                            </a>
+                        </dd>
+                    </div>
+                </div>
+                <div class="border-t border-(--wp-hairline) p-5 sm:border-t-0 sm:border-l sm:px-7">
+                    <dt class="text-muted-foreground text-xs">Jadwal</dt>
+                    <dd class="text-foreground mt-0.5 font-semibold tabular-nums">{{ booking.starts_at || '-' }}</dd>
+                    <dd class="text-muted-foreground text-xs tabular-nums">sampai {{ booking.ends_at || '-' }}</dd>
+                </div>
+                <div class="border-t border-(--wp-hairline) p-5 sm:col-span-2 sm:px-7 xl:col-span-1 xl:border-t-0 xl:border-l">
+                    <dt class="text-muted-foreground text-xs">Jenis pemohon</dt>
+                    <dd class="text-foreground mt-0.5 font-semibold">{{ kategoriLabel }}</dd>
+                    <dd v-if="booking.tujuan" class="text-muted-foreground line-clamp-2 text-xs">{{ booking.tujuan }}</dd>
+                </div>
+            </dl>
         </header>
 
-        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
             <div class="min-w-0 space-y-6">
-                <section aria-labelledby="detail-heading" class="sb-card p-5 sm:p-6">
-                    <h2 id="detail-heading" class="text-foreground text-base font-semibold tracking-tight">Detail pengajuan</h2>
-                    <dl class="mt-4 divide-y divide-(--wp-hairline) text-sm">
-                        <div class="grid gap-1 py-3 first:pt-0 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4">
-                            <dt class="text-muted-foreground">Penyewa</dt>
-                            <dd class="text-foreground">
-                                <span class="font-medium">{{ booking.penyewa?.nama || booking.user?.name }}</span>
-                                <span class="text-muted-foreground block text-xs">{{ booking.user?.email }}</span>
-                                <span v-if="booking.penyewa?.no_hp" class="text-muted-foreground block text-xs tabular-nums">{{
-                                    booking.penyewa.no_hp
-                                }}</span>
-                            </dd>
-                        </div>
-                        <div class="grid gap-1 py-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4">
-                            <dt class="text-muted-foreground">Tempat</dt>
-                            <dd class="text-foreground font-medium">{{ booking.venue?.name }}</dd>
-                        </div>
-                        <div v-if="booking.areas?.length" class="grid gap-1 py-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4">
-                            <dt class="text-muted-foreground">Area</dt>
-                            <dd class="text-foreground">{{ booking.areas.map((a) => a.name).join(', ') }}</dd>
-                        </div>
-                        <div class="grid gap-1 py-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4">
-                            <dt class="text-muted-foreground">Jadwal</dt>
-                            <dd class="text-foreground tabular-nums">{{ booking.starts_at }} — {{ booking.ends_at }}</dd>
-                        </div>
-                        <div class="grid gap-1 py-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4">
-                            <dt class="text-muted-foreground">Tujuan</dt>
-                            <dd class="text-foreground">{{ booking.tujuan }}</dd>
-                        </div>
-                        <div class="grid gap-1 pt-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4">
-                            <dt class="text-foreground font-semibold">Total</dt>
-                            <dd class="text-foreground text-base font-semibold tabular-nums">{{ formatRupiah(booking.grand_total) }}</dd>
-                        </div>
-                    </dl>
-                </section>
-
                 <section
                     v-if="conflictHeadline && conflict?.conflicts?.length"
                     aria-labelledby="conflict-heading"
@@ -508,11 +590,15 @@ const kirimWhatsappSurat = (suratId: number) => {
                     </div>
 
                     <ul class="bg-card divide-y divide-(--wp-hairline) overflow-hidden rounded-xl ring-1 ring-(--wp-hairline)">
-                        <li v-for="item in conflict.conflicts" :key="item.id" class="flex flex-wrap items-start justify-between gap-3 p-3.5">
+                        <li
+                            v-for="item in conflict.conflicts"
+                            :key="item.id"
+                            class="grid gap-3 p-3.5 transition-colors hover:bg-(--wp-accent-soft)/40 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                        >
                             <div class="min-w-0">
                                 <Link
                                     :href="route('e-booking.admin.bookings.show', item.id)"
-                                    class="wp-link-arrow text-foreground inline-flex items-center gap-1.5 rounded-sm font-semibold tabular-nums hover:text-(--wp-accent) focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
+                                    class="wp-link-arrow text-foreground inline-flex items-center gap-1.5 rounded-sm font-mono font-semibold tabular-nums hover:text-(--wp-accent) focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
                                 >
                                     {{ item.nomor }}
                                     <FontAwesomeIcon :icon="['fas', 'arrow-right']" class="size-3" aria-hidden="true" />
@@ -522,11 +608,12 @@ const kirimWhatsappSurat = (suratId: number) => {
                                     {{ item.starts_at || '-' }} — {{ item.ends_at || '-' }}
                                 </p>
                                 <p class="text-muted-foreground mt-1 text-xs">
-                                    Status: {{ statusLabel(item.status) }}
-                                    <template v-if="item.priority_rule"> · {{ item.priority_rule.name }} </template>
+                                    {{ statusLabel(item.status) }}
+                                    <template v-if="item.priority_rule"> · {{ item.priority_rule.name }}</template>
+                                    <template v-if="item.area_tentative"> · area tentatif</template>
                                 </p>
                             </div>
-                            <span class="sb-badge" :class="relationTone(item.relation)">
+                            <span class="sb-badge justify-self-start sm:justify-self-end" :class="relationTone(item.relation)">
                                 {{ relationLabel(item.relation) }}
                             </span>
                         </li>
@@ -541,42 +628,109 @@ const kirimWhatsappSurat = (suratId: number) => {
                     </div>
                 </div>
 
-                <section v-if="status_logs.length" aria-labelledby="history-heading" class="sb-card p-5 sm:p-6">
-                    <h2 id="history-heading" class="text-foreground flex items-center gap-2 text-base font-semibold tracking-tight">
-                        <FontAwesomeIcon :icon="['fas', 'clock-rotate-left']" class="text-muted-foreground size-3.5" aria-hidden="true" />
-                        Riwayat status
+                <section aria-labelledby="detail-heading" class="sb-card p-5 sm:p-6">
+                    <h2 id="detail-heading" class="text-foreground flex items-center gap-2 text-base font-semibold tracking-tight">
+                        <FontAwesomeIcon :icon="['fas', 'receipt']" class="size-3.5 text-(--wp-accent)" aria-hidden="true" />
+                        Detail pengajuan
                     </h2>
-                    <ol class="mt-4 space-y-3 border-l border-(--wp-hairline) pl-4 text-sm">
-                        <li v-for="(log, i) in status_logs" :key="i" class="relative">
-                            <span
-                                class="bg-card absolute top-1.5 -left-[1.3rem] size-2 rounded-full ring-2 ring-(--wp-accent)"
-                                aria-hidden="true"
-                            ></span>
-                            <span class="text-foreground font-medium">{{ statusLabel(log.to_status || '') }}</span>
-                            <span v-if="log.created_at" class="text-muted-foreground tabular-nums"> · {{ log.created_at }}</span>
-                        </li>
-                    </ol>
+
+                    <dl class="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+                        <div class="sm:col-span-2">
+                            <dt class="text-muted-foreground text-xs">Tujuan kegiatan</dt>
+                            <dd class="text-foreground mt-0.5 leading-relaxed">{{ booking.tujuan || '-' }}</dd>
+                        </div>
+                        <div v-if="booking.keterangan" class="sm:col-span-2">
+                            <dt class="text-muted-foreground text-xs">Keterangan dari penyewa</dt>
+                            <dd class="text-foreground mt-0.5 leading-relaxed whitespace-pre-line">{{ booking.keterangan }}</dd>
+                        </div>
+                        <div v-if="booking.admin_notes" class="sm:col-span-2">
+                            <dt class="text-muted-foreground text-xs">Catatan pengelola</dt>
+                            <dd class="bg-muted/60 text-foreground mt-1 rounded-lg px-3 py-2 leading-relaxed">{{ booking.admin_notes }}</dd>
+                        </div>
+                    </dl>
+
+                    <div class="mt-6 border-t border-dashed border-(--wp-hairline) pt-5">
+                        <h3 class="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Rincian biaya</h3>
+                        <ul v-if="booking.items.length" class="mt-3 space-y-2.5 text-sm">
+                            <li v-for="(item, i) in booking.items" :key="i" class="flex items-baseline gap-3">
+                                <span class="text-foreground min-w-0">
+                                    {{ item.uraian }}
+                                    <span class="text-muted-foreground text-xs tabular-nums">({{ item.qty }} × {{ item.satuan }})</span>
+                                </span>
+                                <span class="mb-1 flex-1 self-end border-b border-dotted border-(--wp-hairline)" aria-hidden="true"></span>
+                                <span class="text-foreground tabular-nums">{{ formatRupiah(item.line_total) }}</span>
+                            </li>
+                        </ul>
+                        <dl class="mt-4 space-y-1.5 text-sm">
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-muted-foreground">Biaya dasar</dt>
+                                <dd class="tabular-nums">{{ formatRupiah(booking.subtotal) }}</dd>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-muted-foreground">Tambahan layanan</dt>
+                                <dd class="tabular-nums">{{ formatRupiah(booking.addon_total) }}</dd>
+                            </div>
+                            <div class="text-foreground flex justify-between gap-4 border-t border-(--wp-hairline) pt-2.5 text-base font-bold">
+                                <dt>Total</dt>
+                                <dd class="tabular-nums">{{ formatRupiah(booking.grand_total) }}</dd>
+                            </div>
+                        </dl>
+                    </div>
                 </section>
 
                 <section aria-labelledby="surat-heading" class="sb-card p-5 sm:p-6">
-                    <h2 id="surat-heading" class="text-foreground flex items-center gap-2 text-base font-semibold tracking-tight">
-                        <FontAwesomeIcon :icon="['fas', 'file-lines']" class="size-3.5 text-(--wp-accent)" aria-hidden="true" />
-                        Surat balasan
-                    </h2>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <h2 id="surat-heading" class="text-foreground flex items-center gap-2 text-base font-semibold tracking-tight">
+                            <FontAwesomeIcon :icon="['fas', 'file-lines']" class="size-3.5 text-(--wp-accent)" aria-hidden="true" />
+                            Surat balasan
+                            <span v-if="booking.surats.length" class="sb-badge sb-tone-neutral tabular-nums">{{ booking.surats.length }}</span>
+                        </h2>
+                        <button
+                            type="button"
+                            class="wp-btn px-3.5 py-2 text-xs"
+                            :class="showSuratForm ? 'wp-btn-quiet' : 'wp-btn-primary'"
+                            :aria-expanded="showSuratForm ? 'true' : 'false'"
+                            aria-controls="surat-form"
+                            @click="showSuratForm = !showSuratForm"
+                        >
+                            <FontAwesomeIcon
+                                :icon="['fas', showSuratForm ? 'chevron-down' : 'plus']"
+                                class="size-3 transition-transform"
+                                :class="showSuratForm ? 'rotate-180' : ''"
+                                aria-hidden="true"
+                            />
+                            {{ showSuratForm ? 'Tutup formulir' : 'Buat surat baru' }}
+                        </button>
+                    </div>
 
                     <ul v-if="booking.surats.length" class="mt-4 space-y-3">
-                        <li v-for="s in booking.surats" :key="s.id" class="sb-card-muted space-y-3 p-4 text-sm">
-                            <div>
-                                <p class="text-foreground font-semibold">{{ s.jenis_label }}</p>
-                                <p class="text-muted-foreground text-xs">{{ s.nomor_surat }} · {{ s.perihal }}</p>
-                                <p v-if="s.meeting_at || s.meeting_place" class="text-foreground mt-1 text-xs">
-                                    Meeting: {{ s.meeting_at?.replace('T', ' ') }}{{ s.meeting_place ? ' · ' + s.meeting_place : '' }}
-                                </p>
-                                <p v-if="s.dokumen?.length" class="text-muted-foreground mt-1 text-xs">Dokumen: {{ s.dokumen.join(', ') }}</p>
-                                <p v-if="s.sent_email_at" class="mt-1 text-xs text-(--wp-accent-strong)">Terkirim via email {{ s.sent_email_at }}</p>
-                                <p v-if="s.sent_whatsapp_at" class="mt-1 text-xs text-(--wp-accent-strong)">Terkirim via WhatsApp {{ s.sent_whatsapp_at }}</p>
+                        <li v-for="s in booking.surats" :key="s.id" class="rounded-2xl p-4 text-sm ring-1 ring-(--wp-hairline)">
+                            <div class="flex items-start gap-3">
+                                <span class="wp-icon size-10 shrink-0">
+                                    <FontAwesomeIcon :icon="['fas', 'file-lines']" class="size-4" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-foreground font-semibold">{{ s.jenis_label }}</p>
+                                    <p class="text-muted-foreground text-xs">
+                                        <span class="font-mono tabular-nums">{{ s.nomor_surat }}</span> · {{ s.perihal }}
+                                    </p>
+                                    <p v-if="s.meeting_at || s.meeting_place" class="text-foreground mt-1 text-xs">
+                                        Meeting: {{ s.meeting_at?.replace('T', ' ') }}{{ s.meeting_place ? ' · ' + s.meeting_place : '' }}
+                                    </p>
+                                    <p v-if="s.dokumen?.length" class="text-muted-foreground mt-1 text-xs">Dokumen: {{ s.dokumen.join(', ') }}</p>
+                                    <div class="mt-2 flex flex-wrap gap-1.5">
+                                        <span class="sb-badge" :class="s.sent_email_at ? 'sb-tone-success' : 'sb-tone-neutral'">
+                                            <FontAwesomeIcon :icon="['fas', 'envelope']" class="size-2.5" aria-hidden="true" />
+                                            {{ s.sent_email_at ? `Email ${s.sent_email_at}` : 'Email belum dikirim' }}
+                                        </span>
+                                        <span class="sb-badge" :class="s.sent_whatsapp_at ? 'sb-tone-success' : 'sb-tone-neutral'">
+                                            <FontAwesomeIcon :icon="['fas', 'comment-dots']" class="size-2.5" aria-hidden="true" />
+                                            {{ s.sent_whatsapp_at ? `WhatsApp ${s.sent_whatsapp_at}` : 'WhatsApp belum dikirim' }}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="flex flex-wrap gap-2">
+                            <div class="mt-3 flex flex-wrap gap-2 border-t border-(--wp-hairline) pt-3">
                                 <a
                                     :href="route('e-booking.admin.bookings.surat.download', s.id)"
                                     class="wp-btn wp-btn-quiet bg-card px-3 py-1.5 text-xs"
@@ -596,8 +750,8 @@ const kirimWhatsappSurat = (suratId: number) => {
                                         class="size-3 animate-spin"
                                         aria-hidden="true"
                                     />
-                                    <FontAwesomeIcon :icon="['fas', 'envelope']" class="size-3" aria-hidden="true" />
-                                    Kirim email
+                                    <FontAwesomeIcon v-else :icon="['fas', 'envelope']" class="size-3" aria-hidden="true" />
+                                    {{ s.sent_email_at ? 'Kirim ulang email' : 'Kirim email' }}
                                 </button>
                                 <button
                                     type="button"
@@ -611,59 +765,75 @@ const kirimWhatsappSurat = (suratId: number) => {
                                         class="size-3 animate-spin"
                                         aria-hidden="true"
                                     />
-                                    <FontAwesomeIcon :icon="['fas', 'comment-dots']" class="size-3" aria-hidden="true" />
-                                    WhatsApp
+                                    <FontAwesomeIcon v-else :icon="['fas', 'comment-dots']" class="size-3" aria-hidden="true" />
+                                    {{ s.sent_whatsapp_at ? 'Kirim ulang WhatsApp' : 'WhatsApp' }}
                                 </button>
                             </div>
                         </li>
                     </ul>
-                    <p v-else class="text-muted-foreground mt-2 text-sm">Belum ada surat. Buat di bawah lalu kirim ke penyewa.</p>
+                    <p v-else-if="!showSuratForm" class="text-muted-foreground mt-2 text-sm">Belum ada surat untuk pengajuan ini.</p>
 
-                    <div class="mt-6 space-y-4 border-t border-(--wp-hairline) pt-5">
-                        <h3 class="text-foreground text-sm font-semibold">Buat surat baru</h3>
-
-                        <div>
-                            <p class="sb-label">Jenis surat</p>
-                            <SimpleSelect
-                                v-model="suratForm.jenis"
-                                :options="jenisOptions"
-                                placeholder="Pilih jenis surat"
-                                trigger-class="h-10 w-full rounded-xl border-(--wp-hairline) bg-background px-3 text-sm shadow-none"
-                            />
-                        </div>
-
-                        <div>
-                            <label class="sb-label" for="surat-nomor">Nomor surat (manual)</label>
-                            <input
-                                id="surat-nomor"
-                                v-model="suratForm.nomor_surat"
-                                type="text"
-                                placeholder="cth: 042/E-BK/IX/2026"
-                                class="sb-input"
-                                :aria-invalid="suratForm.errors.nomor_surat ? 'true' : undefined"
-                            />
-                            <p v-if="suratForm.errors.nomor_surat" class="sb-error">{{ suratForm.errors.nomor_surat }}</p>
-                        </div>
-
-                        <div>
-                            <div class="mb-1.5 flex items-center justify-between gap-3">
-                                <label class="text-foreground text-sm font-medium" for="surat-perihal">Perihal</label>
-                                <button
-                                    type="button"
-                                    class="rounded-sm text-xs font-medium text-(--wp-accent) hover:text-(--wp-accent-strong) hover:underline focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
-                                    @click="fillTemplate"
+                    <div v-show="showSuratForm" id="surat-form" class="mt-6 space-y-5 border-t border-(--wp-hairline) pt-5">
+                        <fieldset>
+                            <legend class="sb-label">Jenis surat</legend>
+                            <div class="grid gap-2 sm:grid-cols-3">
+                                <label
+                                    v-for="opt in jenisOptions"
+                                    :key="opt.value"
+                                    class="flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition focus-within:ring-2 focus-within:ring-(--wp-accent)"
+                                    :class="
+                                        suratForm.jenis === opt.value
+                                            ? 'bg-(--wp-accent-soft) font-semibold text-(--wp-accent-strong) ring-2 ring-(--wp-accent)'
+                                            : 'text-foreground hover:bg-muted/60 ring-1 ring-(--wp-hairline)'
+                                    "
                                 >
-                                    Isi otomatis dari template
-                                </button>
+                                    <input v-model="suratForm.jenis" type="radio" name="surat-jenis" :value="opt.value" class="sr-only" />
+                                    <span
+                                        class="grid size-4 shrink-0 place-items-center rounded-full"
+                                        :class="suratForm.jenis === opt.value ? 'bg-(--wp-accent)' : 'ring-1 ring-(--wp-hairline)'"
+                                        aria-hidden="true"
+                                    >
+                                        <span v-if="suratForm.jenis === opt.value" class="size-1.5 rounded-full bg-(--wp-accent-contrast)"></span>
+                                    </span>
+                                    {{ opt.label }}
+                                </label>
                             </div>
-                            <input
-                                id="surat-perihal"
-                                v-model="suratForm.perihal"
-                                type="text"
-                                class="sb-input"
-                                :aria-invalid="suratForm.errors.perihal ? 'true' : undefined"
-                            />
-                            <p v-if="suratForm.errors.perihal" class="sb-error">{{ suratForm.errors.perihal }}</p>
+                            <p v-if="suratForm.errors.jenis" class="sb-error">{{ suratForm.errors.jenis }}</p>
+                        </fieldset>
+
+                        <div class="grid gap-4 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                            <div>
+                                <label class="sb-label" for="surat-nomor">Nomor surat (manual)</label>
+                                <input
+                                    id="surat-nomor"
+                                    v-model="suratForm.nomor_surat"
+                                    type="text"
+                                    placeholder="cth: 042/E-BK/IX/2026"
+                                    class="sb-input font-mono"
+                                    :aria-invalid="suratForm.errors.nomor_surat ? 'true' : undefined"
+                                />
+                                <p v-if="suratForm.errors.nomor_surat" class="sb-error">{{ suratForm.errors.nomor_surat }}</p>
+                            </div>
+                            <div>
+                                <div class="mb-1.5 flex items-center justify-between gap-3">
+                                    <label class="text-foreground text-sm font-medium" for="surat-perihal">Perihal</label>
+                                    <button
+                                        type="button"
+                                        class="rounded-sm text-xs font-medium text-(--wp-accent) hover:text-(--wp-accent-strong) hover:underline focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
+                                        @click="fillTemplate"
+                                    >
+                                        Isi otomatis dari template
+                                    </button>
+                                </div>
+                                <input
+                                    id="surat-perihal"
+                                    v-model="suratForm.perihal"
+                                    type="text"
+                                    class="sb-input"
+                                    :aria-invalid="suratForm.errors.perihal ? 'true' : undefined"
+                                />
+                                <p v-if="suratForm.errors.perihal" class="sb-error">{{ suratForm.errors.perihal }}</p>
+                            </div>
                         </div>
 
                         <div>
@@ -671,54 +841,62 @@ const kirimWhatsappSurat = (suratId: number) => {
                             <textarea
                                 id="surat-isi"
                                 v-model="suratForm.isi"
-                                rows="5"
-                                class="sb-input"
+                                rows="6"
+                                class="sb-input leading-relaxed"
                                 :aria-invalid="suratForm.errors.isi ? 'true' : undefined"
                             />
                             <p v-if="suratForm.errors.isi" class="sb-error">{{ suratForm.errors.isi }}</p>
                         </div>
 
-                        <template v-if="suratForm.jenis === 'undangan_meeting'">
-                            <div class="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label class="sb-label" for="surat-meeting-at">Waktu meeting</label>
-                                    <input
-                                        id="surat-meeting-at"
-                                        v-model="suratForm.meeting_at"
-                                        type="datetime-local"
-                                        class="sb-input"
-                                        :aria-invalid="suratForm.errors.meeting_at ? 'true' : undefined"
-                                    />
-                                    <p v-if="suratForm.errors.meeting_at" class="sb-error">{{ suratForm.errors.meeting_at }}</p>
-                                </div>
-                                <div>
-                                    <label class="sb-label" for="surat-meeting-place">Tempat meeting</label>
-                                    <input
-                                        id="surat-meeting-place"
-                                        v-model="suratForm.meeting_place"
-                                        type="text"
-                                        placeholder="cth: Ruang rapat UPT"
-                                        class="sb-input"
-                                        :aria-invalid="suratForm.errors.meeting_place ? 'true' : undefined"
-                                    />
-                                    <p v-if="suratForm.errors.meeting_place" class="sb-error">{{ suratForm.errors.meeting_place }}</p>
-                                </div>
+                        <div v-if="suratForm.jenis === 'undangan_meeting'" class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="sb-label" for="surat-meeting-at">Waktu meeting</label>
+                                <input
+                                    id="surat-meeting-at"
+                                    v-model="suratForm.meeting_at"
+                                    type="datetime-local"
+                                    class="sb-input"
+                                    :aria-invalid="suratForm.errors.meeting_at ? 'true' : undefined"
+                                />
+                                <p v-if="suratForm.errors.meeting_at" class="sb-error">{{ suratForm.errors.meeting_at }}</p>
                             </div>
-                        </template>
+                            <div>
+                                <label class="sb-label" for="surat-meeting-place">Tempat meeting</label>
+                                <input
+                                    id="surat-meeting-place"
+                                    v-model="suratForm.meeting_place"
+                                    type="text"
+                                    placeholder="cth: Ruang rapat UPT"
+                                    class="sb-input"
+                                    :aria-invalid="suratForm.errors.meeting_place ? 'true' : undefined"
+                                />
+                                <p v-if="suratForm.errors.meeting_place" class="sb-error">{{ suratForm.errors.meeting_place }}</p>
+                            </div>
+                        </div>
 
                         <fieldset v-if="document_types.length">
                             <legend class="sb-label">Dokumen yang harus disiapkan penyewa</legend>
-                            <div class="sb-card-muted space-y-2 p-3">
+                            <div class="flex flex-wrap gap-2">
                                 <label
                                     v-for="d in document_types"
                                     :key="d.id"
-                                    class="text-foreground flex cursor-pointer items-center gap-2.5 text-sm"
+                                    class="flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 text-sm transition focus-within:ring-2 focus-within:ring-(--wp-accent)"
+                                    :class="
+                                        suratForm.dokumen.includes(d.id)
+                                            ? 'bg-(--wp-accent-soft) text-(--wp-accent-strong) ring-1 ring-(--wp-accent)'
+                                            : 'text-foreground hover:bg-muted/60 ring-1 ring-(--wp-hairline)'
+                                    "
                                 >
                                     <input
                                         type="checkbox"
-                                        class="size-4 accent-(--wp-accent)"
+                                        class="sr-only"
                                         :checked="suratForm.dokumen.includes(d.id)"
                                         @change="toggleDokumen(d.id)"
+                                    />
+                                    <FontAwesomeIcon
+                                        :icon="['fas', suratForm.dokumen.includes(d.id) ? 'check' : 'plus']"
+                                        class="size-3"
+                                        aria-hidden="true"
                                     />
                                     <span>{{ d.name }}</span>
                                     <span v-if="d.is_required" class="sb-badge sb-tone-warning px-1.5 py-0 text-[0.6875rem]">wajib</span>
@@ -738,138 +916,184 @@ const kirimWhatsappSurat = (suratId: number) => {
                             </div>
                         </div>
 
-                        <p v-if="namaDokumenTerpilih.length" class="text-muted-foreground text-xs">
-                            Akan tercantum di surat: {{ namaDokumenTerpilih.join(', ') }}
-                        </p>
-
-                        <button
-                            type="button"
-                            class="wp-btn wp-btn-primary w-full justify-center px-5 py-2.5 text-sm sm:w-auto"
-                            :disabled="suratForm.processing"
-                            @click="submitSurat"
-                        >
-                            <FontAwesomeIcon
-                                v-if="suratForm.processing"
-                                :icon="['fas', 'circle-notch']"
-                                class="size-4 animate-spin"
-                                aria-hidden="true"
-                            />
-                            Buat surat (PDF)
-                        </button>
+                        <div class="flex flex-col gap-3 border-t border-(--wp-hairline) pt-4 sm:flex-row sm:items-center sm:justify-between">
+                            <p class="text-muted-foreground text-xs">
+                                <template v-if="namaDokumenTerpilih.length">Akan tercantum di surat: {{ namaDokumenTerpilih.join(', ') }}</template>
+                                <template v-else>Belum ada dokumen yang dipilih.</template>
+                            </p>
+                            <button
+                                type="button"
+                                class="wp-btn wp-btn-primary shrink-0 justify-center px-5 py-2.5 text-sm"
+                                :disabled="suratForm.processing"
+                                @click="submitSurat"
+                            >
+                                <FontAwesomeIcon
+                                    v-if="suratForm.processing"
+                                    :icon="['fas', 'circle-notch']"
+                                    class="size-4 animate-spin"
+                                    aria-hidden="true"
+                                />
+                                <FontAwesomeIcon v-else :icon="['fas', 'file-lines']" class="size-4" aria-hidden="true" />
+                                Buat surat (PDF)
+                            </button>
+                        </div>
                     </div>
+                </section>
+
+                <section v-if="status_logs.length" aria-labelledby="history-heading" class="sb-card p-5 sm:p-6">
+                    <h2 id="history-heading" class="text-foreground flex items-center gap-2 text-base font-semibold tracking-tight">
+                        <FontAwesomeIcon :icon="['fas', 'clock-rotate-left']" class="text-muted-foreground size-3.5" aria-hidden="true" />
+                        Riwayat status
+                    </h2>
+                    <ol class="mt-4 text-sm">
+                        <li v-for="(log, i) in [...status_logs].reverse()" :key="i" class="relative flex gap-4 pb-5 last:pb-0">
+                            <span
+                                v-if="i < status_logs.length - 1"
+                                class="absolute top-4 left-1 h-full w-px bg-(--wp-hairline)"
+                                aria-hidden="true"
+                            ></span>
+                            <span
+                                class="relative mt-1.5 size-2 shrink-0 rounded-full"
+                                :class="i === 0 ? 'bg-(--wp-accent) ring-4 ring-(--wp-accent-soft)' : 'bg-card ring-2 ring-(--wp-hairline)'"
+                                aria-hidden="true"
+                            ></span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-baseline justify-between gap-x-4">
+                                    <p class="text-foreground font-medium">
+                                        {{ statusLabel(log.to_status || '') }}
+                                        <span v-if="log.from_status" class="text-muted-foreground font-normal">
+                                            dari {{ statusLabel(log.from_status) }}</span
+                                        >
+                                    </p>
+                                    <p v-if="log.created_at" class="text-muted-foreground text-xs tabular-nums">{{ log.created_at }}</p>
+                                </div>
+                                <p v-if="log.note" class="bg-muted/60 text-foreground mt-1.5 rounded-lg px-3 py-2 text-xs leading-relaxed">
+                                    {{ log.note }}
+                                </p>
+                            </div>
+                        </li>
+                    </ol>
                 </section>
             </div>
 
             <aside class="space-y-6 lg:sticky lg:top-32 lg:self-start" aria-label="Tindakan">
-                <section v-if="booking.can_review" aria-labelledby="review-heading" class="sb-card space-y-4 p-5">
-                    <h2 id="review-heading" class="text-foreground text-base font-semibold tracking-tight">Keputusan peninjauan</h2>
-
-                    <div>
-                        <p class="sb-label">Aturan prioritas (opsional)</p>
-                        <SimpleSelect
-                            v-model="priorityRuleSelect"
-                            :options="priorityRuleOptions"
-                            placeholder="Pakai aturan bawaan"
-                            trigger-class="h-10 w-full rounded-xl border-(--wp-hairline) bg-background px-3 text-sm shadow-none"
-                        />
+                <section v-if="booking.can_review" aria-labelledby="review-heading" class="sb-card overflow-hidden">
+                    <div class="border-b border-(--wp-hairline) p-5 pb-4">
+                        <h2 id="review-heading" class="text-foreground text-base font-semibold tracking-tight">Keputusan peninjauan</h2>
+                        <div class="bg-muted mt-3 grid grid-cols-3 gap-1 rounded-xl p-1" role="tablist" aria-label="Pilih keputusan">
+                            <button
+                                v-for="tab in decisionTabs"
+                                :key="tab.value"
+                                type="button"
+                                role="tab"
+                                class="flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
+                                :class="
+                                    activeDecision === tab.value
+                                        ? tab.value === 'tolak'
+                                            ? 'bg-card text-(--sb-danger) shadow-sm'
+                                            : tab.value === 'klarifikasi'
+                                              ? 'bg-card text-(--sb-warning) shadow-sm'
+                                              : 'bg-card text-(--wp-accent-strong) shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                "
+                                :aria-selected="activeDecision === tab.value ? 'true' : 'false'"
+                                @click="activeDecision = tab.value"
+                            >
+                                <FontAwesomeIcon :icon="['fas', tab.icon]" class="size-3" aria-hidden="true" />
+                                {{ tab.label }}
+                            </button>
+                        </div>
                     </div>
-                    <div>
-                        <label class="sb-label" for="approve-admin-notes">Catatan untuk penyewa</label>
-                        <textarea
-                            id="approve-admin-notes"
-                            v-model="approveForm.admin_notes"
-                            rows="2"
-                            placeholder="Catatan untuk penyewa (tampil di halaman pesanan mereka)"
-                            class="sb-input"
-                        />
-                    </div>
 
-                    <fieldset class="space-y-3 rounded-xl border border-(--wp-hairline) p-3.5">
-                        <legend class="px-1 text-xs font-semibold tracking-wide text-(--wp-accent-strong) uppercase">Undangan meeting</legend>
-                        <p class="text-muted-foreground text-xs leading-relaxed">
-                            Opsional. Jika diisi, sistem otomatis membuat &amp; mengirim Undangan Meeting via <b>WhatsApp</b> dan <b>email</b> saat
-                            pengajuan disetujui.
-                        </p>
+                    <div v-if="activeDecision === ''" class="space-y-4 p-5" role="tabpanel">
                         <div>
-                            <label class="sb-label" for="approve-meeting-at">Waktu meeting</label>
-                            <input
-                                id="approve-meeting-at"
-                                v-model="approveForm.meeting_at"
-                                type="datetime-local"
-                                class="sb-input"
-                                :aria-invalid="approveForm.errors.meeting_at ? 'true' : undefined"
-                                :aria-describedby="approveForm.errors.meeting_at ? 'approve-meeting-at-error' : undefined"
+                            <p class="sb-label">Aturan prioritas (opsional)</p>
+                            <SimpleSelect
+                                v-model="priorityRuleSelect"
+                                :options="priorityRuleOptions"
+                                placeholder="Pakai aturan bawaan"
+                                trigger-class="h-10 w-full rounded-xl border-(--wp-hairline) bg-background px-3 text-sm shadow-none"
                             />
-                            <p v-if="approveForm.errors.meeting_at" id="approve-meeting-at-error" class="sb-error">{{ approveForm.errors.meeting_at }}</p>
                         </div>
                         <div>
-                            <label class="sb-label" for="approve-meeting-place">Tempat meeting</label>
-                            <input
-                                id="approve-meeting-place"
-                                v-model="approveForm.meeting_place"
-                                type="text"
+                            <label class="sb-label" for="approve-admin-notes">Catatan untuk penyewa</label>
+                            <textarea
+                                id="approve-admin-notes"
+                                v-model="approveForm.admin_notes"
+                                rows="2"
+                                placeholder="Tampil di halaman pesanan penyewa"
                                 class="sb-input"
-                                placeholder="Contoh: Ruang Rapat UPT Dispora"
-                                :aria-invalid="approveForm.errors.meeting_place ? 'true' : undefined"
-                                :aria-describedby="approveForm.errors.meeting_place ? 'approve-meeting-place-error' : undefined"
                             />
-                            <p v-if="approveForm.errors.meeting_place" id="approve-meeting-place-error" class="sb-error">{{ approveForm.errors.meeting_place }}</p>
                         </div>
-                    </fieldset>
 
-                    <div class="space-y-2">
-                        <button
-                            type="button"
-                            class="wp-btn wp-btn-primary w-full justify-center px-5 py-2.5 text-sm"
-                            :disabled="approveForm.processing || rejectForm.processing || klarifikasiForm.processing"
-                            @click="submitApprove(false)"
-                        >
-                            <FontAwesomeIcon
-                                v-if="approveForm.processing"
-                                :icon="['fas', 'circle-notch']"
-                                class="size-4 animate-spin"
-                                aria-hidden="true"
-                            />
-                            <FontAwesomeIcon v-else :icon="['fas', 'check']" class="size-4" aria-hidden="true" />
-                            Setujui pengajuan
-                        </button>
-                        <button
-                            v-if="adaBenturan"
-                            type="button"
-                            class="wp-btn wp-btn-quiet w-full justify-center px-4 py-2 text-xs text-(--sb-warning)"
-                            :disabled="approveForm.processing"
-                            @click="submitApprove(true)"
-                        >
-                            <FontAwesomeIcon :icon="['fas', 'triangle-exclamation']" class="size-3" aria-hidden="true" />
-                            Paksa lanjut (abaikan benturan)
-                        </button>
+                        <fieldset class="space-y-3 rounded-xl border border-dashed border-(--wp-hairline) p-3.5">
+                            <legend class="px-1 text-xs font-semibold tracking-wide text-(--wp-accent-strong) uppercase">Undangan meeting</legend>
+                            <p class="text-muted-foreground text-xs leading-relaxed">
+                                Opsional. Jika diisi, sistem otomatis membuat dan mengirim undangan meeting lewat <b>WhatsApp</b> dan
+                                <b>email</b> saat pengajuan disetujui.
+                            </p>
+                            <div>
+                                <label class="sb-label" for="approve-meeting-at">Waktu meeting</label>
+                                <input
+                                    id="approve-meeting-at"
+                                    v-model="approveForm.meeting_at"
+                                    type="datetime-local"
+                                    class="sb-input"
+                                    :aria-invalid="approveForm.errors.meeting_at ? 'true' : undefined"
+                                    :aria-describedby="approveForm.errors.meeting_at ? 'approve-meeting-at-error' : undefined"
+                                />
+                                <p v-if="approveForm.errors.meeting_at" id="approve-meeting-at-error" class="sb-error">
+                                    {{ approveForm.errors.meeting_at }}
+                                </p>
+                            </div>
+                            <div>
+                                <label class="sb-label" for="approve-meeting-place">Tempat meeting</label>
+                                <input
+                                    id="approve-meeting-place"
+                                    v-model="approveForm.meeting_place"
+                                    type="text"
+                                    class="sb-input"
+                                    placeholder="Contoh: Ruang Rapat UPT Dispora"
+                                    :aria-invalid="approveForm.errors.meeting_place ? 'true' : undefined"
+                                    :aria-describedby="approveForm.errors.meeting_place ? 'approve-meeting-place-error' : undefined"
+                                />
+                                <p v-if="approveForm.errors.meeting_place" id="approve-meeting-place-error" class="sb-error">
+                                    {{ approveForm.errors.meeting_place }}
+                                </p>
+                            </div>
+                        </fieldset>
+
+                        <div class="space-y-2">
+                            <button
+                                type="button"
+                                class="wp-btn wp-btn-primary w-full justify-center px-5 py-2.5 text-sm"
+                                :disabled="approveForm.processing || rejectForm.processing || klarifikasiForm.processing"
+                                @click="submitApprove(false)"
+                            >
+                                <FontAwesomeIcon
+                                    v-if="approveForm.processing"
+                                    :icon="['fas', 'circle-notch']"
+                                    class="size-4 animate-spin"
+                                    aria-hidden="true"
+                                />
+                                <FontAwesomeIcon v-else :icon="['fas', 'check']" class="size-4" aria-hidden="true" />
+                                Setujui pengajuan
+                            </button>
+                            <button
+                                v-if="adaBenturan"
+                                type="button"
+                                class="wp-btn wp-btn-quiet w-full justify-center px-4 py-2 text-xs text-(--sb-warning)"
+                                :disabled="approveForm.processing"
+                                @click="submitApprove(true)"
+                            >
+                                <FontAwesomeIcon :icon="['fas', 'triangle-exclamation']" class="size-3" aria-hidden="true" />
+                                Paksa lanjut (abaikan benturan)
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-2 border-t border-(--wp-hairline) pt-4">
-                        <button
-                            type="button"
-                            class="wp-btn wp-btn-quiet justify-center px-3 py-2 text-xs"
-                            :class="activeDecision === 'klarifikasi' ? 'sb-tone-warning' : ''"
-                            :aria-pressed="activeDecision === 'klarifikasi' ? 'true' : 'false'"
-                            @click="toggleDecision('klarifikasi')"
-                        >
-                            <FontAwesomeIcon :icon="['fas', 'comment-dots']" class="size-3" aria-hidden="true" />
-                            Perlu klarifikasi
-                        </button>
-                        <button
-                            type="button"
-                            class="wp-btn wp-btn-quiet justify-center px-3 py-2 text-xs"
-                            :class="activeDecision === 'tolak' ? 'sb-tone-danger' : 'text-(--sb-danger)'"
-                            :aria-pressed="activeDecision === 'tolak' ? 'true' : 'false'"
-                            @click="toggleDecision('tolak')"
-                        >
-                            <FontAwesomeIcon :icon="['fas', 'circle-xmark']" class="size-3" aria-hidden="true" />
-                            Tolak
-                        </button>
-                    </div>
-
-                    <div v-if="activeDecision === 'klarifikasi'" class="sb-card-muted space-y-3 p-3.5">
-                        <p class="text-foreground text-sm font-semibold">Tandai perlu klarifikasi</p>
+                    <div v-else-if="activeDecision === 'klarifikasi'" class="space-y-3 p-5" role="tabpanel">
+                        <p class="text-muted-foreground text-xs leading-relaxed">Penyewa akan melihat alasan ini dan diminta melengkapi informasi.</p>
                         <div class="flex flex-wrap gap-1.5" role="group" aria-label="Alasan cepat klarifikasi">
                             <button
                                 v-for="chip in klarifikasiChips"
@@ -886,7 +1110,7 @@ const kirimWhatsappSurat = (suratId: number) => {
                         <textarea
                             id="klarifikasi-reason"
                             v-model="klarifikasiForm.reason"
-                            rows="2"
+                            rows="3"
                             required
                             placeholder="Pilih alasan cepat di atas atau tulis sendiri"
                             class="sb-input"
@@ -895,7 +1119,7 @@ const kirimWhatsappSurat = (suratId: number) => {
                         <p v-if="klarifikasiForm.errors.reason" class="sb-error">{{ klarifikasiForm.errors.reason }}</p>
                         <button
                             type="button"
-                            class="wp-btn wp-btn-quiet bg-card w-full justify-center px-4 py-2 text-sm"
+                            class="wp-btn wp-btn-quiet w-full justify-center px-4 py-2.5 text-sm text-(--sb-warning)"
                             :disabled="klarifikasiForm.processing || klarifikasiForm.reason.trim() === ''"
                             @click="submitKlarifikasi"
                         >
@@ -905,12 +1129,13 @@ const kirimWhatsappSurat = (suratId: number) => {
                                 class="size-4 animate-spin"
                                 aria-hidden="true"
                             />
+                            <FontAwesomeIcon v-else :icon="['fas', 'comment-dots']" class="size-4" aria-hidden="true" />
                             Kirim tanda klarifikasi
                         </button>
                     </div>
 
-                    <div v-if="activeDecision === 'tolak'" class="sb-card-muted space-y-3 p-3.5">
-                        <p class="text-foreground text-sm font-semibold">Tolak pengajuan</p>
+                    <div v-else class="space-y-3 p-5" role="tabpanel">
+                        <p class="text-muted-foreground text-xs leading-relaxed">Tanggal langsung tersedia kembali setelah pengajuan ditolak.</p>
                         <div class="flex flex-wrap gap-1.5" role="group" aria-label="Alasan cepat penolakan">
                             <button
                                 v-for="chip in rejectChips"
@@ -927,7 +1152,7 @@ const kirimWhatsappSurat = (suratId: number) => {
                         <textarea
                             id="reject-reason"
                             v-model="rejectForm.reason"
-                            rows="2"
+                            rows="3"
                             required
                             placeholder="Pilih alasan cepat di atas atau tulis sendiri"
                             class="sb-input"
@@ -936,7 +1161,7 @@ const kirimWhatsappSurat = (suratId: number) => {
                         <p v-if="rejectForm.errors.reason" class="sb-error">{{ rejectForm.errors.reason }}</p>
                         <button
                             type="button"
-                            class="wp-btn wp-btn-danger w-full justify-center px-4 py-2 text-sm"
+                            class="wp-btn wp-btn-danger w-full justify-center px-4 py-2.5 text-sm"
                             :disabled="rejectForm.processing || rejectForm.reason.trim() === ''"
                             @click="submitReject"
                         >
@@ -946,46 +1171,56 @@ const kirimWhatsappSurat = (suratId: number) => {
                                 class="size-4 animate-spin"
                                 aria-hidden="true"
                             />
-                            Tolak booking
+                            <FontAwesomeIcon v-else :icon="['fas', 'circle-xmark']" class="size-4" aria-hidden="true" />
+                            Tolak pengajuan
                         </button>
                     </div>
                 </section>
 
                 <section aria-labelledby="payment-heading" class="sb-card space-y-4 p-5 text-sm">
-                    <h2 id="payment-heading" class="text-foreground text-base font-semibold tracking-tight">Pembayaran</h2>
+                    <div class="flex items-center justify-between gap-3">
+                        <h2 id="payment-heading" class="text-foreground text-base font-semibold tracking-tight">Pembayaran</h2>
+                        <span v-if="payment" class="sb-badge sb-tone-neutral">{{ statusLabel(payment.status) }}</span>
+                    </div>
                     <template v-if="payment">
-                        <dl class="space-y-2">
-                            <div class="flex items-center justify-between gap-3">
-                                <dt class="text-muted-foreground">Status</dt>
-                                <dd class="text-foreground font-medium">{{ statusLabel(payment.status) }}</dd>
-                            </div>
-                            <div class="flex items-center justify-between gap-3">
-                                <dt class="text-muted-foreground">Jumlah</dt>
-                                <dd class="text-foreground font-semibold tabular-nums">{{ formatRupiah(payment.amount) }}</dd>
-                            </div>
-                        </dl>
+                        <div class="bg-muted/60 rounded-2xl p-4">
+                            <p class="text-muted-foreground text-xs">Jumlah tagihan</p>
+                            <p class="text-foreground mt-0.5 text-2xl font-bold tracking-tight tabular-nums">{{ formatRupiah(payment.amount) }}</p>
+                            <p v-if="payment.bank" class="text-muted-foreground mt-2 text-xs">
+                                {{ payment.bank }} · <span class="font-mono tabular-nums">{{ payment.rekening }}</span>
+                                <template v-if="payment.atas_nama"> · {{ payment.atas_nama }}</template>
+                            </p>
+                            <p v-if="payment.expires_at" class="text-muted-foreground mt-1 text-xs tabular-nums">
+                                Batas bayar {{ payment.expires_at }}
+                            </p>
+                        </div>
 
                         <a
                             v-if="payment.bukti_url"
                             :href="payment.bukti_url"
                             target="_blank"
                             rel="noopener"
-                            class="group block rounded-xl focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
+                            class="group block overflow-hidden rounded-xl ring-1 ring-(--wp-hairline) transition hover:ring-(--wp-accent)/50 focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
                         >
                             <img
                                 v-if="isImageUrl(payment.bukti_url)"
                                 :src="payment.bukti_url"
                                 alt="Bukti pembayaran"
                                 loading="lazy"
-                                class="bg-muted mb-2 max-h-56 w-full rounded-xl object-contain ring-1 ring-(--wp-hairline)"
+                                class="bg-muted max-h-64 w-full object-contain"
                             />
                             <span
-                                class="wp-link-arrow inline-flex items-center gap-1.5 font-medium text-(--wp-accent) group-hover:text-(--wp-accent-strong)"
+                                class="wp-link-arrow flex items-center justify-between gap-1.5 px-3 py-2.5 font-medium text-(--wp-accent) group-hover:text-(--wp-accent-strong)"
                             >
-                                Lihat bukti
+                                Buka bukti pembayaran
                                 <FontAwesomeIcon :icon="['fas', 'arrow-up-right-from-square']" class="size-3" aria-hidden="true" />
                             </span>
                         </a>
+                        <p v-else class="text-muted-foreground rounded-xl border border-dashed border-(--wp-hairline) p-3 text-center text-xs">
+                            Penyewa belum mengirim bukti pembayaran.
+                        </p>
+
+                        <p v-if="payment.notes" class="bg-muted/60 rounded-lg px-3 py-2 text-xs leading-relaxed">{{ payment.notes }}</p>
 
                         <div v-if="booking.can_verify_payment" class="space-y-3 border-t border-(--wp-hairline) pt-4">
                             <div>
@@ -1013,32 +1248,54 @@ const kirimWhatsappSurat = (suratId: number) => {
                                 <FontAwesomeIcon v-else :icon="['fas', 'check']" class="size-4" aria-hidden="true" />
                                 Verifikasi bukti pembayaran
                             </button>
-                            <div class="pt-2">
-                                <label class="sb-label" for="reject-pay-reason">Alasan tolak bukti</label>
-                                <textarea
-                                    id="reject-pay-reason"
-                                    v-model="rejectPayForm.reason"
-                                    rows="2"
-                                    placeholder="Alasan tolak bukti"
-                                    class="sb-input"
-                                    :aria-invalid="rejectPayForm.errors.reason ? 'true' : undefined"
-                                />
-                                <p v-if="rejectPayForm.errors.reason" class="sb-error">{{ rejectPayForm.errors.reason }}</p>
-                            </div>
+
                             <button
                                 type="button"
-                                class="wp-btn wp-btn-danger w-full justify-center px-4 py-2 text-sm"
-                                :disabled="rejectPayForm.processing"
-                                @click="submitRejectPay"
+                                class="flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium text-(--sb-danger) transition hover:underline focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
+                                :aria-expanded="rejectPayOpen ? 'true' : 'false'"
+                                aria-controls="reject-pay-panel"
+                                @click="rejectPayOpen = !rejectPayOpen"
                             >
                                 <FontAwesomeIcon
-                                    v-if="rejectPayForm.processing"
-                                    :icon="['fas', 'circle-notch']"
-                                    class="size-4 animate-spin"
+                                    :icon="['fas', 'chevron-down']"
+                                    class="size-2.5 transition-transform"
+                                    :class="rejectPayOpen ? 'rotate-180' : ''"
                                     aria-hidden="true"
                                 />
-                                Tolak bukti
+                                Bukti tidak sesuai?
                             </button>
+                            <div
+                                v-show="rejectPayOpen || rejectPayForm.errors.reason"
+                                id="reject-pay-panel"
+                                class="space-y-3 rounded-xl bg-(--sb-danger)/5 p-3"
+                            >
+                                <div>
+                                    <label class="sb-label" for="reject-pay-reason">Alasan tolak bukti</label>
+                                    <textarea
+                                        id="reject-pay-reason"
+                                        v-model="rejectPayForm.reason"
+                                        rows="2"
+                                        placeholder="Contoh: nominal tidak sesuai tagihan"
+                                        class="sb-input"
+                                        :aria-invalid="rejectPayForm.errors.reason ? 'true' : undefined"
+                                    />
+                                    <p v-if="rejectPayForm.errors.reason" class="sb-error">{{ rejectPayForm.errors.reason }}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="wp-btn wp-btn-danger w-full justify-center px-4 py-2 text-sm"
+                                    :disabled="rejectPayForm.processing"
+                                    @click="submitRejectPay"
+                                >
+                                    <FontAwesomeIcon
+                                        v-if="rejectPayForm.processing"
+                                        :icon="['fas', 'circle-notch']"
+                                        class="size-4 animate-spin"
+                                        aria-hidden="true"
+                                    />
+                                    Tolak bukti
+                                </button>
+                            </div>
                         </div>
                     </template>
                     <p v-else class="text-muted-foreground">Belum ada data pembayaran. Muncul setelah pengajuan disetujui.</p>
