@@ -10,6 +10,9 @@ final class BookingStatus
 
     public const PERLU_KLARIFIKASI = 'perlu_klarifikasi';
 
+    /** Undangan meeting sudah dikirim ke penyewa; keputusan akhir menunggu hasil meeting. */
+    public const MENUNGGU_MEETING = 'menunggu_meeting';
+
     public const APPROVED = 'approved';
 
     public const AWAITING_PAYMENT = 'awaiting_payment';
@@ -39,6 +42,7 @@ final class BookingStatus
             self::DRAFT,
             self::MENUNGGU_APPROVAL,
             self::PERLU_KLARIFIKASI,
+            self::MENUNGGU_MEETING,
             self::APPROVED,
             self::AWAITING_PAYMENT,
             self::PAID,
@@ -54,7 +58,7 @@ final class BookingStatus
     }
 
     /**
-     * Pengajuan (menunggu_approval / perlu_klarifikasi) — NON-BLOCKING.
+     * Pengajuan (menunggu_approval / perlu_klarifikasi / menunggu_meeting) — NON-BLOCKING.
      * Tidak masuk locking(): kalender tetap hijau, hanya diberi flag "ada pengajuan".
      * Admin yang memutuskan pengajuan mana yang diloloskan.
      *
@@ -62,7 +66,7 @@ final class BookingStatus
      */
     public static function pengajuan(): array
     {
-        return [self::MENUNGGU_APPROVAL, self::PERLU_KLARIFIKASI];
+        return [self::MENUNGGU_APPROVAL, self::PERLU_KLARIFIKASI, self::MENUNGGU_MEETING];
     }
 
     /** Hold — tanggal terblokir (merah) selama window pembayaran. */

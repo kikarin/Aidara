@@ -16,11 +16,19 @@ class BookingStatusService
         BookingStatus::MENUNGGU_APPROVAL => [
             BookingStatus::APPROVED,
             BookingStatus::PERLU_KLARIFIKASI,
+            BookingStatus::MENUNGGU_MEETING,
             BookingStatus::REJECTED,
             BookingStatus::CANCELLED,
         ],
         BookingStatus::PERLU_KLARIFIKASI => [
             BookingStatus::APPROVED,
+            BookingStatus::MENUNGGU_MEETING,
+            BookingStatus::REJECTED,
+            BookingStatus::CANCELLED,
+        ],
+        BookingStatus::MENUNGGU_MEETING => [
+            BookingStatus::APPROVED,
+            BookingStatus::PERLU_KLARIFIKASI,
             BookingStatus::REJECTED,
             BookingStatus::CANCELLED,
         ],

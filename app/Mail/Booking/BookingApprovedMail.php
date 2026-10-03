@@ -3,6 +3,8 @@
 namespace App\Mail\Booking;
 
 use App\Models\Booking\Booking;
+use App\Models\Booking\BookingPayment;
+use App\Support\Booking\BookingJenisSewa;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -20,12 +22,16 @@ class BookingApprovedMail extends Mailable
     public function __construct(
         public Booking $booking,
         public array $dokumenWajib,
+        public string $jenisSewa = BookingJenisSewa::EVENT,
+        public ?BookingPayment $payment = null,
     ) {}
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Pengajuan '.$this->booking->nomor.' disetujui — silakan siapkan dokumen',
+            subject: $this->jenisSewa === BookingJenisSewa::REGULER
+                ? 'Pengajuan '.$this->booking->nomor.' disetujui — silakan lakukan pembayaran'
+                : 'Pengajuan '.$this->booking->nomor.' disetujui — silakan siapkan dokumen',
         );
     }
 
@@ -33,6 +39,10 @@ class BookingApprovedMail extends Mailable
     {
         return new Content(
             view: 'booking.emails.approved',
+            with: [
+                'reguler' => $this->jenisSewa === BookingJenisSewa::REGULER,
+                'expiresAt' => $this->payment?->meta['expires_at'] ?? null,
+            ],
         );
     }
 }

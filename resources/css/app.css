@@ -1016,6 +1016,8 @@ details[open] > summary {
         --sb-danger: oklch(0.55 0.17 27);
         --sb-warning: oklch(0.52 0.1 70);
         --sb-info: oklch(0.47 0.07 245);
+        --sb-attention: oklch(0.56 0.15 45);
+        --sb-meeting: oklch(0.5 0.14 300);
         --sb-radius: 1.5rem;
     }
 
@@ -1024,6 +1026,8 @@ details[open] > summary {
         --sb-danger: oklch(0.72 0.14 25);
         --sb-warning: oklch(0.84 0.1 80);
         --sb-info: oklch(0.8 0.07 240);
+        --sb-attention: oklch(0.78 0.13 50);
+        --sb-meeting: oklch(0.78 0.11 300);
     }
 
     .sb-card {
@@ -1129,6 +1133,16 @@ details[open] > summary {
     .sb-tone-danger {
         background-color: color-mix(in oklch, var(--sb-danger) 11%, transparent);
         color: var(--sb-danger);
+    }
+
+    .sb-tone-attention {
+        background-color: color-mix(in oklch, var(--sb-attention) 13%, transparent);
+        color: var(--sb-attention);
+    }
+
+    .sb-tone-meeting {
+        background-color: color-mix(in oklch, var(--sb-meeting) 12%, transparent);
+        color: var(--sb-meeting);
     }
 
     .sb-tone-neutral {

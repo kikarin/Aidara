@@ -15,6 +15,7 @@ use App\Services\Booking\BookingPaymentService;
 use App\Services\Booking\BookingSubmitService;
 use App\Services\Booking\PricingService;
 use App\Services\Booking\SuratService;
+use App\Support\Booking\BookingJenisSewa;
 use App\Support\Booking\BookingStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -200,6 +201,7 @@ class BookingController extends Controller
             'subtotal' => (int) $booking->subtotal,
             'addon_total' => (int) $booking->addon_total,
             'can_upload_bukti' => $booking->status === BookingStatus::AWAITING_PAYMENT,
+            'jenis_sewa' => BookingJenisSewa::of($booking),
             'venue' => $booking->venue?->only(['id', 'code', 'name']),
             'areas' => $booking->areas->map(fn ($a) => $a->only(['id', 'code', 'name']))->all(),
             'items' => $booking->items->map(fn ($i) => [
@@ -259,6 +261,10 @@ class BookingController extends Controller
      */
     private function dokumenWajibNames(Booking $booking): array
     {
+        if (BookingJenisSewa::isReguler($booking) && $booking->surats->isEmpty()) {
+            return [];
+        }
+
         $unlocked = in_array($booking->status, [
             BookingStatus::APPROVED,
             BookingStatus::AWAITING_PAYMENT,

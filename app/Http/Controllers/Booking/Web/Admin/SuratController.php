@@ -8,6 +8,7 @@ use App\Models\Booking\BookingSurat;
 use App\Services\Booking\SuratDeliveryService;
 use App\Services\Booking\SuratService;
 use App\Services\Fonnte\FonnteService;
+use App\Support\Booking\BookingStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -64,7 +65,7 @@ class SuratController extends Controller
 
         return back()->with(
             'success',
-            'Surat dikirim ke '.$surat->booking->user?->email.' beserta lampiran PDF.'
+            'Surat dikirim ke '.$surat->booking->user?->email.' beserta lampiran PDF.'.$this->meetingNotice($surat)
         );
     }
 
@@ -80,7 +81,15 @@ class SuratController extends Controller
 
         return back()->with(
             'success',
-            'Surat dikirim via WhatsApp ke '.$this->fonnte->normalizePhone($phone).'.'
+            'Surat dikirim via WhatsApp ke '.$this->fonnte->normalizePhone($phone).'.'.$this->meetingNotice($surat)
         );
+    }
+
+    private function meetingNotice(BookingSurat $surat): string
+    {
+        return $surat->jenis === BookingSurat::JENIS_UNDANGAN_MEETING
+            && $surat->booking->status === BookingStatus::MENUNGGU_MEETING
+            ? ' Status pengajuan sekarang "Meeting dijadwalkan".'
+            : '';
     }
 }

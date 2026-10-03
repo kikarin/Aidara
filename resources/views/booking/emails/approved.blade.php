@@ -15,25 +15,64 @@
             telah <b style="color:#2e7d32;">disetujui</b>.
         </p>
 
-        @if ($dokumenWajib)
-            <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin:0 0 16px;font-size:14px;line-height:1.7;background:#f8fafc;">
-                <b>Silakan siapkan dokumen berikut (dibawa saat meeting):</b>
-                <ul style="margin:6px 0 0 18px;padding:0;">
-                    @foreach ($dokumenWajib as $dok)
-                        <li>{{ $dok }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
+        @if ($reguler)
+            @if ($payment)
+                <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin:0 0 16px;font-size:14px;line-height:1.7;background:#f8fafc;">
+                    <b>Petunjuk pembayaran</b>
+                    <table style="width:100%;margin-top:6px;font-size:14px;border-collapse:collapse;">
+                        <tr>
+                            <td style="padding:2px 0;color:#64748b;">Jumlah</td>
+                            <td style="padding:2px 0;text-align:right;font-weight:bold;">Rp {{ number_format((int) $payment->amount, 0, ',', '.') }}</td>
+                        </tr>
+                        @if ($payment->bank)
+                            <tr>
+                                <td style="padding:2px 0;color:#64748b;">Bank</td>
+                                <td style="padding:2px 0;text-align:right;">{{ $payment->bank }}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:2px 0;color:#64748b;">No. rekening</td>
+                                <td style="padding:2px 0;text-align:right;font-family:monospace;font-size:15px;">{{ $payment->rekening }}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:2px 0;color:#64748b;">Atas nama</td>
+                                <td style="padding:2px 0;text-align:right;">{{ $payment->atas_nama }}</td>
+                            </tr>
+                        @endif
+                        @if ($expiresAt)
+                            <tr>
+                                <td style="padding:2px 0;color:#64748b;">Bayar sebelum</td>
+                                <td style="padding:2px 0;text-align:right;color:#b45309;font-weight:bold;">{{ \Illuminate\Support\Carbon::parse($expiresAt)->format('d-m-Y H:i') }}</td>
+                            </tr>
+                        @endif
+                    </table>
+                </div>
+            @endif
 
-        <p style="margin:0 0 20px;font-size:14px;line-height:1.6;">
-            Surat balasan berisi jadwal meeting akan dikirim terpisah melalui email/WA oleh pengelola.
-            Setelah meeting, silakan lakukan pembayaran sesuai petunjuk pada halaman detail pesanan.
-        </p>
+            <p style="margin:0 0 20px;font-size:14px;line-height:1.6;">
+                Sewa ini tidak memerlukan meeting. Silakan transfer sesuai petunjuk di atas, lalu unggah bukti pembayaran
+                di halaman detail pesanan. Jadwal sudah kami tahan untuk Anda sampai batas waktu pembayaran.
+            </p>
+        @else
+            @if ($dokumenWajib)
+                <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin:0 0 16px;font-size:14px;line-height:1.7;background:#f8fafc;">
+                    <b>Silakan siapkan dokumen berikut (dibawa saat meeting):</b>
+                    <ul style="margin:6px 0 0 18px;padding:0;">
+                        @foreach ($dokumenWajib as $dok)
+                            <li>{{ $dok }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            <p style="margin:0 0 20px;font-size:14px;line-height:1.6;">
+                Surat balasan berisi jadwal meeting akan dikirim terpisah melalui email/WA oleh pengelola.
+                Setelah meeting, silakan lakukan pembayaran sesuai petunjuk pada halaman detail pesanan.
+            </p>
+        @endif
 
         <a href="{{ route('e-booking.bookings.show', $booking->id) }}"
            style="display:inline-block;background:#2e7d32;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;padding:10px 20px;border-radius:999px;">
-            Lihat detail pesanan
+            {{ $reguler ? 'Bayar dan unggah bukti' : 'Lihat detail pesanan' }}
         </a>
     </div>
 </body>

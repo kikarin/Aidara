@@ -38,6 +38,7 @@ class BookingAdminController extends Controller
             $query->whereIn('status', [
                 BookingStatus::MENUNGGU_APPROVAL,
                 BookingStatus::PERLU_KLARIFIKASI,
+                BookingStatus::MENUNGGU_MEETING,
                 BookingStatus::AWAITING_PAYMENT,
                 BookingStatus::APPROVED,
             ]);

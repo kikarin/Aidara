@@ -1,10 +1,11 @@
-export type BookingStatusTone = 'success' | 'warning' | 'info' | 'danger' | 'neutral';
+export type BookingStatusTone = 'success' | 'warning' | 'attention' | 'meeting' | 'info' | 'danger' | 'neutral';
 
 export type BookingStatusAudience = 'renter' | 'admin';
 
 const RENTER_LABELS: Record<string, string> = {
     draft: 'Draf',
     menunggu_approval: 'Menunggu ditinjau',
+    menunggu_meeting: 'Undangan meeting',
     awaiting_payment: 'Menunggu pembayaran',
     awaiting_verification: 'Bukti sedang dicek',
     approved: 'Sudah disetujui',
@@ -21,6 +22,7 @@ const RENTER_LABELS: Record<string, string> = {
 const ADMIN_LABELS: Record<string, string> = {
     draft: 'Draf',
     menunggu_approval: 'Perlu ditinjau',
+    menunggu_meeting: 'Meeting dijadwalkan',
     awaiting_payment: 'Menunggu bayar',
     awaiting_verification: 'Bukti perlu dicek',
     approved: 'Disetujui',
@@ -36,7 +38,8 @@ const ADMIN_LABELS: Record<string, string> = {
 
 const TONES: Record<string, BookingStatusTone> = {
     menunggu_approval: 'warning',
-    perlu_klarifikasi: 'warning',
+    perlu_klarifikasi: 'attention',
+    menunggu_meeting: 'meeting',
     awaiting_payment: 'info',
     awaiting_verification: 'info',
     approved: 'success',

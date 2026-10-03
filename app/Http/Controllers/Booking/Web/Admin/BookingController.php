@@ -16,6 +16,7 @@ use App\Models\Booking\BookingSetting;
 use App\Services\Booking\AdminApprovalService;
 use App\Services\Booking\BookingInvitationService;
 use App\Services\Booking\BookingPaymentService;
+use App\Support\Booking\BookingJenisSewa;
 use App\Support\Booking\BookingStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -55,6 +56,7 @@ class BookingController extends Controller
             'user:id,name,email',
             'penyewaProfile:id,nama,no_hp,instansi',
             'payments' => fn ($q) => $q->latest('id'),
+            'items:id,booking_id,uraian,satuan,snapshot',
         ]);
 
         $applyTab = function ($query) use ($tab, $status) {
@@ -62,6 +64,7 @@ class BookingController extends Controller
                 'review' => $query->whereIn('status', [
                     BookingStatus::MENUNGGU_APPROVAL,
                     BookingStatus::PERLU_KLARIFIKASI,
+                    BookingStatus::MENUNGGU_MEETING,
                 ]),
                 'payment' => $query->where('status', BookingStatus::AWAITING_PAYMENT),
                 'verify'  => $query
@@ -73,6 +76,7 @@ class BookingController extends Controller
                 default => $query->whereIn('status', [
                     BookingStatus::MENUNGGU_APPROVAL,
                     BookingStatus::PERLU_KLARIFIKASI,
+                    BookingStatus::MENUNGGU_MEETING,
                     BookingStatus::AWAITING_PAYMENT,
                     BookingStatus::APPROVED,
                 ]),
@@ -89,6 +93,10 @@ class BookingController extends Controller
                         && $paymentStatus       === 'awaiting_verification';
 
                     $action = match (true) {
+                        $b->status === BookingStatus::MENUNGGU_MEETING => [
+                            'label' => 'Tindak lanjut meeting',
+                            'tone'  => 'meeting',
+                        ],
                         in_array($b->status, [BookingStatus::MENUNGGU_APPROVAL, BookingStatus::PERLU_KLARIFIKASI], true) => [
                             'label' => 'Tinjau sekarang',
                             'tone'  => 'amber',
@@ -119,6 +127,7 @@ class BookingController extends Controller
                         'area'           => $b->areas->pluck('name')->implode(', ') ?: null,
                         'penyewa'        => $b->penyewaProfile?->nama ?? $b->user?->name,
                         'payment_status' => $paymentStatus,
+                        'jenis_sewa'     => BookingJenisSewa::of($b),
                         'needs_verify'   => $needsVerify,
                         'action_label'   => $action['label'],
                         'action_tone'    => $action['tone'],
@@ -129,12 +138,14 @@ class BookingController extends Controller
                 'active' => Booking::query()->whereIn('status', [
                     BookingStatus::MENUNGGU_APPROVAL,
                     BookingStatus::PERLU_KLARIFIKASI,
+                    BookingStatus::MENUNGGU_MEETING,
                     BookingStatus::AWAITING_PAYMENT,
                     BookingStatus::APPROVED,
                 ])->count(),
                 'review' => Booking::query()->whereIn('status', [
                     BookingStatus::MENUNGGU_APPROVAL,
                     BookingStatus::PERLU_KLARIFIKASI,
+                    BookingStatus::MENUNGGU_MEETING,
                 ])->count(),
                 'payment' => Booking::query()->where('status', BookingStatus::AWAITING_PAYMENT)->count(),
                 'verify'  => Booking::query()
@@ -150,6 +161,7 @@ class BookingController extends Controller
             'status_options' => [
                 BookingStatus::MENUNGGU_APPROVAL,
                 BookingStatus::PERLU_KLARIFIKASI,
+                BookingStatus::MENUNGGU_MEETING,
                 BookingStatus::AWAITING_PAYMENT,
                 BookingStatus::APPROVED,
                 BookingStatus::CONFIRMED,
@@ -210,9 +222,11 @@ class BookingController extends Controller
                     'qty'        => $i->qty,
                     'line_total' => (int) $i->line_total,
                 ]),
+                'jenis_sewa' => BookingJenisSewa::of($booking),
                 'can_review' => in_array($booking->status, [
                     BookingStatus::MENUNGGU_APPROVAL,
                     BookingStatus::PERLU_KLARIFIKASI,
+                    BookingStatus::MENUNGGU_MEETING,
                 ], true),
                 'can_verify_payment' => $booking->status === BookingStatus::AWAITING_PAYMENT
                     && $payment
@@ -280,18 +294,29 @@ class BookingController extends Controller
 
         $booking = $result['booking'];
 
+        $jenisSewa = BookingJenisSewa::of($booking);
+
         $message = $booking->status === BookingStatus::PERLU_KLARIFIKASI
             ? 'Pengajuan perlu dikonfirmasi lebih lanjut karena benturan prioritas masih sama.'
-            : 'Pengajuan disetujui. Menunggu pembayaran dari penyewa.';
+            : ($jenisSewa === BookingJenisSewa::REGULER
+                ? 'Sewa reguler disetujui. Penyewa langsung menerima petunjuk pembayaran tanpa meeting.'
+                : 'Pengajuan disetujui. Menunggu pembayaran dari penyewa.');
 
-        $dokumenWajib = in_array($booking->status, [BookingStatus::APPROVED, BookingStatus::AWAITING_PAYMENT], true)
+        $approved = in_array($booking->status, [BookingStatus::APPROVED, BookingStatus::AWAITING_PAYMENT], true);
+
+        $dokumenWajib = $approved && $jenisSewa === BookingJenisSewa::EVENT
             ? $this->dokumenWajibNames()
             : [];
 
-        if ($booking->user?->email) {
+        if ($approved && $booking->user?->email) {
             try {
                 Mail::to($booking->user->email)->send(
-                    new BookingApprovedMail($booking->fresh(['penyewaProfile', 'user']), $dokumenWajib)
+                    new BookingApprovedMail(
+                        $booking->fresh(['penyewaProfile', 'user', 'venue']),
+                        $dokumenWajib,
+                        $jenisSewa,
+                        $result['payment'],
+                    )
                 );
             } catch (\Throwable $e) {
                 report($e);

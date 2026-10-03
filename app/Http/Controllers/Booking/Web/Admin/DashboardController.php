@@ -20,6 +20,7 @@ class DashboardController extends Controller
                     ->whereIn('status', [
                         BookingStatus::MENUNGGU_APPROVAL,
                         BookingStatus::PERLU_KLARIFIKASI,
+                        BookingStatus::MENUNGGU_MEETING,
                     ])
                     ->count();
 
@@ -51,6 +52,7 @@ class DashboardController extends Controller
                     ->whereIn('status', [
                         BookingStatus::MENUNGGU_APPROVAL,
                         BookingStatus::PERLU_KLARIFIKASI,
+                        BookingStatus::MENUNGGU_MEETING,
                         BookingStatus::AWAITING_PAYMENT,
                     ])
                     ->latest('id')

@@ -76,6 +76,7 @@ const props = defineProps<{
         subtotal: number;
         addon_total: number;
         can_upload_bukti: boolean;
+        jenis_sewa?: 'reguler' | 'event';
         venue: { id: number; code: string; name: string } | null;
         areas: Array<{ id: number; code: string; name: string }>;
         items: Array<{ uraian: string; satuan: string; qty: number; line_total: number }>;
@@ -114,6 +115,7 @@ const formatRp = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currenc
 const statusLabel = (status: string) => {
     const map: Record<string, string> = {
         menunggu_approval: 'Menunggu ditinjau',
+        menunggu_meeting: 'Undangan meeting',
         awaiting_payment: 'Menunggu pembayaran',
         approved: 'Sudah disetujui',
         paid: 'Pembayaran masuk',
@@ -128,6 +130,8 @@ const statusLabel = (status: string) => {
 
     return map[status] ?? status;
 };
+
+const isReguler = computed(() => props.booking.jenis_sewa === 'reguler');
 
 const form = useForm({
     bukti: null as File | null,
@@ -180,9 +184,26 @@ const countdown = ref('');
 const countdownParts = ref<Array<{ value: string; unit: string }>>([]);
 let timer: ReturnType<typeof setInterval> | null = null;
 
+const paymentStatusLabel = (status: string) => {
+    const map: Record<string, string> = {
+        pending: 'Menunggu transfer',
+        awaiting_verification: 'Bukti sedang diperiksa',
+        verified: 'Lunas',
+        rejected: 'Bukti ditolak',
+    };
+
+    return map[status] ?? statusLabel(status);
+};
+
+const awaitingTransfer = computed(
+    () => props.booking.status === 'awaiting_payment' && ['pending', 'rejected'].includes(props.booking.payment?.status ?? ''),
+);
+
+const awaitingVerification = computed(() => props.booking.status === 'awaiting_payment' && props.booking.payment?.status === 'awaiting_verification');
+
 const updateCountdown = () => {
     const raw = props.booking.payment?.expires_at;
-    if (!raw) {
+    if (!raw || !awaitingTransfer.value) {
         countdown.value = '';
         countdownParts.value = [];
 
@@ -240,25 +261,40 @@ const copyText = async (key: string, value: string | null | undefined) => {
 };
 
 const title = computed(() => {
+    if (awaitingVerification.value) {
+        return 'Bukti sedang diperiksa';
+    }
     if (props.booking.status === 'awaiting_payment') {
         return 'Menunggu pembayaran';
     }
     if (props.booking.status === 'menunggu_approval') {
         return 'Menunggu ditinjau';
     }
+    if (props.booking.status === 'menunggu_meeting') {
+        return 'Hadiri meeting dengan pengelola';
+    }
 
     return `Pesanan ${props.booking.nomor}`;
 });
 
 const nextStepText = computed(() => {
+    if (awaitingVerification.value) {
+        return 'Bukti pembayaran Anda sudah masuk dan sedang diperiksa pengelola. Anda tidak perlu transfer lagi.';
+    }
     if (props.booking.status === 'awaiting_payment') {
         return 'Silakan transfer sesuai petunjuk di bawah, lalu kirim bukti pembayaran.';
+    }
+    if (props.booking.status === 'menunggu_approval' && isReguler.value) {
+        return 'Pengajuan Anda sudah masuk. Sewa latihan tidak perlu meeting, jadi begitu disetujui petunjuk pembayaran langsung muncul di halaman ini.';
     }
     if (props.booking.status === 'menunggu_approval') {
         return `Pengajuan Anda sudah masuk. Proses peninjauan maksimal ${props.slaHariKerja ?? 7} hari kerja — balasan berupa surat akan dikirim setelah selesai.`;
     }
     if (props.booking.status === 'perlu_klarifikasi') {
         return 'Pengelola perlu konfirmasi tambahan. Mohon cek catatan terbaru.';
+    }
+    if (props.booking.status === 'menunggu_meeting') {
+        return 'Pengelola mengundang Anda meeting sebelum memutuskan pengajuan. Cek surat undangan dan bawa dokumen yang diminta.';
     }
 
     return 'Lihat rincian pesanan dan pantau perkembangannya di halaman ini.';
@@ -281,7 +317,7 @@ const progressIndex = computed(() => {
     if (['approved', 'awaiting_payment', 'awaiting_verification', 'forfeited', 'expired'].includes(s)) {
         return 2;
     }
-    if (['menunggu_approval', 'perlu_klarifikasi', 'rejected', 'cancelled'].includes(s)) {
+    if (['menunggu_approval', 'perlu_klarifikasi', 'menunggu_meeting', 'rejected', 'cancelled'].includes(s)) {
         return 1;
     }
 
@@ -300,7 +336,7 @@ const stepState = (i: number) => {
 };
 
 const statusNote = computed(() => {
-    if (!['rejected', 'perlu_klarifikasi'].includes(props.booking.status)) {
+    if (!['rejected', 'perlu_klarifikasi', 'menunggu_meeting'].includes(props.booking.status)) {
         return null;
     }
 
@@ -392,6 +428,9 @@ const progressPercent = computed(() => {
                                 />
                             </button>
                             <span class="sr-only" aria-live="polite">{{ copied === 'nomor' ? 'Kode pesanan disalin' : '' }}</span>
+                            <span v-if="booking.jenis_sewa" class="sb-badge" :class="isReguler ? 'sb-tone-info' : 'sb-tone-meeting'">
+                                {{ isReguler ? 'Sewa latihan' : 'Sewa event' }}
+                            </span>
                         </div>
 
                         <h1 class="mt-4 text-3xl font-bold tracking-tight text-balance sm:text-4xl">{{ heading }}</h1>
@@ -498,10 +537,30 @@ const progressPercent = computed(() => {
                 </div>
             </header>
 
-            <p v-if="statusNote" class="sb-callout" :class="booking.status === 'rejected' ? 'sb-tone-danger' : 'sb-tone-warning'">
-                <FontAwesomeIcon :icon="['fas', 'triangle-exclamation']" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <p
+                v-if="statusNote"
+                class="sb-callout"
+                :class="{
+                    'sb-tone-danger': booking.status === 'rejected',
+                    'sb-tone-attention': booking.status === 'perlu_klarifikasi',
+                    'sb-tone-meeting': booking.status === 'menunggu_meeting',
+                }"
+            >
+                <FontAwesomeIcon
+                    :icon="['fas', booking.status === 'menunggu_meeting' ? 'calendar-days' : 'triangle-exclamation']"
+                    class="mt-0.5 size-4 shrink-0"
+                    aria-hidden="true"
+                />
                 <span>
-                    <span class="font-semibold">{{ booking.status === 'rejected' ? 'Alasan tidak disetujui' : 'Catatan pengelola' }}:</span>
+                    <span class="font-semibold"
+                        >{{
+                            booking.status === 'rejected'
+                                ? 'Alasan tidak disetujui'
+                                : booking.status === 'menunggu_meeting'
+                                  ? 'Undangan meeting'
+                                  : 'Catatan pengelola'
+                        }}:</span
+                    >
                     {{ statusNote }}
                 </span>
             </p>
@@ -640,7 +699,12 @@ const progressPercent = computed(() => {
                                     <FontAwesomeIcon :icon="['fas', 'building-columns']" class="size-3.5 text-(--wp-accent)" aria-hidden="true" />
                                     Pembayaran
                                 </h3>
-                                <span v-if="booking.payment" class="sb-badge sb-tone-neutral">{{ statusLabel(booking.payment.status) }}</span>
+                                <span
+                                    v-if="booking.payment"
+                                    class="sb-badge"
+                                    :class="booking.payment.status === 'verified' ? 'sb-tone-success' : 'sb-tone-neutral'"
+                                    >{{ paymentStatusLabel(booking.payment.status) }}</span
+                                >
                             </div>
 
                             <template v-if="booking.payment">
@@ -668,7 +732,9 @@ const progressPercent = computed(() => {
                                 </p>
 
                                 <div class="flex items-baseline justify-between gap-4 text-sm">
-                                    <span class="text-muted-foreground">Jumlah transfer</span>
+                                    <span class="text-muted-foreground">{{
+                                        booking.payment.status === 'verified' ? 'Jumlah dibayar' : 'Jumlah transfer'
+                                    }}</span>
                                     <span class="text-xl font-bold tabular-nums">{{ formatRp(booking.payment.amount) }}</span>
                                 </div>
 

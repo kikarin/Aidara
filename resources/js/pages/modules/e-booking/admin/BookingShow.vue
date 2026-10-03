@@ -99,6 +99,7 @@ const props = defineProps<{
         user: { id: number; name: string; email: string } | null;
         penyewa: { nama: string; no_hp: string | null; instansi: string | null } | null;
         items: Array<{ uraian: string; satuan: string; qty: number; line_total: number }>;
+        jenis_sewa?: 'reguler' | 'event';
         can_review: boolean;
         can_verify_payment: boolean;
         surats: Array<{
@@ -138,6 +139,10 @@ const props = defineProps<{
 }>();
 
 const statusLabel = (status: string) => bookingStatusLabel(status, 'admin');
+
+const paymentStatusLabels: Record<string, string> = { pending: 'Menunggu transfer', verified: 'Lunas', rejected: 'Bukti ditolak' };
+
+const paymentStatusLabel = (status: string) => paymentStatusLabels[status] ?? statusLabel(status);
 
 const isImageUrl = (url: string) => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url);
 
@@ -269,6 +274,9 @@ const decisionTabs = [
 ] as const;
 
 const rejectPayOpen = ref(false);
+
+const isReguler = computed(() => props.booking.jenis_sewa === 'reguler');
+const showMeetingFields = ref(!isReguler.value);
 
 const adaBenturan = computed(() => Boolean(props.conflict?.conflicts?.length));
 
@@ -504,6 +512,9 @@ onUnmounted(() => {
                         <span class="sr-only" aria-live="polite">{{ copied ? 'Nomor pengajuan disalin' : '' }}</span>
                         <SbStatusBadge :status="booking.status" audience="admin" />
                         <span v-if="booking.priority_flag" class="sb-badge sb-tone-neutral">Prioritas {{ booking.priority_flag }}</span>
+                        <span v-if="booking.jenis_sewa" class="sb-badge" :class="isReguler ? 'sb-tone-info' : 'sb-tone-meeting'">
+                            {{ isReguler ? 'Sewa latihan · tanpa meeting' : 'Sewa event · perlu meeting' }}
+                        </span>
                     </div>
                     <h1 class="text-foreground mt-3 text-2xl font-bold tracking-tight text-balance sm:text-3xl">
                         {{ booking.venue?.name ?? booking.nomor }}
@@ -980,6 +991,10 @@ onUnmounted(() => {
                 <section v-if="booking.can_review" aria-labelledby="review-heading" class="sb-card overflow-hidden">
                     <div class="border-b border-(--wp-hairline) p-5 pb-4">
                         <h2 id="review-heading" class="text-foreground text-base font-semibold tracking-tight">Keputusan peninjauan</h2>
+                        <p v-if="booking.status === 'menunggu_meeting'" class="sb-callout sb-tone-meeting mt-3 p-3 text-xs">
+                            <FontAwesomeIcon :icon="['fas', 'circle-info']" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                            <span>Undangan meeting sudah terkirim. Putuskan setelah meeting dengan penyewa selesai.</span>
+                        </p>
                         <div class="bg-muted mt-3 grid grid-cols-3 gap-1 rounded-xl p-1" role="tablist" aria-label="Pilih keputusan">
                             <button
                                 v-for="tab in decisionTabs"
@@ -1026,7 +1041,21 @@ onUnmounted(() => {
                             />
                         </div>
 
-                        <fieldset class="space-y-3 rounded-xl border border-dashed border-(--wp-hairline) p-3.5">
+                        <div v-if="!showMeetingFields" class="sb-callout sb-tone-info p-3 text-xs">
+                            <FontAwesomeIcon :icon="['fas', 'circle-info']" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                            <span>
+                                Sewa latihan tidak perlu meeting. Setelah disetujui, penyewa langsung menerima petunjuk pembayaran lewat email.
+                                <button
+                                    type="button"
+                                    class="mt-1 block rounded-sm font-semibold underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
+                                    @click="showMeetingFields = true"
+                                >
+                                    Tetap undang meeting
+                                </button>
+                            </span>
+                        </div>
+
+                        <fieldset v-else class="space-y-3 rounded-xl border border-dashed border-(--wp-hairline) p-3.5">
                             <legend class="px-1 text-xs font-semibold tracking-wide text-(--wp-accent-strong) uppercase">Undangan meeting</legend>
                             <p class="text-muted-foreground text-xs leading-relaxed">
                                 Opsional. Jika diisi, sistem otomatis membuat dan mengirim undangan meeting lewat <b>WhatsApp</b> dan
@@ -1180,7 +1209,9 @@ onUnmounted(() => {
                 <section aria-labelledby="payment-heading" class="sb-card space-y-4 p-5 text-sm">
                     <div class="flex items-center justify-between gap-3">
                         <h2 id="payment-heading" class="text-foreground text-base font-semibold tracking-tight">Pembayaran</h2>
-                        <span v-if="payment" class="sb-badge sb-tone-neutral">{{ statusLabel(payment.status) }}</span>
+                        <span v-if="payment" class="sb-badge" :class="payment.status === 'verified' ? 'sb-tone-success' : 'sb-tone-neutral'">{{
+                            paymentStatusLabel(payment.status)
+                        }}</span>
                     </div>
                     <template v-if="payment">
                         <div class="bg-muted/60 rounded-2xl p-4">

@@ -25,6 +25,7 @@ type Row = {
     area: string | null;
     penyewa: string | null;
     payment_status: string | null;
+    jenis_sewa?: 'reguler' | 'event';
     needs_verify: boolean;
     action_label: string;
     action_tone: string;
@@ -67,6 +68,7 @@ const actionToneClass = (tone: string) => {
     const map: Record<string, string> = {
         amber: 'text-(--sb-warning)',
         violet: 'text-(--sb-info)',
+        meeting: 'text-(--sb-meeting)',
         sky: 'text-(--wp-accent)',
         slate: 'text-muted-foreground',
     };
@@ -295,6 +297,13 @@ const activeTabLabel = computed(() => tabs.value.find((t) => t.key === activeTab
                                     <p class="text-muted-foreground mt-0.5 text-xs">
                                         {{ item.venue || 'Tempat' }}<template v-if="item.area"> · {{ item.area }}</template>
                                     </p>
+                                    <span
+                                        v-if="item.jenis_sewa"
+                                        class="sb-badge mt-1.5 px-1.5 py-0 text-[0.6875rem]"
+                                        :class="item.jenis_sewa === 'reguler' ? 'sb-tone-info' : 'sb-tone-meeting'"
+                                    >
+                                        {{ item.jenis_sewa === 'reguler' ? 'Latihan' : 'Event' }}
+                                    </span>
                                 </td>
                                 <td class="text-muted-foreground min-w-44 text-xs tabular-nums">
                                     {{ formatSchedule(item.starts_at, item.ends_at) }}

@@ -147,10 +147,7 @@ class AdminApprovalService
 
         $peers = Booking::query()
             ->whereIn('id', $peerIds)
-            ->whereIn('status', [
-                BookingStatus::MENUNGGU_APPROVAL,
-                BookingStatus::PERLU_KLARIFIKASI,
-            ])
+            ->whereIn('status', BookingStatus::pengajuan())
             ->get();
 
         foreach ($peers as $peer) {
@@ -184,10 +181,7 @@ class AdminApprovalService
 
     private function assertReviewable(Booking $booking): void
     {
-        if (! in_array($booking->status, [
-            BookingStatus::MENUNGGU_APPROVAL,
-            BookingStatus::PERLU_KLARIFIKASI,
-        ], true)) {
+        if (! in_array($booking->status, BookingStatus::pengajuan(), true)) {
             throw new InvalidArgumentException(
                 "Booking status {$booking->status} tidak bisa di-review."
             );

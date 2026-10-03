@@ -55,6 +55,7 @@ class VenuePolicyService
         $cancellable = [
             BookingStatus::MENUNGGU_APPROVAL,
             BookingStatus::PERLU_KLARIFIKASI,
+            BookingStatus::MENUNGGU_MEETING,
             BookingStatus::APPROVED,
             BookingStatus::AWAITING_PAYMENT,
             BookingStatus::PAID,
