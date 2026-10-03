@@ -7,6 +7,7 @@ use App\Models\Booking\BookingDocumentType;
 use App\Models\Booking\BookingSetting;
 use App\Models\Booking\BookingSurat;
 use App\Models\User;
+use App\Support\Booking\SuratTemplate;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -45,24 +46,24 @@ class SuratService
         return DB::transaction(function () use ($booking, $admin, $data, $jenis, $dokumen, $kop) {
             /** @var BookingSurat $surat */
             $surat = $booking->surats()->create([
-                'jenis' => $jenis,
-                'nomor_surat' => trim((string) $data['nomor_surat']),
-                'perihal' => trim((string) $data['perihal']),
-                'isi' => (string) $data['isi'],
-                'meeting_at' => $data['meeting_at'] ?? null,
-                'meeting_place' => $data['meeting_place'] ?? null,
-                'dokumen' => $dokumen !== [] ? $dokumen : null,
-                'penandatangan_nama' => $data['penandatangan_nama'] ?? ($kop['penandatangan_nama'] ?? null),
+                'jenis'                 => $jenis,
+                'nomor_surat'           => trim((string) $data['nomor_surat']),
+                'perihal'               => trim((string) $data['perihal']),
+                'isi'                   => (string) $data['isi'],
+                'meeting_at'            => $data['meeting_at']    ?? null,
+                'meeting_place'         => $data['meeting_place'] ?? null,
+                'dokumen'               => $dokumen !== [] ? $dokumen : null,
+                'penandatangan_nama'    => $data['penandatangan_nama']    ?? ($kop['penandatangan_nama'] ?? null),
                 'penandatangan_jabatan' => $data['penandatangan_jabatan'] ?? ($kop['penandatangan_jabatan'] ?? null),
-                'file_path' => '',
-                'created_by' => $admin->id,
+                'file_path'             => '',
+                'created_by'            => $admin->id,
             ]);
 
             $pdf = Pdf::loadView('booking.surat', [
-                'surat' => $surat,
-                'kop' => $kop,
+                'surat'   => $surat,
+                'kop'     => $kop,
                 'penyewa' => [
-                    'nama' => $booking->penyewaProfile?->nama ?? $booking->user?->name ?? '-',
+                    'nama'     => $booking->penyewaProfile?->nama ?? $booking->user?->name ?? '-',
                     'instansi' => $booking->penyewaProfile?->instansi,
                 ],
                 'kota' => $kop['kota'] ?? 'Kabupaten Bogor',
@@ -78,6 +79,39 @@ class SuratService
 
             return $surat->refresh();
         });
+    }
+
+    public function createUndanganMeeting(Booking $booking, User $admin, string $meetingAt, string $meetingPlace): BookingSurat
+    {
+        $template = SuratTemplate::forJenis($booking, BookingSurat::JENIS_UNDANGAN_MEETING);
+
+        return $this->create($booking, $admin, [
+            'jenis'         => BookingSurat::JENIS_UNDANGAN_MEETING,
+            'nomor_surat'   => $this->generateNomor(),
+            'perihal'       => $template['perihal'],
+            'isi'           => $template['isi'],
+            'meeting_at'    => $meetingAt,
+            'meeting_place' => $meetingPlace,
+            'dokumen'       => BookingDocumentType::query()
+                ->where('is_active', true)
+                ->where('is_required', true)
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->pluck('name')
+                ->all(),
+        ]);
+    }
+
+    public function generateNomor(): string
+    {
+        $year = (int) now()->year;
+
+        $count = BookingSurat::query()
+            ->withTrashed()
+            ->whereYear('created_at', $year)
+            ->count() + 1;
+
+        return sprintf('%03d/EB-UPT/%d', $count, $year);
     }
 
     public function rawPdf(BookingSurat $surat): string

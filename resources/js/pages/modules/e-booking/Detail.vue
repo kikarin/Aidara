@@ -79,6 +79,7 @@ const props = defineProps<{
             meeting_place: string | null;
             dokumen: string[] | null;
             sent_email_at: string | null;
+            sent_whatsapp_at: string | null;
             created_at: string | null;
             download_url: string;
         }>;

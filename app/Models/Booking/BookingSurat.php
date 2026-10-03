@@ -33,6 +33,7 @@ class BookingSurat extends Model
         'penandatangan_jabatan',
         'file_path',
         'sent_email_at',
+        'sent_whatsapp_at',
     ];
 
     protected function casts(): array
@@ -41,6 +42,7 @@ class BookingSurat extends Model
             'meeting_at' => 'datetime',
             'dokumen' => 'array',
             'sent_email_at' => 'datetime',
+            'sent_whatsapp_at' => 'datetime',
         ];
     }
 

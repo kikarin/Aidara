@@ -223,6 +223,7 @@ class BookingController extends Controller
                 'meeting_place' => $s->meeting_place,
                 'dokumen' => $s->dokumen,
                 'sent_email_at' => optional($s->sent_email_at)?->format('Y-m-d H:i'),
+                'sent_whatsapp_at' => optional($s->sent_whatsapp_at)?->format('Y-m-d H:i'),
                 'created_at' => optional($s->created_at)?->format('Y-m-d H:i'),
                 'download_url' => route('e-booking.bookings.surat.download', ['id' => $booking->id, 'surat' => $s->id]),
             ]),

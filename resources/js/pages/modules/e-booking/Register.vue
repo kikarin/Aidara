@@ -43,7 +43,7 @@ const points: Array<{ icon: IconName; text: string }> = [
                 <p class="wp-eyebrow">Akun penyewa</p>
                 <h1 id="register-title" class="mt-3 text-3xl font-bold tracking-tight text-balance sm:text-4xl">Buat akun Si Bola</h1>
                 <p class="text-muted-foreground mt-2 max-w-2xl text-sm leading-relaxed">
-                    Siapkan email dan nomor HP yang aktif agar pengelola bisa menghubungi Anda bila diperlukan.
+                    Siapkan email dan nomor WhatsApp yang aktif agar pengelola bisa mengirim undangan meeting dan menghubungi Anda bila diperlukan.
                 </p>
 
                 <form class="mt-8 grid gap-5 sm:grid-cols-2" @submit.prevent="submit">
@@ -79,7 +79,7 @@ const points: Array<{ icon: IconName; text: string }> = [
                         <p v-if="form.errors.email" id="email-error" class="sb-error">{{ form.errors.email }}</p>
                     </div>
                     <div>
-                        <label class="sb-label" for="no_hp">Nomor HP</label>
+                        <label class="sb-label" for="no_hp">Nomor WhatsApp (aktif)</label>
                         <input
                             id="no_hp"
                             v-model="form.no_hp"
@@ -88,10 +88,12 @@ const points: Array<{ icon: IconName; text: string }> = [
                             required
                             autocomplete="tel"
                             inputmode="tel"
+                            placeholder="Contoh: 081234567890"
                             class="sb-input tabular-nums"
                             :aria-invalid="form.errors.no_hp ? 'true' : undefined"
-                            :aria-describedby="form.errors.no_hp ? 'no_hp-error' : undefined"
+                            :aria-describedby="form.errors.no_hp ? 'no_hp-hint no_hp-error' : 'no_hp-hint'"
                         />
+                        <p id="no_hp-hint" class="sb-hint">Dipakai untuk mengirim undangan meeting dan surat resmi.</p>
                         <p v-if="form.errors.no_hp" id="no_hp-error" class="sb-error">{{ form.errors.no_hp }}</p>
                     </div>
                     <div>

@@ -9,6 +9,7 @@ use App\Models\Booking\BookingPenyewaProfile;
 use App\Models\Booking\BookingPriorityRule;
 use App\Models\Booking\BookingRule;
 use App\Models\Booking\BookingSetting;
+use App\Models\Booking\BookingSurat;
 use App\Models\Booking\BookingTarif;
 use App\Models\Booking\BookingVenue;
 use App\Models\Role;
@@ -17,7 +18,9 @@ use App\Services\Booking\BookingSubmitService;
 use App\Support\Booking\BookingSatuan;
 use App\Support\Booking\BookingStatus;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -56,19 +59,19 @@ class BookingSuratTest extends TestCase
 
         $response = $this->actingAs($this->admin)
             ->post(route('e-booking.admin.bookings.surat.store', $booking->id), [
-                'jenis' => 'undangan_meeting',
-                'nomor_surat' => '042/E-BK/IX/2026',
-                'perihal' => 'Undangan Meeting Penyewaan',
-                'isi' => 'Mohon hadir pada meeting pembahasan pengajuan.',
-                'meeting_at' => now()->addDays(3)->format('Y-m-d H:i:s'),
+                'jenis'         => 'undangan_meeting',
+                'nomor_surat'   => '042/E-BK/IX/2026',
+                'perihal'       => 'Undangan Meeting Penyewaan',
+                'isi'           => 'Mohon hadir pada meeting pembahasan pengajuan.',
+                'meeting_at'    => now()->addDays(3)->format('Y-m-d H:i:s'),
                 'meeting_place' => 'Ruang Rapat UPT',
-                'dokumen' => ['Surat Izin Kepolisian', 'Proposal Kegiatan'],
+                'dokumen'       => ['Surat Izin Kepolisian', 'Proposal Kegiatan'],
             ]);
 
         $response->assertRedirect(route('e-booking.admin.bookings.show', $booking->id));
         $this->assertDatabaseHas('booking_surats', [
-            'booking_id' => $booking->id,
-            'jenis' => 'undangan_meeting',
+            'booking_id'  => $booking->id,
+            'jenis'       => 'undangan_meeting',
             'nomor_surat' => '042/E-BK/IX/2026',
         ]);
 
@@ -86,10 +89,10 @@ class BookingSuratTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post(route('e-booking.admin.bookings.surat.store', $booking->id), [
-                'jenis' => 'undangan_meeting',
+                'jenis'       => 'undangan_meeting',
                 'nomor_surat' => '043/E-BK/IX/2026',
-                'perihal' => 'Undangan Meeting',
-                'isi' => 'Isi surat.',
+                'perihal'     => 'Undangan Meeting',
+                'isi'         => 'Isi surat.',
             ])
             ->assertSessionHasErrors(['meeting_at', 'meeting_place']);
     }
@@ -98,7 +101,7 @@ class BookingSuratTest extends TestCase
     public function penyewa_can_download_own_surat(): void
     {
         $booking = $this->makeBooking();
-        $surat = $this->makeSurat($booking);
+        $surat   = $this->makeSurat($booking);
 
         $response = $this->actingAs($this->penyewa)
             ->get(route('e-booking.bookings.surat.download', ['id' => $booking->id, 'surat' => $surat->id]));
@@ -110,7 +113,7 @@ class BookingSuratTest extends TestCase
     public function other_penyewa_cannot_download_surat(): void
     {
         $booking = $this->makeBooking();
-        $surat = $this->makeSurat($booking);
+        $surat   = $this->makeSurat($booking);
 
         $penyewaLain = $this->makeUser('penyewa', 'lain.'.uniqid().'@test.local');
 
@@ -125,7 +128,7 @@ class BookingSuratTest extends TestCase
         Mail::fake();
 
         $booking = $this->makeBooking();
-        $surat = $this->makeSurat($booking);
+        $surat   = $this->makeSurat($booking);
 
         $this->actingAs($this->admin)
             ->post(route('e-booking.admin.bookings.surat.email', $surat->id))
@@ -139,22 +142,63 @@ class BookingSuratTest extends TestCase
     }
 
     #[Test]
-    public function whatsapp_share_redirects_to_wa_me(): void
+    public function whatsapp_share_sends_message_via_fonnte_and_marks_sent(): void
     {
+        config([
+            'fonnte.enabled'  => true,
+            'fonnte.token'    => 'test-token',
+            'fonnte.base_url' => 'https://api.fonnte.com',
+        ]);
+
+        Http::fake([
+            'api.fonnte.com/*' => Http::response(['status' => true, 'detail' => 'success'], 200),
+        ]);
+
         $booking = $this->makeBooking();
-        $surat = $this->makeSurat($booking);
+        $surat   = $this->makeSurat($booking);
 
         $this->actingAs($this->admin)
-            ->get(route('e-booking.admin.bookings.surat.whatsapp', $surat->id))
+            ->post(route('e-booking.admin.bookings.surat.whatsapp', $surat->id))
+            ->assertRedirect();
+
+        Http::assertSent(function (HttpRequest $request) use ($surat) {
+            $data = $this->multipartData($request);
+
+            return $request->url() === 'https://api.fonnte.com/send'
+                && $data['target'] === '6281234567890'
+                && str_contains($data['message'], $surat->nomor_surat);
+        });
+
+        $this->assertNotNull($surat->fresh()->sent_whatsapp_at);
+    }
+
+    #[Test]
+    public function whatsapp_share_fails_when_fonnte_not_configured(): void
+    {
+        config([
+            'fonnte.enabled' => false,
+            'fonnte.token'   => null,
+        ]);
+
+        Http::fake();
+
+        $booking = $this->makeBooking();
+        $surat   = $this->makeSurat($booking);
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.surat.whatsapp', $surat->id))
             ->assertRedirect()
-            ->assertRedirectContains('wa.me/6281234567890');
+            ->assertSessionHas('error');
+
+        Http::assertNothingSent();
+        $this->assertNull($surat->fresh()->sent_whatsapp_at);
     }
 
     #[Test]
     public function shared_signed_link_is_downloadable(): void
     {
         $booking = $this->makeBooking();
-        $surat = $this->makeSurat($booking);
+        $surat   = $this->makeSurat($booking);
 
         $unsigned = route('e-booking.surat.shared', $surat->id);
 
@@ -172,10 +216,10 @@ class BookingSuratTest extends TestCase
 
         BookingSetting::setValue('payment_expire_hours', 48);
         BookingDocumentType::query()->create([
-            'code' => 'surat_izin_polisi_'.uniqid(),
-            'name' => 'Surat Izin Kepolisian',
+            'code'        => 'surat_izin_polisi_'.uniqid(),
+            'name'        => 'Surat Izin Kepolisian',
             'is_required' => true,
-            'is_active' => true,
+            'is_active'   => true,
         ]);
 
         $booking = $this->makeBooking();
@@ -183,9 +227,9 @@ class BookingSuratTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post(route('e-booking.admin.bookings.approve', $booking->id), [
-                'force' => false,
+                'force'            => false,
                 'priority_rule_id' => '',
-                'admin_notes' => '',
+                'admin_notes'      => '',
             ])
             ->assertRedirect();
 
@@ -194,18 +238,102 @@ class BookingSuratTest extends TestCase
         });
     }
 
+    #[Test]
+    public function approve_with_meeting_fields_creates_and_sends_invitation(): void
+    {
+        Mail::fake();
+
+        config([
+            'fonnte.enabled'  => true,
+            'fonnte.token'    => 'test-token',
+            'fonnte.base_url' => 'https://api.fonnte.com',
+        ]);
+
+        Http::fake([
+            'api.fonnte.com/*' => Http::response(['status' => true, 'detail' => 'success'], 200),
+        ]);
+
+        $booking = $this->makeBooking();
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.approve', $booking->id), [
+                'force'            => false,
+                'priority_rule_id' => '',
+                'admin_notes'      => '',
+                'meeting_at'       => now()->addDays(3)->setTime(10, 0)->format('Y-m-d H:i:s'),
+                'meeting_place'    => 'Ruang Rapat UPT',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $surat = $booking->surats()->where('jenis', BookingSurat::JENIS_UNDANGAN_MEETING)->first();
+        $this->assertNotNull($surat);
+        $this->assertSame('Ruang Rapat UPT', $surat->meeting_place);
+        $this->assertNotNull($surat->sent_email_at);
+        $this->assertNotNull($surat->sent_whatsapp_at);
+
+        Mail::assertSent(BookingSuratMail::class, fn (BookingSuratMail $mail) => $mail->surat->id === $surat->id);
+
+        Http::assertSent(function (HttpRequest $request) use ($surat) {
+            $data = $this->multipartData($request);
+
+            return $request->url() === 'https://api.fonnte.com/send'
+                && $data['target'] === '6281234567890'
+                && str_contains($data['message'], $surat->nomor_surat);
+        });
+    }
+
+    #[Test]
+    public function approve_without_meeting_fields_does_not_create_invitation(): void
+    {
+        Mail::fake();
+        Http::fake();
+
+        $booking = $this->makeBooking();
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.approve', $booking->id), [
+                'force'            => false,
+                'priority_rule_id' => '',
+                'admin_notes'      => '',
+                'meeting_at'       => '',
+                'meeting_place'    => '',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(0, $booking->surats()->where('jenis', BookingSurat::JENIS_UNDANGAN_MEETING)->count());
+        Mail::assertNotSent(BookingSuratMail::class);
+        Http::assertNothingSent();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function multipartData(HttpRequest $request): array
+    {
+        $data = $request->data();
+
+        if (isset($data[0]['name'])) {
+            return collect($data)->pluck('contents', 'name')->all();
+        }
+
+        return $data;
+    }
+
     private function makeBooking()
     {
         return app(BookingSubmitService::class)->submit($this->penyewa, [
             'kategori_tarif' => 'non_pemerintah',
-            'areas' => [],
-            'tarif_id' => $this->tarifVenueWide->id,
-            'starts_at' => now()->addDays(2)->setTime(9, 0)->format('Y-m-d H:i:s'),
-            'ends_at' => now()->addDays(2)->setTime(11, 0)->format('Y-m-d H:i:s'),
-            'qty' => 1,
-            'tujuan' => 'Latihan rutin',
-            'keterangan' => null,
-            'addon_ids' => [],
+            'areas'          => [],
+            'tarif_id'       => $this->tarifVenueWide->id,
+            'starts_at'      => now()->addDays(2)->setTime(9, 0)->format('Y-m-d H:i:s'),
+            'ends_at'        => now()->addDays(2)->setTime(11, 0)->format('Y-m-d H:i:s'),
+            'qty'            => 1,
+            'tujuan'         => 'Latihan rutin',
+            'keterangan'     => null,
+            'addon_ids'      => [],
             'terms_accepted' => true,
         ]);
     }
@@ -214,10 +342,10 @@ class BookingSuratTest extends TestCase
     {
         $this->actingAs($this->admin)
             ->post(route('e-booking.admin.bookings.surat.store', $booking->id), [
-                'jenis' => 'balasan_persetujuan',
+                'jenis'       => 'balasan_persetujuan',
                 'nomor_surat' => 'SURAT/'.uniqid().'/2026',
-                'perihal' => 'Persetujuan Pengajuan Sewa',
-                'isi' => 'Pengajuan Anda disetujui.',
+                'perihal'     => 'Persetujuan Pengajuan Sewa',
+                'isi'         => 'Pengajuan Anda disetujui.',
             ]);
 
         return $booking->surats()->firstOrFail();
@@ -231,12 +359,12 @@ class BookingSuratTest extends TestCase
         );
 
         $user = User::query()->create([
-            'name' => ucfirst($roleName).' '.substr(uniqid(), -5),
-            'email' => $email,
-            'password' => Hash::make('password123'),
-            'is_active' => 1,
+            'name'              => ucfirst($roleName).' '.substr(uniqid(), -5),
+            'email'             => $email,
+            'password'          => Hash::make('password123'),
+            'is_active'         => 1,
             'email_verified_at' => now(),
-            'current_role_id' => $role->id,
+            'current_role_id'   => $role->id,
         ]);
         $user->assignRole($role);
 
@@ -246,35 +374,35 @@ class BookingSuratTest extends TestCase
     private function seedMinimal(): void
     {
         $this->penyewa = $this->makeUser('penyewa', 'surat.penyewa.'.uniqid().'@test.local');
-        $this->admin = $this->makeUser('admin_upt', 'surat.admin.'.uniqid().'@test.local');
+        $this->admin   = $this->makeUser('admin_upt', 'surat.admin.'.uniqid().'@test.local');
 
         BookingPenyewaProfile::query()->create([
-            'user_id' => $this->penyewa->id,
-            'nama' => $this->penyewa->name,
-            'no_hp' => '081234567890',
-            'instansi' => 'Klub Surat',
+            'user_id'          => $this->penyewa->id,
+            'nama'             => $this->penyewa->name,
+            'no_hp'            => '081234567890',
+            'instansi'         => 'Klub Surat',
             'kategori_default' => 'non_pemerintah',
         ]);
 
         $suffix = substr(uniqid(), -6);
 
         $this->venue = BookingVenue::query()->create([
-            'code' => 'surat_venue_'.$suffix,
-            'name' => 'Venue Surat '.$suffix,
-            'is_active' => true,
+            'code'       => 'surat_venue_'.$suffix,
+            'name'       => 'Venue Surat '.$suffix,
+            'is_active'  => true,
             'sort_order' => 99,
         ]);
 
         $this->tarifVenueWide = BookingTarif::query()->create([
-            'venue_id' => $this->venue->id,
-            'area_id' => null,
-            'code' => 'tarif_surat_'.$suffix,
-            'uraian' => 'Sewa seluruh venue',
-            'satuan' => BookingSatuan::PER_HOUR,
-            'tarif_pemerintah' => 200_000,
+            'venue_id'             => $this->venue->id,
+            'area_id'              => null,
+            'code'                 => 'tarif_surat_'.$suffix,
+            'uraian'               => 'Sewa seluruh venue',
+            'satuan'               => BookingSatuan::PER_HOUR,
+            'tarif_pemerintah'     => 200_000,
             'tarif_non_pemerintah' => 300_000,
-            'category' => 'olahraga',
-            'is_active' => true,
+            'category'             => 'olahraga',
+            'is_active'            => true,
         ]);
 
         BookingRule::query()->updateOrCreate(

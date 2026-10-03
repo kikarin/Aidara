@@ -18,21 +18,20 @@ class BookingUserSeeder extends Seeder
 {
     public function run(): void
     {
-        $adminRole = Role::query()->where('name', 'admin_upt')->where('guard_name', 'web')->firstOrFail();
+        $adminRole   = Role::query()->where('name', 'admin_upt')->where('guard_name', 'web')->firstOrFail();
         $penyewaRole = Role::query()->where('name', 'penyewa')->where('guard_name', 'web')->firstOrFail();
 
         $admin = User::query()->updateOrCreate(
             ['email' => 'admin.upt@test.local'],
             [
-                'name' => 'Admin UPT E-Booking',
-                'password' => Hash::make('Sewdaq123'),
-                'no_hp' => '085777183633',
-                'is_active' => 1,
+                'name'              => 'Admin UPT E-Booking',
+                'password'          => Hash::make('Sewdaq123'),
+                'no_hp'             => '085777183633',
+                'is_active'         => 1,
                 'email_verified_at' => now(),
-                'is_verifikasi' => 1,
-                'current_role_id' => $adminRole->id,
+                'is_verifikasi'     => 1,
+                'current_role_id'   => $adminRole->id,
             ]
-
         );
         if (! $admin->hasRole('admin_upt')) {
             $admin->assignRole($adminRole);
@@ -42,13 +41,13 @@ class BookingUserSeeder extends Seeder
         $penyewa = User::query()->updateOrCreate(
             ['email' => 'penyewa.demo@test.local'],
             [
-                'name' => 'Penyewa Demo',
-                'password' => Hash::make('password123'),
-                'no_hp' => '081234567890',
-                'is_active' => 1,
+                'name'              => 'Penyewa Demo',
+                'password'          => Hash::make('password123'),
+                'no_hp'             => '081234567890',
+                'is_active'         => 1,
                 'email_verified_at' => now(),
-                'is_verifikasi' => 1,
-                'current_role_id' => $penyewaRole->id,
+                'is_verifikasi'     => 1,
+                'current_role_id'   => $penyewaRole->id,
             ],
             //  ['email' => 'nikoagustio22@gmail.com'],
             // [
@@ -75,13 +74,13 @@ class BookingUserSeeder extends Seeder
             // ],
             ['email' => 'nikoagustio22@gmail.com'],
             [
-                'name' => 'Admin UPT E-Booking',
-                'password' => Hash::make('Sewdaq123'),
-                'no_hp' => '085777183633',
-                'is_active' => 1,
+                'name'              => 'Admin UPT E-Booking',
+                'password'          => Hash::make('Sewdaq123'),
+                'no_hp'             => '62895337152486',
+                'is_active'         => 1,
                 'email_verified_at' => now(),
-                'is_verifikasi' => 1,
-                'current_role_id' => $penyewaRole->id,
+                'is_verifikasi'     => 1,
+                'current_role_id'   => $penyewaRole->id,
             ]
         );
 
@@ -93,11 +92,11 @@ class BookingUserSeeder extends Seeder
         BookingPenyewaProfile::query()->updateOrCreate(
             ['user_id' => $penyewa->id],
             [
-                'nama' => 'Penyewa Demo',
-                'nik' => '3201010101010001',
-                'no_hp' => '081234567890',
-                'alamat' => 'Cibinong, Kabupaten Bogor',
-                'instansi' => 'Demo Instansi',
+                'nama'             => 'Penyewa Demo',
+                'nik'              => '3201010101010001',
+                'no_hp'            => '62895337152486',
+                'alamat'           => 'Cibinong, Kabupaten Bogor',
+                'instansi'         => 'Demo Instansi',
                 'kategori_default' => 'non_pemerintah',
             ]
         );

@@ -193,7 +193,7 @@ Route::middleware(['booking.web:admin_upt'])->prefix('booking/admin')->group(fun
     Route::post('/surat/{surat}/email', [EBookingAdminSuratController::class, 'sendEmail'])
         ->whereNumber('surat')
         ->name('e-booking.admin.bookings.surat.email');
-    Route::get('/surat/{surat}/whatsapp', [EBookingAdminSuratController::class, 'shareWhatsApp'])
+    Route::post('/surat/{surat}/whatsapp', [EBookingAdminSuratController::class, 'shareWhatsApp'])
         ->whereNumber('surat')
         ->name('e-booking.admin.bookings.surat.whatsapp');
     Route::post('/payments/{paymentId}/verify', [EBookingAdminBookingController::class, 'verifyPayment'])

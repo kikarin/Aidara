@@ -99,6 +99,7 @@ const props = defineProps<{
             meeting_place: string | null;
             dokumen: string[] | null;
             sent_email_at: string | null;
+            sent_whatsapp_at: string | null;
             created_at: string | null;
         }>;
     };
@@ -223,6 +224,8 @@ const approveForm = useForm({
     priority_rule_id: '' as number | '',
     admin_notes: '',
     note: '',
+    meeting_at: '',
+    meeting_place: '',
 });
 
 const rejectForm = useForm({ reason: '' });
@@ -416,6 +419,12 @@ const emailForm = useForm({});
 const kirimEmailSurat = (suratId: number) => {
     emailForm.post(route('e-booking.admin.bookings.surat.email', suratId), { preserveScroll: true });
 };
+
+const whatsappForm = useForm({});
+
+const kirimWhatsappSurat = (suratId: number) => {
+    whatsappForm.post(route('e-booking.admin.bookings.surat.whatsapp', suratId), { preserveScroll: true });
+};
 </script>
 
 <template>
@@ -565,6 +574,7 @@ const kirimEmailSurat = (suratId: number) => {
                                 </p>
                                 <p v-if="s.dokumen?.length" class="text-muted-foreground mt-1 text-xs">Dokumen: {{ s.dokumen.join(', ') }}</p>
                                 <p v-if="s.sent_email_at" class="mt-1 text-xs text-(--wp-accent-strong)">Terkirim via email {{ s.sent_email_at }}</p>
+                                <p v-if="s.sent_whatsapp_at" class="mt-1 text-xs text-(--wp-accent-strong)">Terkirim via WhatsApp {{ s.sent_whatsapp_at }}</p>
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 <a
@@ -589,15 +599,21 @@ const kirimEmailSurat = (suratId: number) => {
                                     <FontAwesomeIcon :icon="['fas', 'envelope']" class="size-3" aria-hidden="true" />
                                     Kirim email
                                 </button>
-                                <a
-                                    :href="route('e-booking.admin.bookings.surat.whatsapp', s.id)"
-                                    target="_blank"
-                                    rel="noopener"
+                                <button
+                                    type="button"
                                     class="wp-btn wp-btn-quiet bg-card px-3 py-1.5 text-xs"
+                                    :disabled="whatsappForm.processing"
+                                    @click="kirimWhatsappSurat(s.id)"
                                 >
-                                    <FontAwesomeIcon :icon="['fas', 'arrow-up-right-from-square']" class="size-3" aria-hidden="true" />
+                                    <FontAwesomeIcon
+                                        v-if="whatsappForm.processing"
+                                        :icon="['fas', 'circle-notch']"
+                                        class="size-3 animate-spin"
+                                        aria-hidden="true"
+                                    />
+                                    <FontAwesomeIcon :icon="['fas', 'comment-dots']" class="size-3" aria-hidden="true" />
                                     WhatsApp
-                                </a>
+                                </button>
                             </div>
                         </li>
                     </ul>
@@ -767,6 +783,39 @@ const kirimEmailSurat = (suratId: number) => {
                             class="sb-input"
                         />
                     </div>
+
+                    <fieldset class="space-y-3 rounded-xl border border-(--wp-hairline) p-3.5">
+                        <legend class="px-1 text-xs font-semibold tracking-wide text-(--wp-accent-strong) uppercase">Undangan meeting</legend>
+                        <p class="text-muted-foreground text-xs leading-relaxed">
+                            Opsional. Jika diisi, sistem otomatis membuat &amp; mengirim Undangan Meeting via <b>WhatsApp</b> dan <b>email</b> saat
+                            pengajuan disetujui.
+                        </p>
+                        <div>
+                            <label class="sb-label" for="approve-meeting-at">Waktu meeting</label>
+                            <input
+                                id="approve-meeting-at"
+                                v-model="approveForm.meeting_at"
+                                type="datetime-local"
+                                class="sb-input"
+                                :aria-invalid="approveForm.errors.meeting_at ? 'true' : undefined"
+                                :aria-describedby="approveForm.errors.meeting_at ? 'approve-meeting-at-error' : undefined"
+                            />
+                            <p v-if="approveForm.errors.meeting_at" id="approve-meeting-at-error" class="sb-error">{{ approveForm.errors.meeting_at }}</p>
+                        </div>
+                        <div>
+                            <label class="sb-label" for="approve-meeting-place">Tempat meeting</label>
+                            <input
+                                id="approve-meeting-place"
+                                v-model="approveForm.meeting_place"
+                                type="text"
+                                class="sb-input"
+                                placeholder="Contoh: Ruang Rapat UPT Dispora"
+                                :aria-invalid="approveForm.errors.meeting_place ? 'true' : undefined"
+                                :aria-describedby="approveForm.errors.meeting_place ? 'approve-meeting-place-error' : undefined"
+                            />
+                            <p v-if="approveForm.errors.meeting_place" id="approve-meeting-place-error" class="sb-error">{{ approveForm.errors.meeting_place }}</p>
+                        </div>
+                    </fieldset>
 
                     <div class="space-y-2">
                         <button
