@@ -236,7 +236,7 @@ class BookingSuratTest extends TestCase
             ])
             ->assertRedirect();
 
-        Mail::assertSent(BookingApprovedMail::class, function (BookingApprovedMail $mail) {
+        Mail::assertQueued(BookingApprovedMail::class, function (BookingApprovedMail $mail) {
             return in_array('Surat Izin Kepolisian', $mail->dokumenWajib, true);
         });
     }

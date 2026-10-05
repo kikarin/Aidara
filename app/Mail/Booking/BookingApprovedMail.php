@@ -6,15 +6,18 @@ use App\Models\Booking\Booking;
 use App\Models\Booking\BookingPayment;
 use App\Support\Booking\BookingJenisSewa;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class BookingApprovedMail extends Mailable
+class BookingApprovedMail extends Mailable implements ShouldQueueAfterCommit
 {
     use Queueable;
     use SerializesModels;
+
+    public int $tries = 3;
 
     /**
      * @param  list<string>  $dokumenWajib

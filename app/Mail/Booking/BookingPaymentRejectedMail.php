@@ -5,15 +5,18 @@ namespace App\Mail\Booking;
 use App\Models\Booking\Booking;
 use App\Models\Booking\BookingPayment;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class BookingPaymentRejectedMail extends Mailable
+class BookingPaymentRejectedMail extends Mailable implements ShouldQueueAfterCommit
 {
     use Queueable;
     use SerializesModels;
+
+    public int $tries = 3;
 
     public function __construct(
         public Booking $booking,

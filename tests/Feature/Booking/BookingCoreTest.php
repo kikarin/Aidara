@@ -378,8 +378,8 @@ class BookingCoreTest extends TestCase
 
         app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload());
 
-        Mail::assertSent(BookingSubmittedMail::class, fn (BookingSubmittedMail $mail) => $mail->hasTo($this->penyewa->email));
-        Mail::assertNotSent(BookingSubmittedAdminMail::class);
+        Mail::assertQueued(BookingSubmittedMail::class, fn (BookingSubmittedMail $mail) => $mail->hasTo($this->penyewa->email));
+        Mail::assertNotQueued(BookingSubmittedAdminMail::class);
     }
 
     #[Test]
@@ -389,8 +389,8 @@ class BookingCoreTest extends TestCase
 
         $this->makeSubmittedBooking();
 
-        Mail::assertSent(BookingSubmittedMail::class, fn (BookingSubmittedMail $mail) => $mail->hasTo($this->penyewa->email));
-        Mail::assertSent(BookingSubmittedAdminMail::class);
+        Mail::assertQueued(BookingSubmittedMail::class, fn (BookingSubmittedMail $mail) => $mail->hasTo($this->penyewa->email));
+        Mail::assertQueued(BookingSubmittedAdminMail::class);
     }
 
     #[Test]
@@ -406,8 +406,8 @@ class BookingCoreTest extends TestCase
             UploadedFile::fake()->image('bukti.jpg'),
         );
 
-        Mail::assertSent(BookingPaymentProofMail::class);
-        Mail::assertSent(BookingPaymentReceivedMail::class, fn (BookingPaymentReceivedMail $mail) => $mail->hasTo($this->penyewa->email));
+        Mail::assertQueued(BookingPaymentProofMail::class);
+        Mail::assertQueued(BookingPaymentReceivedMail::class, fn (BookingPaymentReceivedMail $mail) => $mail->hasTo($this->penyewa->email));
     }
 
     #[Test]
@@ -425,7 +425,7 @@ class BookingCoreTest extends TestCase
 
         app(BookingPaymentService::class)->verify($payment, $this->admin);
 
-        Mail::assertSent(BookingPaymentVerifiedMail::class, fn (BookingPaymentVerifiedMail $mail) => $mail->hasTo($this->penyewa->email));
+        Mail::assertQueued(BookingPaymentVerifiedMail::class, fn (BookingPaymentVerifiedMail $mail) => $mail->hasTo($this->penyewa->email));
     }
 
     #[Test]
@@ -443,14 +443,15 @@ class BookingCoreTest extends TestCase
 
         app(BookingPaymentService::class)->rejectBukti($payment, $this->admin, 'Nominal tidak sesuai');
 
-        Mail::assertSent(
+        Mail::assertQueued(
             BookingPaymentRejectedMail::class,
             fn (BookingPaymentRejectedMail $mail) => $mail->hasTo($this->penyewa->email) && $mail->reason === 'Nominal tidak sesuai'
         );
     }
 
     /** @param  array<string, mixed>  $overrides */
-    private function validSubmitPayload(array $overrides = []): array    {
+    private function validSubmitPayload(array $overrides = []): array
+    {
         $start = now()->addDay()->setTime(8, 0);
         $end = now()->addDay()->setTime(9, 0);
 
