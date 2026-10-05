@@ -5,6 +5,7 @@ namespace App\Services\Booking;
 use App\Models\Booking\Booking;
 use App\Models\Booking\BookingPayment;
 use App\Models\User;
+use App\Support\Booking\BookingJenisSewa;
 use App\Support\Booking\BookingStatus;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
@@ -17,6 +18,7 @@ class BookingPaymentService
         private readonly BookingStatusService $statuses,
         private readonly AvailabilityService $availability,
         private readonly RulesEngine $rules,
+        private readonly BookingNotifier $notifier,
     ) {}
 
     public function uploadBukti(Booking $booking, User $user, UploadedFile $file, ?string $notes = null): BookingPayment
@@ -48,7 +50,12 @@ class BookingPaymentService
             'notes' => $notes,
         ]);
 
-        return $payment->refresh();
+        $payment = $payment->refresh();
+
+        $this->notifier->notifyBuktiAdmins($booking, $payment);
+        $this->notifier->notifyBuktiReceived($booking, $payment);
+
+        return $payment;
     }
 
     /**
@@ -56,7 +63,7 @@ class BookingPaymentService
      */
     public function verify(BookingPayment $payment, User $admin, ?string $notes = null): array
     {
-        return DB::transaction(function () use ($payment, $admin, $notes) {
+        $result = DB::transaction(function () use ($payment, $admin, $notes) {
             /** @var BookingPayment $payment */
             $payment = BookingPayment::query()
                 ->whereKey($payment->id)
@@ -81,12 +88,15 @@ class BookingPaymentService
             $this->lockOverlappingBookings($booking);
 
             // Blokir jika sudah ada hard-lock booking lain di slot yang sama.
+            // Pengajuan per hari tidak memblokir pembayaran booking per jam lama.
             $this->availability->assertBookable([
                 'venue_id' => $booking->venue_id,
                 'area_id' => $booking->area_id,
                 'starts_at' => $booking->starts_at,
                 'ends_at' => $booking->ends_at,
                 'exclude_booking_id' => $booking->id,
+                'is_per_hari' => BookingJenisSewa::isPerHari($booking),
+                'block_pengajuan' => false,
             ]);
 
             $payment->update([
@@ -117,6 +127,10 @@ class BookingPaymentService
                 'payment' => $payment->refresh(),
             ];
         });
+
+        $this->notifier->notifyPaymentVerified($result['booking']);
+
+        return $result;
     }
 
     public function rejectBukti(BookingPayment $payment, User $admin, string $reason): BookingPayment
@@ -135,7 +149,11 @@ class BookingPaymentService
             'paid_at' => null,
         ]);
 
-        return $payment->refresh();
+        $payment->refresh();
+
+        $this->notifier->notifyPaymentRejected($booking, $payment, $reason);
+
+        return $payment;
     }
 
     private function lockOverlappingBookings(Booking $booking): void

@@ -2,6 +2,12 @@
 
 namespace Tests\Feature\Booking;
 
+use App\Mail\Booking\BookingPaymentProofMail;
+use App\Mail\Booking\BookingPaymentReceivedMail;
+use App\Mail\Booking\BookingPaymentRejectedMail;
+use App\Mail\Booking\BookingPaymentVerifiedMail;
+use App\Mail\Booking\BookingSubmittedAdminMail;
+use App\Mail\Booking\BookingSubmittedMail;
 use App\Models\Booking\Booking;
 use App\Models\Booking\BookingAddon;
 use App\Models\Booking\BookingArea;
@@ -19,13 +25,16 @@ use App\Models\User;
 use App\Services\Booking\AdminApprovalService;
 use App\Services\Booking\AvailabilityService;
 use App\Services\Booking\BookingPaymentExpireService;
+use App\Services\Booking\BookingPaymentService;
 use App\Services\Booking\BookingSubmitService;
 use App\Services\Booking\PricingService;
 use App\Services\Booking\VenuePolicyService;
 use App\Support\Booking\BookingSatuan;
 use App\Support\Booking\BookingStatus;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -43,6 +52,8 @@ class BookingCoreTest extends TestCase
     private BookingArea $area;
 
     private BookingTarif $tarif;
+
+    private BookingTarif $tarifHari;
 
     private User $penyewa;
 
@@ -93,6 +104,21 @@ class BookingCoreTest extends TestCase
         $this->expectExceptionMessage('nomor HP dan email');
 
         app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload());
+    }
+
+    #[Test]
+    public function per_jam_submit_goes_straight_to_awaiting_payment_without_approval(): void
+    {
+        $booking = app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload());
+
+        $booking->refresh();
+
+        $this->assertSame(BookingStatus::AWAITING_PAYMENT, $booking->status);
+        $this->assertNull($booking->approved_at);
+        $this->assertFalse(
+            $booking->statusLogs()->where('to_status', BookingStatus::APPROVED)->exists(),
+            'Sewa per jam tidak boleh melewati status approved.'
+        );
     }
 
     #[Test]
@@ -300,9 +326,131 @@ class BookingCoreTest extends TestCase
         $this->assertSame('expired', $payment->fresh()->status);
     }
 
-    /** @param  array<string, mixed>  $overrides */
-    private function validSubmitPayload(array $overrides = []): array
+    #[Test]
+    public function pengajuan_per_hari_blocks_per_jam_including_buffer(): void
     {
+        BookingRule::query()->updateOrCreate(
+            ['venue_id' => $this->venue->id, 'key' => 'buffer_before_days'],
+            ['value' => 1, 'is_active' => true]
+        );
+        BookingRule::query()->updateOrCreate(
+            ['venue_id' => $this->venue->id, 'key' => 'buffer_after_days'],
+            ['value' => 1, 'is_active' => true]
+        );
+
+        // Pengajuan per hari (menunggu_approval) di H+1 08:00–09:00.
+        $this->makeSubmittedBooking();
+
+        $probe = function (int $offset) {
+            $start = now()->addDay()->addDays($offset)->setTime(18, 0);
+
+            return app(AvailabilityService::class)->check([
+                'venue_id' => $this->venue->id,
+                'area_ids' => [$this->area->id],
+                'starts_at' => $start->toDateTimeString(),
+                'ends_at' => $start->copy()->addHour()->toDateTimeString(),
+                'is_per_hari' => false,
+            ]);
+        };
+
+        $this->assertSame('merah', $probe(0)['status']);
+        $this->assertSame('merah', $probe(-1)['status']);
+        $this->assertSame('merah', $probe(1)['status']);
+        $this->assertSame('hijau', $probe(4)['status']);
+
+        // Sewa per hari tetap boleh diajukan (bukan diblokir sesama per hari).
+        $perHari = app(AvailabilityService::class)->check([
+            'venue_id' => $this->venue->id,
+            'area_ids' => [$this->area->id],
+            'starts_at' => now()->addDay()->setTime(10, 0)->toDateTimeString(),
+            'ends_at' => now()->addDay()->setTime(11, 0)->toDateTimeString(),
+            'is_per_hari' => true,
+        ]);
+        $this->assertSame('hijau', $perHari['status']);
+        $this->assertTrue($perHari['bookable']);
+        $this->assertTrue($perHari['pengajuan']);
+    }
+
+    #[Test]
+    public function per_jam_submit_notifies_penyewa_not_admin(): void
+    {
+        Mail::fake();
+
+        app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload());
+
+        Mail::assertSent(BookingSubmittedMail::class, fn (BookingSubmittedMail $mail) => $mail->hasTo($this->penyewa->email));
+        Mail::assertNotSent(BookingSubmittedAdminMail::class);
+    }
+
+    #[Test]
+    public function per_hari_submit_notifies_penyewa_and_admin(): void
+    {
+        Mail::fake();
+
+        $this->makeSubmittedBooking();
+
+        Mail::assertSent(BookingSubmittedMail::class, fn (BookingSubmittedMail $mail) => $mail->hasTo($this->penyewa->email));
+        Mail::assertSent(BookingSubmittedAdminMail::class);
+    }
+
+    #[Test]
+    public function upload_bukti_notifies_admin_and_penyewa(): void
+    {
+        Mail::fake();
+
+        $booking = app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload());
+
+        app(BookingPaymentService::class)->uploadBukti(
+            $booking->fresh(),
+            $this->penyewa,
+            UploadedFile::fake()->image('bukti.jpg'),
+        );
+
+        Mail::assertSent(BookingPaymentProofMail::class);
+        Mail::assertSent(BookingPaymentReceivedMail::class, fn (BookingPaymentReceivedMail $mail) => $mail->hasTo($this->penyewa->email));
+    }
+
+    #[Test]
+    public function verify_payment_notifies_penyewa(): void
+    {
+        Mail::fake();
+
+        $booking = app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload());
+        app(BookingPaymentService::class)->uploadBukti(
+            $booking->fresh(),
+            $this->penyewa,
+            UploadedFile::fake()->image('bukti.jpg'),
+        );
+        $payment = BookingPayment::query()->where('booking_id', $booking->id)->firstOrFail();
+
+        app(BookingPaymentService::class)->verify($payment, $this->admin);
+
+        Mail::assertSent(BookingPaymentVerifiedMail::class, fn (BookingPaymentVerifiedMail $mail) => $mail->hasTo($this->penyewa->email));
+    }
+
+    #[Test]
+    public function reject_bukti_notifies_penyewa(): void
+    {
+        Mail::fake();
+
+        $booking = app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload());
+        app(BookingPaymentService::class)->uploadBukti(
+            $booking->fresh(),
+            $this->penyewa,
+            UploadedFile::fake()->image('bukti.jpg'),
+        );
+        $payment = BookingPayment::query()->where('booking_id', $booking->id)->firstOrFail();
+
+        app(BookingPaymentService::class)->rejectBukti($payment, $this->admin, 'Nominal tidak sesuai');
+
+        Mail::assertSent(
+            BookingPaymentRejectedMail::class,
+            fn (BookingPaymentRejectedMail $mail) => $mail->hasTo($this->penyewa->email) && $mail->reason === 'Nominal tidak sesuai'
+        );
+    }
+
+    /** @param  array<string, mixed>  $overrides */
+    private function validSubmitPayload(array $overrides = []): array    {
         $start = now()->addDay()->setTime(8, 0);
         $end = now()->addDay()->setTime(9, 0);
 
@@ -320,7 +468,7 @@ class BookingCoreTest extends TestCase
     /** @param  array<string, mixed>  $attrs */
     private function makeSubmittedBooking(array $attrs = []): Booking
     {
-        $payload = $this->validSubmitPayload();
+        $payload = $this->validSubmitPayload(['tarif_id' => $this->tarifHari->id]);
         $userId = $attrs['user_id'] ?? $this->penyewa->id;
 
         $booking = app(BookingSubmitService::class)->submit(
@@ -384,6 +532,19 @@ class BookingCoreTest extends TestCase
             'code' => 'tarif_'.$suffix,
             'uraian' => 'Latihan Test',
             'satuan' => BookingSatuan::PER_HOUR,
+            'tarif_pemerintah' => 100_000,
+            'tarif_non_pemerintah' => 150_000,
+            'category' => 'olahraga',
+            'is_active' => true,
+        ]);
+
+        // Tarif per hari → pengajuan event (masuk menunggu_approval, bukan auto-approve).
+        $this->tarifHari = BookingTarif::query()->create([
+            'venue_id' => $this->venue->id,
+            'area_id' => $this->area->id,
+            'code' => 'tarif_hari_'.$suffix,
+            'uraian' => 'Kegiatan Test',
+            'satuan' => BookingSatuan::PER_DAY,
             'tarif_pemerintah' => 100_000,
             'tarif_non_pemerintah' => 150_000,
             'category' => 'olahraga',

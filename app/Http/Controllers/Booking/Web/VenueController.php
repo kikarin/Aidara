@@ -118,6 +118,7 @@ class VenueController extends Controller
             'area_ids.*' => ['integer', 'exists:booking_areas,id'],
             'duration_hours' => ['nullable', 'integer', 'min:1', 'max:12'],
             'step_hours' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'is_per_hari' => ['nullable', 'boolean'],
         ]);
 
         try {
@@ -128,6 +129,7 @@ class VenueController extends Controller
                 'area_id' => $data['area_id'] ?? null,
                 'duration_hours' => $data['duration_hours'] ?? 1,
                 'step_hours' => $data['step_hours'] ?? 1,
+                'is_per_hari' => $request->boolean('is_per_hari', true),
             ]);
         } catch (InvalidArgumentException $e) {
             return response()->json([
@@ -149,6 +151,7 @@ class VenueController extends Controller
             'area_id' => ['nullable', 'integer', 'exists:booking_areas,id'],
             'area_ids' => ['nullable', 'array'],
             'area_ids.*' => ['integer', 'exists:booking_areas,id'],
+            'is_per_hari' => ['nullable', 'boolean'],
         ]);
 
         try {
@@ -157,6 +160,7 @@ class VenueController extends Controller
                 'month' => $data['month'],
                 'area_ids' => isset($data['area_ids']) ? array_map('intval', $data['area_ids']) : null,
                 'area_id' => $data['area_id'] ?? null,
+                'is_per_hari' => $request->boolean('is_per_hari', true),
             ]);
         } catch (InvalidArgumentException $e) {
             return response()->json([

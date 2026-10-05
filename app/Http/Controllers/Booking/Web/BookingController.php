@@ -73,6 +73,10 @@ class BookingController extends Controller
                 'area_ids' => $areaIds,
                 'starts_at' => $validated['starts_at'],
                 'ends_at' => $validated['ends_at'],
+                'is_per_hari' => BookingJenisSewa::satuanPerHari(array_map(
+                    fn (array $line) => $line['satuan'],
+                    $quote['lines']
+                )),
             ]);
         } catch (InvalidArgumentException $e) {
             return back()->withInput()->with('error', $e->getMessage());
@@ -93,6 +97,15 @@ class BookingController extends Controller
             $booking = $this->submitter->submit($request->user(), $validated);
         } catch (InvalidArgumentException $e) {
             return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        if (BookingJenisSewa::isReguler($booking)) {
+            return redirect()
+                ->route('e-booking.bookings.show', $booking->id)
+                ->with(
+                    'success',
+                    'Booking per jam berhasil dibuat. Silakan lanjutkan pembayaran sesuai instruksi.'
+                );
         }
 
         $slaHari = max(1, (int) (BookingSetting::getValue('pengajuan_sla_hari_kerja', 7) ?? 7));
@@ -202,6 +215,11 @@ class BookingController extends Controller
             'addon_total' => (int) $booking->addon_total,
             'can_upload_bukti' => $booking->status === BookingStatus::AWAITING_PAYMENT,
             'jenis_sewa' => BookingJenisSewa::of($booking),
+            'surat_permohonan_url' => $booking->surat_permohonan_path
+                ? Storage::disk('public')->url($booking->surat_permohonan_path)
+                : null,
+            'surat_permohonan_name' => $booking->surat_permohonan_name,
+            'surat_permohonan_submitted_at' => optional($booking->submitted_surat_permohonan_at)?->format('Y-m-d H:i'),
             'venue' => $booking->venue?->only(['id', 'code', 'name']),
             'areas' => $booking->areas->map(fn ($a) => $a->only(['id', 'code', 'name']))->all(),
             'items' => $booking->items->map(fn ($i) => [

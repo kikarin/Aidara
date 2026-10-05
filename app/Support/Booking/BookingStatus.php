@@ -57,6 +57,29 @@ final class BookingStatus
         ];
     }
 
+    /** Label status untuk tampilan admin (Bahasa Indonesia). */
+    public static function adminLabel(string $status): string
+    {
+        return match ($status) {
+            self::DRAFT => 'Draf',
+            self::MENUNGGU_APPROVAL => 'Perlu ditinjau',
+            self::PERLU_KLARIFIKASI => 'Perlu klarifikasi',
+            self::MENUNGGU_MEETING => 'Meeting dijadwalkan',
+            self::APPROVED => 'Disetujui',
+            self::AWAITING_PAYMENT => 'Menunggu bayar',
+            self::PAID => 'Sudah bayar',
+            self::CONFIRMED => 'Dikonfirmasi',
+            self::COMPLETED => 'Selesai',
+            self::REJECTED => 'Ditolak',
+            self::CANCELLED => 'Dibatalkan',
+            self::FORFEITED => 'Hangus',
+            self::EXPIRED => 'Kedaluwarsa',
+            self::RESCHEDULE_PENDING => 'Menunggu jadwal ulang',
+            self::NO_COMPENSATION => 'Tanpa kompensasi',
+            default => $status,
+        };
+    }
+
     /**
      * Pengajuan (menunggu_approval / perlu_klarifikasi / menunggu_meeting) — NON-BLOCKING.
      * Tidak masuk locking(): kalender tetap hijau, hanya diberi flag "ada pengajuan".

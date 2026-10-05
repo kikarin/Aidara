@@ -7,7 +7,9 @@ use App\Models\Booking\BookingAddonSelected;
 use App\Models\Booking\BookingItem;
 use App\Models\Booking\BookingPenyewaProfile;
 use App\Models\User;
+use App\Support\Booking\BookingJenisSewa;
 use App\Support\Booking\BookingStatus;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -20,6 +22,8 @@ class BookingSubmitService
         private readonly RulesEngine $rules,
         private readonly ConflictResolver $conflicts,
         private readonly VenuePolicyService $policies,
+        private readonly AdminApprovalService $approvals,
+        private readonly BookingNotifier $notifier,
     ) {}
 
     /**
@@ -73,17 +77,24 @@ class BookingSubmitService
         $endsAt = \Carbon\Carbon::parse($input['ends_at']);
         $this->policies->assertOperatingHours($venueId, $startsAt, $endsAt);
 
+        $isPerHari = BookingJenisSewa::satuanPerHari(array_map(
+            fn (array $line) => $line['satuan'],
+            $quote['lines']
+        ));
+
         $availability = $this->availability->assertBookable([
             'venue_id' => $venueId,
             'area_ids' => $areaIds,
             'starts_at' => $input['starts_at'],
             'ends_at' => $input['ends_at'],
+            'is_per_hari' => $isPerHari,
         ]);
 
-        $bufferBefore = (int) ($this->rules->get('buffer_before_days', $venueId, 1) ?? 1);
-        $bufferAfter = (int) ($this->rules->get('buffer_after_days', $venueId, 1) ?? 1);
+        // Buffer hari sebelum/sesudah hanya untuk sewa per hari (kegiatan).
+        $bufferBefore = $isPerHari ? (int) ($this->rules->get('buffer_before_days', $venueId, 1) ?? 1) : 0;
+        $bufferAfter = $isPerHari ? (int) ($this->rules->get('buffer_after_days', $venueId, 1) ?? 1) : 0;
 
-        return DB::transaction(function () use ($user, $profile, $quote, $input, $venueId, $areaIds, $isWholeVenue, $availability, $bufferBefore, $bufferAfter) {
+        $booking = DB::transaction(function () use ($user, $profile, $quote, $input, $venueId, $areaIds, $isWholeVenue, $availability, $bufferBefore, $bufferAfter) {
             $booking = Booking::query()->create([
                 'nomor' => $this->generateNomor(),
                 'user_id' => $user->id,
@@ -145,6 +156,20 @@ class BookingSubmitService
             $booking->priority_rule_id = $this->conflicts->suggestPriorityRuleId($booking);
             $booking->save();
 
+            $booking->load('items');
+            $perHari = BookingJenisSewa::isPerHari($booking);
+
+            $surat = $input['surat_permohonan'] ?? null;
+            if ($perHari && $surat instanceof UploadedFile) {
+                $path = $surat->store('booking/surat-permohonan/'.$booking->id, 'public');
+
+                $booking->forceFill([
+                    'surat_permohonan_path' => $path,
+                    'surat_permohonan_name' => $surat->getClientOriginalName(),
+                    'submitted_surat_permohonan_at' => now(),
+                ])->save();
+            }
+
             $booking = $this->statuses->transition(
                 $booking,
                 BookingStatus::MENUNGGU_APPROVAL,
@@ -154,8 +179,23 @@ class BookingSubmitService
 
             $booking->forceFill(['submitted_at' => now()])->save();
 
-            return $booking->load(['items', 'addonSelected', 'venue', 'areas', 'penyewaProfile']);
+            // Sewa per jam langsung booking: tanpa persetujuan, tanpa meeting.
+            // Pengelola cukup memvalidasi bukti pembayaran nanti.
+            if (! $perHari) {
+                $booking = $this->approvals->autoBookPerJam($booking)['booking'];
+            }
+
+            return $booking->load(['items', 'addonSelected', 'venue', 'areas', 'penyewaProfile', 'payments']);
         });
+
+        $this->notifier->notifySubmitted($booking);
+
+        // Per hari (event) menunggu peninjauan admin; per jam langsung pembayaran.
+        if (BookingJenisSewa::isPerHari($booking)) {
+            $this->notifier->notifySubmittedAdmins($booking);
+        }
+
+        return $booking;
     }
 
     private function hasContactInfo(User $user, BookingPenyewaProfile $profile): bool

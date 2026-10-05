@@ -223,7 +223,10 @@ class BookingSuratTest extends TestCase
         ]);
 
         $booking = $this->makeBooking();
+        // Jadikan sewa per hari (event) agar dokumen wajib ikut dilampirkan di email.
+        $booking->items()->update(['satuan' => BookingSatuan::PER_DAY]);
         $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+        $booking->load('items');
 
         $this->actingAs($this->admin)
             ->post(route('e-booking.admin.bookings.approve', $booking->id), [

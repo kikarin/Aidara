@@ -1,17 +1,45 @@
 <script setup lang="ts">
 import SeoHead from '@/components/SeoHead.vue';
 import SbStatusBadge from '@/components/sibola/SbStatusBadge.vue';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import SimpleSelect from '@/components/ui/select/SimpleSelect.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
 import { bookingStatusLabel, formatRupiah } from '@/lib/bookingStatus';
 import { library } from '@fortawesome/fontawesome-svg-core';
-import { faArrowRight, faClipboardList, faMagnifyingGlass, faShieldHalved, faWallet } from '@fortawesome/free-solid-svg-icons';
+import {
+    faArrowRight,
+    faCalendarDay,
+    faClipboardList,
+    faFileArrowDown,
+    faList,
+    faMagnifyingGlass,
+    faShieldHalved,
+    faUsers,
+    faWallet,
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { Deferred, Link, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
-library.add(faArrowRight, faClipboardList, faMagnifyingGlass, faShieldHalved, faWallet);
+library.add(
+    faArrowRight,
+    faCalendarDay,
+    faClipboardList,
+    faFileArrowDown,
+    faList,
+    faMagnifyingGlass,
+    faShieldHalved,
+    faUsers,
+    faWallet,
+);
 
 type Row = {
     id: number;
@@ -189,17 +217,80 @@ const displayStatus = (item: Row) => {
 };
 
 const activeTabLabel = computed(() => tabs.value.find((t) => t.key === activeTab.value)?.label ?? 'Pengajuan');
+
+const exporting = ref(false);
+
+const currentMonth = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+})();
+
+const runExport = (params: Record<string, string | undefined>) => {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') {
+            search.set(key, value);
+        }
+    });
+
+    const query = search.toString();
+    const base = route('e-booking.admin.bookings.export');
+
+    exporting.value = true;
+    window.location.href = query ? `${base}?${query}` : base;
+    window.setTimeout(() => {
+        exporting.value = false;
+    }, 1500);
+};
+
+const exportCurrentFilter = () =>
+    runExport({
+        tab: activeTab.value,
+        ...(activeTab.value === 'all' && statusFilter.value ? { status: statusFilter.value } : {}),
+    });
 </script>
 
 <template>
     <SeoHead title="Pengajuan Sewa" />
 
     <AdminLayout active="bookings">
-        <header class="mb-6">
-            <h1 class="text-foreground text-2xl font-bold tracking-tight sm:text-3xl">Pengajuan sewa</h1>
-            <p class="text-muted-foreground mt-1.5 max-w-2xl text-sm">
-                Pilih tab sesuai pekerjaan Anda. Setiap baris menampilkan apa yang perlu dilakukan berikutnya.
-            </p>
+        <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h1 class="text-foreground text-2xl font-bold tracking-tight sm:text-3xl">Pengajuan sewa</h1>
+                <p class="text-muted-foreground mt-1.5 max-w-2xl text-sm">
+                    Pilih tab sesuai pekerjaan Anda. Setiap baris menampilkan apa yang perlu dilakukan berikutnya.
+                </p>
+            </div>
+
+            <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                    <button type="button" class="wp-btn wp-btn-quiet shrink-0 px-4 py-2 text-sm" :disabled="exporting">
+                        <FontAwesomeIcon :icon="['fas', 'file-arrow-down']" class="size-3.5" aria-hidden="true" />
+                        {{ exporting ? 'Menyiapkan…' : 'Export Excel' }}
+                    </button>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent align="end" class="w-64 rounded-xl p-1.5">
+                    <DropdownMenuLabel class="text-muted-foreground px-2 py-1.5 text-xs font-medium">Export pengajuan</DropdownMenuLabel>
+                    <DropdownMenuItem class="gap-2.5 rounded-lg" @click="runExport({ month: currentMonth })">
+                        <FontAwesomeIcon :icon="['fas', 'calendar-day']" class="size-3.5 text-muted-foreground" aria-hidden="true" />
+                        Bulan ini (semua status)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem class="gap-2.5 rounded-lg" @click="runExport({ month: currentMonth, has_meeting: '1' })">
+                        <FontAwesomeIcon :icon="['fas', 'users']" class="size-3.5 text-muted-foreground" aria-hidden="true" />
+                        Bulan ini + sudah meeting
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem class="gap-2.5 rounded-lg" @click="exportCurrentFilter()">
+                        <FontAwesomeIcon :icon="['fas', 'list']" class="size-3.5 text-muted-foreground" aria-hidden="true" />
+                        Sesuai filter aktif
+                    </DropdownMenuItem>
+                    <DropdownMenuItem class="gap-2.5 rounded-lg" @click="runExport({})">
+                        <FontAwesomeIcon :icon="['fas', 'clipboard-list']" class="size-3.5 text-muted-foreground" aria-hidden="true" />
+                        Semua pengajuan
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </header>
 
         <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

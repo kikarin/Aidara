@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Booking\Web\Admin;
 
+use App\Exports\BookingExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Booking\Admin\ApproveBookingRequest;
 use App\Http\Requests\Booking\Admin\RejectBookingRequest;
@@ -13,11 +14,13 @@ use App\Models\Booking\BookingDocumentType;
 use App\Models\Booking\BookingPayment;
 use App\Models\Booking\BookingPriorityRule;
 use App\Models\Booking\BookingSetting;
+use App\Models\Booking\BookingSurat;
 use App\Services\Booking\AdminApprovalService;
 use App\Services\Booking\BookingInvitationService;
 use App\Services\Booking\BookingPaymentService;
 use App\Support\Booking\BookingJenisSewa;
 use App\Support\Booking\BookingStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -25,6 +28,8 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use InvalidArgumentException;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class BookingController extends Controller
 {
@@ -50,42 +55,11 @@ class BookingController extends Controller
             $status = '';
         }
 
-        $base = fn () => Booking::query()->with([
-            'venue:id,code,name',
-            'areas:id,code,name',
-            'user:id,name,email',
-            'penyewaProfile:id,nama,no_hp,instansi',
-            'payments' => fn ($q) => $q->latest('id'),
-            'items:id,booking_id,uraian,satuan,snapshot',
-        ]);
-
-        $applyTab = function ($query) use ($tab, $status) {
-            return match ($tab) {
-                'review' => $query->whereIn('status', [
-                    BookingStatus::MENUNGGU_APPROVAL,
-                    BookingStatus::PERLU_KLARIFIKASI,
-                    BookingStatus::MENUNGGU_MEETING,
-                ]),
-                'payment' => $query->where('status', BookingStatus::AWAITING_PAYMENT),
-                'verify'  => $query
-                    ->where('status', BookingStatus::AWAITING_PAYMENT)
-                    ->whereHas('payments', fn ($q) => $q->where('status', 'awaiting_verification')),
-                'all' => is_string($status) && $status !== ''
-                    ? $query->where('status', $status)
-                    : $query,
-                default => $query->whereIn('status', [
-                    BookingStatus::MENUNGGU_APPROVAL,
-                    BookingStatus::PERLU_KLARIFIKASI,
-                    BookingStatus::MENUNGGU_MEETING,
-                    BookingStatus::AWAITING_PAYMENT,
-                    BookingStatus::APPROVED,
-                ]),
-            };
-        };
-
         return Inertia::render('modules/e-booking/admin/Bookings', [
-            'bookings' => Inertia::defer(function () use ($base, $applyTab) {
-                $paginator = $applyTab($base()->latest('id'))->paginate(20)->withQueryString();
+            'bookings' => Inertia::defer(function () use ($tab, $status) {
+                $paginator = $this->applyTabFilter($this->bookingsQuery()->latest('id'), $tab, $status)
+                    ->paginate(20)
+                    ->withQueryString();
 
                 return $paginator->through(function (Booking $b) {
                     $paymentStatus = $b->payments->first()?->status;
@@ -173,6 +147,109 @@ class BookingController extends Controller
         ]);
     }
 
+    /**
+     * @return Builder<Booking>
+     */
+    private function bookingsQuery(bool $withMeeting = false): Builder
+    {
+        $relations = [
+            'venue:id,code,name',
+            'areas:id,code,name',
+            'user:id,name,email',
+            'penyewaProfile:id,nama,no_hp,instansi',
+            'payments' => fn ($q) => $q->latest('id'),
+            'items:id,booking_id,uraian,satuan,snapshot',
+        ];
+
+        if ($withMeeting) {
+            $relations['surats'] = fn ($q) => $q->latest('id');
+        }
+
+        return Booking::query()->with($relations);
+    }
+
+    /**
+     * @param  Builder<Booking>  $query
+     * @return Builder<Booking>
+     */
+    private function applyTabFilter(Builder $query, string $tab, ?string $status): Builder
+    {
+        return match ($tab) {
+            'review' => $query->whereIn('status', [
+                BookingStatus::MENUNGGU_APPROVAL,
+                BookingStatus::PERLU_KLARIFIKASI,
+                BookingStatus::MENUNGGU_MEETING,
+            ]),
+            'payment' => $query->where('status', BookingStatus::AWAITING_PAYMENT),
+            'verify'  => $query
+                ->where('status', BookingStatus::AWAITING_PAYMENT)
+                ->whereHas('payments', fn ($q) => $q->where('status', 'awaiting_verification')),
+            'all' => is_string($status) && $status !== ''
+                ? $query->where('status', $status)
+                : $query,
+            default => $query->whereIn('status', [
+                BookingStatus::MENUNGGU_APPROVAL,
+                BookingStatus::PERLU_KLARIFIKASI,
+                BookingStatus::MENUNGGU_MEETING,
+                BookingStatus::AWAITING_PAYMENT,
+                BookingStatus::APPROVED,
+            ]),
+        };
+    }
+
+    public function export(Request $request): BinaryFileResponse
+    {
+        $query = $this->applyExportFilters(
+            $this->bookingsQuery(withMeeting: true)->latest('id'),
+            $request,
+        );
+
+        $fileName = 'Pengajuan_Sewa_'.now()->format('Ymd_His').'.xlsx';
+
+        return Excel::download(new BookingExport($query), $fileName);
+    }
+
+    /**
+     * @param  Builder<Booking>  $query
+     * @return Builder<Booking>
+     */
+    private function applyExportFilters(Builder $query, Request $request): Builder
+    {
+        $tab    = is_string($request->query('tab')) ? $request->query('tab') : null;
+        $status = is_string($request->query('status')) ? $request->query('status') : null;
+
+        if ($tab !== null && in_array($tab, ['active', 'review', 'payment', 'verify', 'all'], true)) {
+            $query = $this->applyTabFilter($query, $tab, $status);
+        } elseif ($status !== null && in_array($status, BookingStatus::all(), true)) {
+            $query->where('status', $status);
+        }
+
+        $month = $request->query('month');
+        if (is_string($month) && preg_match('/^(\d{4})-(\d{2})$/', $month, $matches) === 1) {
+            $query->whereYear('submitted_at', (int) $matches[1])
+                ->whereMonth('submitted_at', (int) $matches[2]);
+        }
+
+        $dateFrom = $request->query('date_from');
+        if (is_string($dateFrom) && $dateFrom !== '') {
+            $query->whereDate('submitted_at', '>=', $dateFrom);
+        }
+
+        $dateTo = $request->query('date_to');
+        if (is_string($dateTo) && $dateTo !== '') {
+            $query->whereDate('submitted_at', '<=', $dateTo);
+        }
+
+        if ($request->boolean('has_meeting')) {
+            $query->where(function (Builder $sub): void {
+                $sub->where('status', BookingStatus::MENUNGGU_MEETING)
+                    ->orWhereHas('surats', fn ($s) => $s->where('jenis', BookingSurat::JENIS_UNDANGAN_MEETING));
+            });
+        }
+
+        return $query;
+    }
+
     public function show(int $id): Response
     {
         $booking = Booking::query()
@@ -223,6 +300,11 @@ class BookingController extends Controller
                     'line_total' => (int) $i->line_total,
                 ]),
                 'jenis_sewa' => BookingJenisSewa::of($booking),
+                'surat_permohonan_url' => $booking->surat_permohonan_path
+                    ? Storage::disk('public')->url($booking->surat_permohonan_path)
+                    : null,
+                'surat_permohonan_name' => $booking->surat_permohonan_name,
+                'surat_permohonan_submitted_at' => optional($booking->submitted_surat_permohonan_at)?->format('Y-m-d H:i'),
                 'can_review' => in_array($booking->status, [
                     BookingStatus::MENUNGGU_APPROVAL,
                     BookingStatus::PERLU_KLARIFIKASI,

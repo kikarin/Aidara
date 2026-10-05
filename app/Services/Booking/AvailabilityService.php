@@ -4,6 +4,7 @@ namespace App\Services\Booking;
 
 use App\Models\Booking\Booking;
 use App\Models\Booking\BookingVenue;
+use App\Support\Booking\BookingJenisSewa;
 use App\Support\Booking\BookingStatus;
 use Carbon\Carbon;
 use InvalidArgumentException;
@@ -22,7 +23,10 @@ class AvailabilityService
      *   area_ids?: list<int>|null,
      *   starts_at: string|\DateTimeInterface,
      *   ends_at: string|\DateTimeInterface,
-     *   exclude_booking_id?: int|null
+     *   exclude_booking_id?: int|null,
+     *   is_per_hari?: bool|null,
+     *   block_pengajuan?: bool|null,
+     *   ignore_closures?: bool|null
      * }  $input
      * @return array{
      *   status: string,
@@ -54,8 +58,14 @@ class AvailabilityService
         $areaIds = $this->resolveAreaIds($input);
         $excludeId = isset($input['exclude_booking_id']) ? (int) $input['exclude_booking_id'] : null;
 
+        // Buffer hari sebelum/sesudah hanya berlaku untuk sewa per hari (kegiatan).
+        // Sewa per jam hanya memblokir jamnya sendiri, bukan hari sebelum/sesudahnya.
+        $isPerHari = (bool) ($input['is_per_hari'] ?? true);
+        $blockPengajuan = (bool) ($input['block_pengajuan'] ?? true);
         $bufferBefore = (int) ($this->rules->get('buffer_before_days', $venueId, 1) ?? 1);
         $bufferAfter = (int) ($this->rules->get('buffer_after_days', $venueId, 1) ?? 1);
+        $candidateBufferBefore = $isPerHari ? $bufferBefore : 0;
+        $candidateBufferAfter = $isPerHari ? $bufferAfter : 0;
         $horizonDays = $this->rules->get('booking_horizon_days', $venueId, null);
         $horizonDays = is_numeric($horizonDays) ? (int) $horizonDays : null;
 
@@ -77,11 +87,11 @@ class AvailabilityService
         }
         $closed = $closureRows !== [];
 
-        $windowStart = $startsAt->copy()->subDays($bufferBefore)->startOfDay();
-        $windowEnd = $endsAt->copy()->addDays($bufferAfter)->endOfDay();
+        $windowStart = $startsAt->copy()->subDays($candidateBufferBefore)->startOfDay();
+        $windowEnd = $endsAt->copy()->addDays($candidateBufferAfter)->endOfDay();
 
         $query = Booking::query()
-            ->with('areas:id,code,name')
+            ->with(['areas:id,code,name', 'items:id,booking_id,satuan'])
             ->where('venue_id', $venueId)
             ->whereIn('status', BookingStatus::locking())
             ->where('starts_at', '<', $windowEnd)
@@ -102,13 +112,17 @@ class AvailabilityService
             ->orderBy('starts_at')
             ->get(['id', 'nomor', 'status', 'priority_flag', 'starts_at', 'ends_at', 'buffer_before_days', 'buffer_after_days']);
 
-        // Pengajuan (menunggu_approval/perlu_klarifikasi) TIDAK memblokir —
-        // hanya dihitung sebagai info "ada pengajuan" tanpa detail pemohon.
+        // Pengajuan dicari dengan margin buffer hari agar pengajuan per hari di
+        // H-1/H+1 tetap terdeteksi saat kandidat per jam hanya sepanjang satu hari.
+        $pengajuanWindowStart = $windowStart->copy()->subDays(max(1, $bufferBefore));
+        $pengajuanWindowEnd = $windowEnd->copy()->addDays(max(1, $bufferAfter));
+
         $pengajuanQuery = Booking::query()
+            ->with(['items:id,booking_id,satuan'])
             ->where('venue_id', $venueId)
             ->whereIn('status', BookingStatus::pengajuan())
-            ->where('starts_at', '<', $windowEnd)
-            ->where('ends_at', '>', $windowStart);
+            ->where('starts_at', '<', $pengajuanWindowEnd)
+            ->where('ends_at', '>', $pengajuanWindowStart);
         if ($areaIds !== []) {
             $pengajuanQuery->where(function ($q) use ($areaIds) {
                 $q->whereHas('areas', fn ($aq) => $aq->whereIn('booking_areas.id', $areaIds))
@@ -118,12 +132,33 @@ class AvailabilityService
         if ($excludeId) {
             $pengajuanQuery->where('id', '!=', $excludeId);
         }
-        $hasPengajuan = $pengajuanQuery->exists();
+        $pengajuanRows = $pengajuanQuery
+            ->orderBy('starts_at')
+            ->get(['id', 'nomor', 'status', 'starts_at', 'ends_at', 'buffer_before_days', 'buffer_after_days']);
+
+        // Pengajuan TIDAK memblokir sesama sewa per hari — hanya info "ada pengajuan"
+        // agar beberapa pemohon per hari tetap bisa bersaing (prioritas/klarifikasi).
+        $hasPengajuan = $pengajuanRows->isNotEmpty();
+
+        // Skala prioritas: pengajuan sewa PER HARI memblokir sewa PER JAM
+        // (termasuk buffer hari), walau belum di-ACC admin.
+        $pendingBlocks = [];
+        if ($blockPengajuan && ! $isPerHari) {
+            foreach ($pengajuanRows as $pending) {
+                if ($this->pendingBlocksPerJam($pending, $startsAt, $endsAt, $windowStart, $windowEnd)) {
+                    $pendingBlocks[] = $pending;
+                }
+            }
+        }
 
         $hasHard = false;
         $mapped = [];
 
         foreach ($conflicts as $booking) {
+            if (! $this->bookingBlocks($booking, $startsAt, $endsAt, $isPerHari, $windowStart, $windowEnd)) {
+                continue;
+            }
+
             $hasHard = true;
 
             $mapped[] = [
@@ -135,7 +170,28 @@ class AvailabilityService
                 'areas' => $booking->areas->map(fn ($a) => ['id' => $a->id, 'code' => $a->code, 'name' => $a->name])->all(),
                 'starts_at' => optional($booking->starts_at)->toDateTimeString(),
                 'ends_at' => optional($booking->ends_at)->toDateTimeString(),
+                'buffer_before_days' => (int) ($booking->buffer_before_days ?? 0),
+                'buffer_after_days' => (int) ($booking->buffer_after_days ?? 0),
                 'lock_level' => 'hard',
+            ];
+        }
+
+        foreach ($pendingBlocks as $pending) {
+            $hasHard = true;
+
+            // Data pemohon disembunyikan dari kandidat lain.
+            $mapped[] = [
+                'id' => null,
+                'nomor' => null,
+                'status' => $pending->status,
+                'priority_flag' => null,
+                'area_ids' => [],
+                'areas' => [],
+                'starts_at' => optional($pending->starts_at)->toDateTimeString(),
+                'ends_at' => optional($pending->ends_at)->toDateTimeString(),
+                'buffer_before_days' => (int) ($pending->buffer_before_days ?? 0),
+                'buffer_after_days' => (int) ($pending->buffer_after_days ?? 0),
+                'lock_level' => 'pengajuan',
             ];
         }
 
@@ -164,6 +220,82 @@ class AvailabilityService
         ];
     }
 
+    /**
+     * Apakah booking lain (yang overlap window pencarian) benar-benar memblokir
+     * kandidat. Sewa per jam tidak pernah terblokir buffer hari dari event di hari
+     * sebelum/sesudahnya; buffer hari hanya berlaku antar sewa per hari.
+     */
+    private function bookingBlocks(
+        Booking $other,
+        Carbon $startsAt,
+        Carbon $endsAt,
+        bool $candidatePerHari,
+        Carbon $windowStart,
+        Carbon $windowEnd,
+    ): bool {
+        $otherStart = $other->starts_at;
+        $otherEnd = $other->ends_at;
+
+        if (! $otherStart || ! $otherEnd) {
+            return false;
+        }
+
+        if ($otherStart->lt($endsAt) && $otherEnd->gt($startsAt)) {
+            return true;
+        }
+
+        if (! $candidatePerHari) {
+            return false;
+        }
+
+        $otherPerHari = BookingJenisSewa::satuanPerHari(
+            $other->relationLoaded('items') ? $other->items->pluck('satuan')->all() : []
+        );
+        if (! $otherPerHari) {
+            return false;
+        }
+
+        $bufferedStart = $otherStart->copy()->subDays((int) ($other->buffer_before_days ?? 0))->startOfDay();
+        $bufferedEnd = $otherEnd->copy()->addDays((int) ($other->buffer_after_days ?? 0))->endOfDay();
+
+        return $bufferedStart->lt($windowEnd) && $bufferedEnd->gt($windowStart);
+    }
+
+    /**
+     * Skala prioritas: pengajuan sewa per hari memblokir kandidat sewa per jam,
+     * baik saat jamnya beririsan maupun saat kandidat masuk rentang buffer hari
+     * pengajuan (H-1/H+1). Berlaku walau pengajuan belum di-ACC.
+     */
+    private function pendingBlocksPerJam(
+        Booking $pending,
+        Carbon $startsAt,
+        Carbon $endsAt,
+        Carbon $windowStart,
+        Carbon $windowEnd,
+    ): bool {
+        $pendingStart = $pending->starts_at;
+        $pendingEnd = $pending->ends_at;
+        if (! $pendingStart || ! $pendingEnd) {
+            return false;
+        }
+
+        $pendingPerHari = BookingJenisSewa::satuanPerHari(
+            $pending->relationLoaded('items') ? $pending->items->pluck('satuan')->all() : []
+        );
+        if (! $pendingPerHari) {
+            return false;
+        }
+
+        if ($pendingStart->lt($endsAt) && $pendingEnd->gt($startsAt)) {
+            return true;
+        }
+
+        $bufferedStart = $pendingStart->copy()->subDays((int) ($pending->buffer_before_days ?? 0))->startOfDay();
+        $bufferedEnd = $pendingEnd->copy()->addDays((int) ($pending->buffer_after_days ?? 0))->endOfDay();
+
+        return $bufferedStart->lt($windowEnd) && $bufferedEnd->gt($windowStart);
+    }
+
     public function assertBookable(array $input): array
     {
         $result = $this->check($input);
@@ -187,7 +319,14 @@ class AvailabilityService
         }
 
         if ($result['status'] === 'merah') {
-            throw new InvalidArgumentException('Slot tidak tersedia (hard-lock).');
+            $pendingBlocked = collect($result['conflicts'])->contains(
+                fn (array $conflict) => ($conflict['lock_level'] ?? null) === 'pengajuan'
+            );
+            throw new InvalidArgumentException(
+                $pendingBlocked
+                    ? 'Slot sudah diajukan untuk sewa per hari (menunggu keputusan admin).'
+                    : 'Slot tidak tersedia (hard-lock).'
+            );
         }
 
         return $result;
@@ -242,6 +381,7 @@ class AvailabilityService
         $areaIds = $this->resolveAreaIds($input);
         $durationHours = max(1, min(12, (int) ($input['duration_hours'] ?? 1)));
         $stepHours = max(1, min(12, (int) ($input['step_hours'] ?? 1)));
+        $isPerHari = (bool) ($input['is_per_hari'] ?? true);
 
         $hoursRule = $this->rules->get('operating_hours', $venueId, ['start' => '06:00', 'end' => '21:00']);
         $openStr = is_array($hoursRule) ? (string) ($hoursRule['start'] ?? '06:00') : '06:00';
@@ -299,6 +439,7 @@ class AvailabilityService
                 'area_ids' => $areaIds,
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
+                'is_per_hari' => $isPerHari,
             ]);
 
             $reason = null;
@@ -309,7 +450,11 @@ class AvailabilityService
             } elseif (! empty($check['closed'])) {
                 $reason = $check['closures'][0]['reason'] ?? 'Ditutup pengelola';
             } elseif ($check['status'] === 'merah') {
-                $reason = 'Sudah dipesan / disetujui';
+                $reason = collect($check['conflicts'])->contains(
+                    fn (array $conflict) => ($conflict['lock_level'] ?? null) === 'pengajuan'
+                )
+                    ? 'Sudah diajukan untuk sewa per hari (menunggu keputusan)'
+                    : 'Sudah dipesan / disetujui';
             }
 
             $slots[] = [
@@ -369,6 +514,7 @@ class AvailabilityService
         }
 
         $areaIds = $this->resolveAreaIds($input);
+        $isPerHari = (bool) ($input['is_per_hari'] ?? true);
 
         $hoursRule = $this->rules->get('operating_hours', $venueId, ['start' => '06:00', 'end' => '21:00']);
         $openStr = is_array($hoursRule) ? (string) ($hoursRule['start'] ?? '06:00') : '06:00';
@@ -396,6 +542,14 @@ class AvailabilityService
                 continue;
             }
 
+            // Sewa per jam: hari tetap bisa dipilih selama masih ada jam kosong.
+            if (! $isPerHari) {
+                $days[] = $this->perJamDaySummary($venueId, $dateStr, $areaIds, $openStr, $closeStr);
+                $cursor->addDay();
+
+                continue;
+            }
+
             $startsAt = $cursor->copy()->setTime($openH, $openM, 0);
             $endsAt = $cursor->copy()->setTime($closeH, $closeM, 0);
             if ($endsAt->lte($startsAt)) {
@@ -407,6 +561,7 @@ class AvailabilityService
                 'area_ids' => $areaIds,
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
+                'is_per_hari' => $isPerHari,
             ]);
 
             $closures = $check['closures'];
@@ -423,6 +578,7 @@ class AvailabilityService
                     'starts_at' => $startsAt,
                     'ends_at' => $endsAt,
                     'ignore_closures' => true,
+                    'is_per_hari' => $isPerHari,
                 ]);
             }
 
@@ -460,6 +616,128 @@ class AvailabilityService
                 'end' => $closeStr,
             ],
             'days' => $days,
+        ];
+    }
+
+    /**
+     * Ringkasan satu hari untuk sewa per jam: hari dianggap masih bisa dipilih
+     * selama tersedia minimal satu jam kosong. Booking pada jam tertentu tidak
+     * memblokir seluruh hari.
+     *
+     * @param  list<int>  $areaIds
+     * @return array{date: string, status: string, bookable: bool, pengajuan: bool, reason: string|null}
+     */
+    private function perJamDaySummary(int $venueId, string $dateStr, array $areaIds, string $openStr, string $closeStr): array
+    {
+        $horizonDays = $this->rules->get('booking_horizon_days', $venueId, null);
+        $horizonDays = is_numeric($horizonDays) ? (int) $horizonDays : null;
+
+        $dayOpen = Carbon::parse($dateStr.' '.$openStr);
+        $withinHorizon = true;
+        if ($horizonDays !== null && $horizonDays > 0) {
+            $latest = now()->startOfDay()->addDays($horizonDays)->endOfDay();
+            $withinHorizon = $dayOpen->lte($latest) && $dayOpen->gte(now()->startOfDay());
+        }
+
+        if (! $withinHorizon) {
+            return [
+                'date' => $dateStr,
+                'status' => 'merah',
+                'bookable' => false,
+                'pengajuan' => false,
+                'reason' => $horizonDays
+                    ? "Hanya bisa dipesan sampai {$horizonDays} hari ke depan"
+                    : 'Di luar batas pemesanan',
+            ];
+        }
+
+        $dayStart = Carbon::parse($dateStr.' '.$openStr);
+        $dayEnd = Carbon::parse($dateStr.' '.$closeStr);
+        if ($dayEnd->lte($dayStart)) {
+            $dayEnd = $dayStart->copy()->addHour();
+        }
+
+        $check = $this->check([
+            'venue_id' => $venueId,
+            'area_ids' => $areaIds,
+            'starts_at' => $dayStart->toDateTimeString(),
+            'ends_at' => $dayEnd->toDateTimeString(),
+            'is_per_hari' => false,
+        ]);
+
+        // Interval yang menutup sebagian hari: booking yang benar-benar overlap
+        // maupun penutupan admin. Pengajuan per hari memakai rentang buffer.
+        $blocked = [];
+        $hasPendingBlock = false;
+        foreach ($check['conflicts'] as $conflict) {
+            $start = Carbon::parse($conflict['starts_at']);
+            $end = Carbon::parse($conflict['ends_at']);
+
+            if (($conflict['lock_level'] ?? null) === 'pengajuan') {
+                $hasPendingBlock = true;
+                $start = $start->copy()->subDays((int) ($conflict['buffer_before_days'] ?? 0))->startOfDay();
+                $end = $end->copy()->addDays((int) ($conflict['buffer_after_days'] ?? 0))->endOfDay();
+            }
+
+            $blocked[] = [$start, $end];
+        }
+        foreach ($check['closures'] as $closure) {
+            $blocked[] = [Carbon::parse($closure['starts_at']), Carbon::parse($closure['ends_at'])];
+        }
+
+        // Cari minimal satu slot 1 jam (selaras jam operasional) yang masih kosong.
+        $hasFreeHour = false;
+        $slot = $dayStart->copy();
+        while ($slot->copy()->addHour()->lte($dayEnd)) {
+            $slotStart = $slot->copy();
+            $slotEnd = $slot->copy()->addHour();
+
+            if ($slotStart->gte(now())) {
+                $free = true;
+                foreach ($blocked as [$blockedStart, $blockedEnd]) {
+                    if ($blockedStart->lt($slotEnd) && $blockedEnd->gt($slotStart)) {
+                        $free = false;
+
+                        break;
+                    }
+                }
+                if ($free) {
+                    $hasFreeHour = true;
+
+                    break;
+                }
+            }
+
+            $slot->addHour();
+        }
+
+        $reason = null;
+        if (! $hasFreeHour && now()->gte($dayEnd)) {
+            $reason = 'Jam sudah lewat';
+        } elseif (! $hasFreeHour) {
+            $fullDayClosure = collect($check['closures'])->first(
+                fn (array $closure) => ($closure['is_full_day'] ?? false)
+                    || (Carbon::parse($closure['starts_at'])->lte($dayStart) && Carbon::parse($closure['ends_at'])->gte($dayEnd))
+            );
+            if ($fullDayClosure) {
+                $reason = ($fullDayClosure['reason'] ?? null)
+                    ? 'Penuh — '.$fullDayClosure['reason']
+                    : 'Penuh (ditutup admin)';
+            } elseif ($hasPendingBlock) {
+                $reason = 'Sudah diajukan untuk sewa per hari (menunggu keputusan)';
+            } else {
+                $reason = 'Semua jam sudah terisi';
+            }
+        } elseif ($check['closures'] !== []) {
+            $reason = 'Sebagian jam ditutup / terisi';
+        }
+
+        return [
+            'date' => $dateStr,
+            'status' => $hasFreeHour ? 'hijau' : 'merah',
+            'bookable' => $hasFreeHour,
+            'pengajuan' => (bool) $check['pengajuan'],
+            'reason' => $reason,
         ];
     }
 

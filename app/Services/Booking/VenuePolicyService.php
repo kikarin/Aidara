@@ -7,6 +7,7 @@ use App\Models\Booking\BookingIncident;
 use App\Models\Booking\BookingSetting;
 use App\Models\Booking\BookingVenue;
 use App\Models\User;
+use App\Support\Booking\BookingJenisSewa;
 use App\Support\Booking\BookingStatus;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -210,6 +211,8 @@ class VenuePolicyService
             'starts_at' => $newStart,
             'ends_at' => $newEnd,
             'exclude_booking_id' => $booking->id,
+            'is_per_hari' => BookingJenisSewa::isPerHari($booking),
+            'block_pengajuan' => false,
         ]);
 
         return DB::transaction(function () use ($booking, $actor, $newStart, $newEnd, $areaId, $isForceMajeure) {

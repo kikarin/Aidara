@@ -160,7 +160,7 @@ const initAreaRows = (): AreaRow[] => {
 };
 
 let areaRowSeq = 0;
-const bookingMode = ref<'all' | 'areas'>('all');
+const bookingMode = ref<'all' | 'areas'>('areas');
 const allAreasShortcut = ref(false);
 const areaRows = ref<AreaRow[]>([]);
 
@@ -202,6 +202,7 @@ const form = useForm({
     keterangan: props.oldForm?.keterangan ?? '',
     terms_accepted: false,
     tata_tertib_accepted: false,
+    surat_permohonan: null as File | null,
     addon_ids: [] as Array<{ id: number; qty: number }>,
 });
 
@@ -213,7 +214,6 @@ if (areaRows.value.length) {
 const allTarifId = ref<number | ''>(props.oldForm?.tarif_id != null && props.oldForm.tarif_id !== '' ? Number(props.oldForm.tarif_id) : '');
 
 const venueWideTarifs = computed(() => props.tarifs.filter((t) => t.area_id === null));
-const hasVenueWideTarif = computed(() => venueWideTarifs.value.length > 0);
 
 const selectedAreaIds = computed(() => areaRows.value.filter((row) => row.area_id !== '').map((row) => Number(row.area_id)));
 
@@ -231,6 +231,29 @@ const selectedTarif = computed(() => props.tarifs.find((t) => t.id === Number(al
 
 const firstRowTarif = computed(() => (areaRows.value.length ? tarifForRow(areaRows.value[0]) : null));
 const activeTarif = computed(() => (bookingMode.value === 'all' ? selectedTarif.value : firstRowTarif.value));
+
+/** Satuan yang berarti sewa per jam (langsung booking, tanpa surat permohonan). */
+const SATUAN_PER_JAM = ['per_hour', 'per_court_hour', 'per_unit_3hour', 'per_match', 'per_person'];
+
+const selectedSatuans = computed(() => {
+    if (bookingMode.value === 'all') {
+        return selectedTarif.value ? [selectedTarif.value.satuan] : [];
+    }
+
+    return areaRows.value
+        .filter((row) => row.area_id !== '' && row.tarif_id !== '')
+        .map((row) => tarifForRow(row)?.satuan)
+        .filter((satuan): satuan is string => Boolean(satuan));
+});
+
+/** Sewa per hari wajib melampirkan surat permohonan. */
+const isPerHari = computed(() => {
+    if (!selectedSatuans.value.length) {
+        return false;
+    }
+
+    return selectedSatuans.value.some((satuan) => !SATUAN_PER_JAM.includes(satuan));
+});
 
 const selectedAreaName = computed(() => {
     if (bookingMode.value === 'all' || allAreasShortcut.value) {
@@ -303,42 +326,6 @@ const durationOptions = computed(() => {
 const blockOptions = computed(() => [1, 2, 3, 4]);
 const dayOptions = computed(() => [1, 2, 3, 4, 5, 7, 14, 30]);
 const monthOptions = computed(() => [1, 2, 3, 6, 12]);
-
-const setBookingMode = (mode: 'all' | 'areas') => {
-    if (mode === 'all' && !hasVenueWideTarif.value) {
-        selectAllAreas();
-        allAreasShortcut.value = true;
-        bookingMode.value = 'areas';
-        refreshSchedule();
-
-        return;
-    }
-
-    allAreasShortcut.value = false;
-    bookingMode.value = mode;
-    if (mode === 'areas' && areaRows.value.length === 0) {
-        addAreaRow();
-    }
-    refreshSchedule();
-};
-
-const selectAllAreas = () => {
-    const rows: AreaRow[] = [];
-    for (const area of props.venue.areas) {
-        const tarif = tarifsForArea(area.id)[0];
-        if (!tarif) {
-            continue;
-        }
-        rows.push({
-            uid: ++areaRowSeq,
-            area_id: area.id,
-            tarif_id: tarif.id,
-            qty: 1,
-            luas_m2: '',
-        });
-    }
-    areaRows.value = rows;
-};
 
 const addAreaRow = () => {
     allAreasShortcut.value = false;
@@ -581,6 +568,7 @@ const fetchQuoteForRange = async (startsAt: string, endsAt: string) => {
             venue_id: String(props.venue.id),
             starts_at: startsAt,
             ends_at: endsAt,
+            is_per_hari: isPerHari.value ? '1' : '0',
         });
         for (const areaId of selectedAreaIds.value) {
             availParams.append('area_ids[]', String(areaId));
@@ -673,6 +661,7 @@ const loadDaySlots = async () => {
             date: selectedDate.value,
             duration_hours: String(duration),
             step_hours: String(step),
+            is_per_hari: isPerHari.value ? '1' : '0',
         });
         for (const areaId of selectedAreaIds.value) {
             params.append('area_ids[]', String(areaId));
@@ -895,6 +884,7 @@ const canSubmit = computed(
         !!form.tujuan &&
         form.terms_accepted &&
         form.tata_tertib_accepted &&
+        (!isPerHari.value || !!form.surat_permohonan) &&
         !form.processing &&
         !quoteLoading.value,
 );
@@ -923,6 +913,9 @@ const submitHint = computed(() => {
     }
     if (!form.tata_tertib_accepted) {
         return 'Centang pernyataan bahwa Anda sudah membaca tata tertib.';
+    }
+    if (isPerHari.value && !form.surat_permohonan) {
+        return 'Unggah surat permohonan (PDF, maks 5MB) untuk sewa per hari.';
     }
 
     return '';
@@ -972,6 +965,7 @@ const submitBooking = () => {
             addon_ids: selectedAddonIds.value.map((id) => ({ id, qty: 1 })),
             terms_accepted: 1,
             tata_tertib_accepted: 1,
+            surat_permohonan: form.surat_permohonan,
         };
 
         if (bookingMode.value === 'all') {
@@ -998,6 +992,11 @@ const submitBooking = () => {
         preserveScroll: true,
         onFinish: () => form.transform((data) => data),
     });
+};
+
+const onSuratPermohonanChange = (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    form.surat_permohonan = input.files?.[0] ?? null;
 };
 
 const slotClass = (slot: DaySlot) => {
@@ -1131,26 +1130,6 @@ const slotTitle = (slot: DaySlot) => {
                             <p class="text-muted-foreground mt-1 text-sm leading-relaxed">Sewa seluruh venue, atau pilih beberapa area sekaligus.</p>
                         </div>
                     </header>
-
-                    <div class="mb-5 flex flex-wrap gap-2" role="group" aria-label="Cakupan sewa">
-                        <button
-                            type="button"
-                            class="sb-chip px-4 py-2"
-                            :aria-pressed="bookingMode === 'all' || allAreasShortcut"
-                            @click="setBookingMode('all')"
-                        >
-                            Seluruh venue
-                        </button>
-                        <button
-                            type="button"
-                            class="sb-chip px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            :aria-pressed="bookingMode === 'areas' && !allAreasShortcut"
-                            :disabled="venue.areas.length === 0"
-                            @click="setBookingMode('areas')"
-                        >
-                            Area tertentu
-                        </button>
-                    </div>
 
                     <div v-if="allAreasShortcut" class="sb-callout sb-tone-info mb-5">
                         <FontAwesomeIcon :icon="['fas', 'circle-info']" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -1322,7 +1301,7 @@ const slotTitle = (slot: DaySlot) => {
                     <div class="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
                         <div>
                             <p class="sb-label">Kalender ketersediaan</p>
-                            <BookingAvailabilityCalendar v-model="selectedDate" :venue-id="venue.id" :area-ids="selectedAreaIds" />
+                            <BookingAvailabilityCalendar v-model="selectedDate" :venue-id="venue.id" :area-ids="selectedAreaIds" :is-per-hari="isPerHari" />
                         </div>
 
                         <div class="space-y-5">
@@ -1681,6 +1660,26 @@ const slotTitle = (slot: DaySlot) => {
                         <span class="text-muted-foreground leading-relaxed">{{ termsText }}</span>
                     </label>
                     <InputError :message="form.errors.terms_accepted" />
+
+                    <div v-if="isPerHari" class="mt-4 rounded-xl border border-(--wp-hairline) p-4">
+                        <label for="surat-permohonan" class="text-sm font-semibold">
+                            Surat permohonan <span class="text-(--sb-danger)">*</span>
+                        </label>
+                        <p class="text-muted-foreground mt-1 text-xs">
+                            Sewa per hari wajib melampirkan surat permohonan (PDF, maks 5MB).
+                        </p>
+                        <input
+                            id="surat-permohonan"
+                            type="file"
+                            accept="application/pdf,.pdf"
+                            class="mt-3 block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-(--wp-accent-soft) file:px-3 file:py-2 file:text-sm file:font-medium file:text-(--wp-accent-strong)"
+                            @change="onSuratPermohonanChange"
+                        />
+                        <p v-if="form.surat_permohonan" class="text-muted-foreground mt-2 text-xs">
+                            Terpilih: {{ form.surat_permohonan.name }}
+                        </p>
+                        <InputError :message="form.errors.surat_permohonan" class="mt-1" />
+                    </div>
 
                     <button
                         v-if="bookingAuth"

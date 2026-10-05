@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests\Booking;
 
+use App\Models\Booking\BookingTarif;
+use App\Support\Booking\BookingJenisSewa;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreBookingRequest extends FormRequest
 {
@@ -41,7 +44,57 @@ class StoreBookingRequest extends FormRequest
             'keterangan' => ['nullable', 'string'],
             'terms_accepted' => ['required', 'accepted'],
             'tata_tertib_accepted' => ['required', 'accepted'],
+            'surat_permohonan' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
         ];
+    }
+
+    /**
+     * Sewa per hari wajib melampirkan surat permohonan. Aturan ini hanya
+     * diberlakukan untuk jalur web (Inertia); klien API mobile lama masih boleh
+     * mengajukan per hari tanpa file (dilengkapi admin lewat klarifikasi).
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            if (! $this->inertia() || ! $this->isPerHariRequest()) {
+                return;
+            }
+
+            if (! $this->hasFile('surat_permohonan')) {
+                $validator->errors()->add(
+                    'surat_permohonan',
+                    'Surat permohonan wajib diunggah untuk sewa per hari (PDF, maks 5MB).'
+                );
+            }
+        });
+    }
+
+    private function isPerHariRequest(): bool
+    {
+        $tarifIds = [];
+
+        if ($this->filled('tarif_id')) {
+            $tarifIds[] = (int) $this->input('tarif_id');
+        }
+
+        foreach ((array) $this->input('areas', []) as $area) {
+            if (is_array($area) && ! empty($area['tarif_id'])) {
+                $tarifIds[] = (int) $area['tarif_id'];
+            }
+        }
+
+        $tarifIds = array_values(array_unique(array_filter($tarifIds)));
+
+        if ($tarifIds === []) {
+            return false;
+        }
+
+        $satuans = BookingTarif::query()
+            ->whereIn('id', $tarifIds)
+            ->pluck('satuan')
+            ->all();
+
+        return BookingJenisSewa::satuanPerHari($satuans);
     }
 
     /** @return array<string, string> */

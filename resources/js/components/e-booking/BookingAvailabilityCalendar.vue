@@ -19,6 +19,7 @@ const props = defineProps<{
     venueId: number;
     areaIds?: number[];
     modelValue: string;
+    isPerHari?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -131,7 +132,10 @@ const loadMonth = async () => {
     error.value = '';
 
     try {
-        const params = new URLSearchParams({ month: monthCursor.value });
+        const params = new URLSearchParams({
+            month: monthCursor.value,
+            is_per_hari: props.isPerHari === false ? '0' : '1',
+        });
         for (const areaId of props.areaIds ?? []) {
             params.append('area_ids[]', String(areaId));
         }
@@ -153,7 +157,7 @@ const loadMonth = async () => {
 };
 
 watch(
-    () => [monthCursor.value, (props.areaIds ?? []).join(',')] as const,
+    () => [monthCursor.value, (props.areaIds ?? []).join(','), props.isPerHari] as const,
     () => {
         loadMonth();
     },

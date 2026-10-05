@@ -15,6 +15,7 @@ class BookingStatusService
         BookingStatus::DRAFT => [BookingStatus::MENUNGGU_APPROVAL, BookingStatus::CANCELLED],
         BookingStatus::MENUNGGU_APPROVAL => [
             BookingStatus::APPROVED,
+            BookingStatus::AWAITING_PAYMENT,
             BookingStatus::PERLU_KLARIFIKASI,
             BookingStatus::MENUNGGU_MEETING,
             BookingStatus::REJECTED,

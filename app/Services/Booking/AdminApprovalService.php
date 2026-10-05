@@ -92,6 +92,44 @@ class AdminApprovalService
         });
     }
 
+    /**
+     * Sewa per jam (reguler): TANPA tahap persetujuan. Booking langsung masuk
+     * menunggu pembayaran; pengelola hanya memvalidasi bukti bayar nanti.
+     * Booking harus sudah berstatus pengajuan.
+     *
+     * @return array{booking: Booking, payment: BookingPayment}
+     */
+    public function autoBookPerJam(Booking $booking): array
+    {
+        $this->assertReviewable($booking);
+
+        if (! $booking->priority_rule_id) {
+            $booking->priority_rule_id = $this->conflicts->suggestPriorityRuleId($booking);
+            $booking->save();
+        }
+
+        return DB::transaction(function () use ($booking) {
+            $booking->priority_flag = 'normal';
+            $booking->save();
+
+            $booking = $this->statuses->transition(
+                $booking,
+                BookingStatus::AWAITING_PAYMENT,
+                'Sewa per jam — menunggu pembayaran & validasi bukti oleh pengelola',
+                $booking->user_id
+            );
+
+            $payment = $this->gateways->resolve()->initiate($booking, [
+                'initiated_by' => $booking->user_id,
+            ]);
+
+            return [
+                'booking' => $booking->load(['payments', 'venue', 'areas', 'items', 'addonSelected']),
+                'payment' => $payment,
+            ];
+        });
+    }
+
     public function reject(Booking $booking, User $admin, string $reason): Booking
     {
         $this->assertReviewable($booking);

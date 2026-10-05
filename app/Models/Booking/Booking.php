@@ -44,6 +44,9 @@ class Booking extends Model
         'cancelled_at',
         'confirmed_at',
         'admin_notes',
+        'surat_permohonan_path',
+        'surat_permohonan_name',
+        'submitted_surat_permohonan_at',
         'meta',
     ];
 
@@ -65,6 +68,7 @@ class Booking extends Model
             'rejected_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'confirmed_at' => 'datetime',
+            'submitted_surat_permohonan_at' => 'datetime',
             'meta' => 'array',
         ];
     }

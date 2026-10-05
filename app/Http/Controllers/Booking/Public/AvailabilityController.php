@@ -121,7 +121,9 @@ class AvailabilityController extends Controller
     public function check(CheckAvailabilityRequest $request): JsonResponse
     {
         try {
-            $result = $this->availability->check($request->validated());
+            $data = $request->validated();
+            $data['is_per_hari'] = $request->boolean('is_per_hari', true);
+            $result = $this->availability->check($data);
         } catch (InvalidArgumentException $e) {
             return response()->json([
                 'success' => false,

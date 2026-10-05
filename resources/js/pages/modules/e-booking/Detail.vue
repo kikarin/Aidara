@@ -82,6 +82,9 @@ const props = defineProps<{
         items: Array<{ uraian: string; satuan: string; qty: number; line_total: number }>;
         addons: Array<{ name: string; qty: number; line_total: number }>;
         dokumen_wajib: string[];
+        surat_permohonan_url: string | null;
+        surat_permohonan_name: string | null;
+        surat_permohonan_submitted_at: string | null;
         surats: Array<{
             id: number;
             jenis_label: string;
@@ -285,7 +288,7 @@ const nextStepText = computed(() => {
         return 'Silakan transfer sesuai petunjuk di bawah, lalu kirim bukti pembayaran.';
     }
     if (props.booking.status === 'menunggu_approval' && isReguler.value) {
-        return 'Pengajuan Anda sudah masuk. Sewa latihan tidak perlu meeting, jadi begitu disetujui petunjuk pembayaran langsung muncul di halaman ini.';
+        return 'Pengajuan sewa per jam Anda sudah masuk dan langsung terbooking. Petunjuk pembayaran muncul otomatis di halaman ini.';
     }
     if (props.booking.status === 'menunggu_approval') {
         return `Pengajuan Anda sudah masuk. Proses peninjauan maksimal ${props.slaHariKerja ?? 7} hari kerja — balasan berupa surat akan dikirim setelah selesai.`;
@@ -300,7 +303,9 @@ const nextStepText = computed(() => {
     return 'Lihat rincian pesanan dan pantau perkembangannya di halaman ini.';
 });
 
-const progressSteps = ['Pengajuan dikirim', 'Ditinjau pengelola', 'Pembayaran', 'Terkonfirmasi'];
+const progressSteps = isReguler.value
+    ? ['Pengajuan dikirim', 'Langsung terbooking', 'Pembayaran', 'Terkonfirmasi']
+    : ['Pengajuan dikirim', 'Ditinjau pengelola', 'Pembayaran', 'Terkonfirmasi'];
 
 const haltedStatuses = ['rejected', 'cancelled', 'forfeited', 'expired'];
 
@@ -429,7 +434,7 @@ const progressPercent = computed(() => {
                             </button>
                             <span class="sr-only" aria-live="polite">{{ copied === 'nomor' ? 'Kode pesanan disalin' : '' }}</span>
                             <span v-if="booking.jenis_sewa" class="sb-badge" :class="isReguler ? 'sb-tone-info' : 'sb-tone-meeting'">
-                                {{ isReguler ? 'Sewa latihan' : 'Sewa event' }}
+                                {{ isReguler ? 'Sewa per jam' : 'Sewa per hari' }}
                             </span>
                         </div>
 
@@ -607,6 +612,25 @@ const progressPercent = computed(() => {
                         <p v-if="booking.keterangan" class="text-muted-foreground mt-5 text-sm leading-relaxed">
                             <span class="text-foreground font-medium">Keterangan:</span> {{ booking.keterangan }}
                         </p>
+                    </section>
+
+                    <section v-if="booking.surat_permohonan_url" class="sb-card p-6 sm:p-8" aria-labelledby="surat-permohonan-heading">
+                        <h2 id="surat-permohonan-heading" class="text-lg font-semibold tracking-tight">Surat permohonan Anda</h2>
+                        <div class="mt-5 flex flex-col gap-4 rounded-2xl p-4 text-sm ring-1 ring-(--wp-hairline) sm:flex-row sm:items-center">
+                            <span class="wp-icon size-11 shrink-0">
+                                <FontAwesomeIcon :icon="['fas', 'file-pdf']" class="size-4" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-semibold">{{ booking.surat_permohonan_name ?? 'Surat permohonan' }}</p>
+                                <p v-if="booking.surat_permohonan_submitted_at" class="text-muted-foreground mt-0.5 text-xs tabular-nums">
+                                    Diunggah {{ booking.surat_permohonan_submitted_at }}
+                                </p>
+                            </div>
+                            <a :href="booking.surat_permohonan_url" target="_blank" rel="noopener" class="wp-btn wp-btn-quiet shrink-0 px-4 py-2 text-sm">
+                                <FontAwesomeIcon :icon="['fas', 'download']" class="size-3.5" aria-hidden="true" />
+                                Lihat PDF
+                            </a>
+                        </div>
                     </section>
 
                     <section v-if="booking.surats.length" class="sb-card p-6 sm:p-8" aria-labelledby="surat-heading">

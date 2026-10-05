@@ -172,6 +172,7 @@ Route::middleware(['booking.web:admin_upt'])->prefix('booking/admin')->group(fun
     Route::post('/logout', [EBookingAdminAuthController::class, 'logout'])->name('e-booking.admin.logout');
     Route::get('/', EBookingAdminDashboardController::class)->name('e-booking.admin.dashboard');
     Route::get('/bookings', [EBookingAdminBookingController::class, 'index'])->name('e-booking.admin.bookings.index');
+    Route::get('/bookings/export', [EBookingAdminBookingController::class, 'export'])->name('e-booking.admin.bookings.export');
     Route::get('/bookings/{id}', [EBookingAdminBookingController::class, 'show'])
         ->whereNumber('id')
         ->name('e-booking.admin.bookings.show');
@@ -1045,35 +1046,6 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::post('/event/destroy-selected', [EventController::class, 'destroy_selected'])->name('event.destroy_selected');
 });
 
-// =====================
-// DEVELOPMENT/UTILITY ROUTES
-// =====================
-// Route untuk migrate fresh dengan seed (HANYA UNTUK DEVELOPMENT!)
-Route::get('/dev/migrate-fresh-seed', function () {
-    // Hanya bisa diakses di local/development environment
-    if (app()->environment('production')) {
-        abort(403, 'Route ini tidak tersedia di production environment.');
-    }
-
-    try {
-        // Jalankan migrate:fresh --seed
-        Artisan::call('migrate:fresh', ['--seed' => true]);
-        
-        $output = Artisan::output();
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Migrate fresh dengan seed berhasil dijalankan.',
-            'output' => $output,
-        ], 200);
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Terjadi kesalahan saat menjalankan migrate fresh seed.',
-            'error' => $e->getMessage(),
-        ], 500);
-    }
-})->name('dev.migrate-fresh-seed');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

@@ -4,6 +4,7 @@ namespace App\Http\Resources\Booking;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 /** @mixin \App\Models\Booking\Booking */
 class BookingResource extends JsonResource
@@ -19,6 +20,11 @@ class BookingResource extends JsonResource
             'status' => $this->status,
             'priority_flag' => $this->priority_flag,
             'kategori_tarif' => $this->kategori_tarif,
+            'jenis_sewa' => \App\Support\Booking\BookingJenisSewa::of($this->resource),
+            'surat_permohonan_url' => $this->surat_permohonan_path
+                ? Storage::disk('public')->url($this->surat_permohonan_path)
+                : null,
+            'surat_permohonan_name' => $this->surat_permohonan_name,
             'tujuan' => $this->tujuan,
             'keterangan' => $this->keterangan,
             'starts_at' => optional($this->starts_at)->toDateTimeString(),

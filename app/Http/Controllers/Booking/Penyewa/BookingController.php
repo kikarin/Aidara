@@ -85,7 +85,9 @@ class BookingController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Booking berhasil disubmit, menunggu approval',
+            'message' => \App\Support\Booking\BookingJenisSewa::isReguler($booking)
+                ? 'Booking per jam berhasil dibuat, silakan lanjutkan pembayaran.'
+                : 'Booking berhasil disubmit, menunggu approval',
             'data' => new BookingResource($booking),
         ], 201);
     }

@@ -100,6 +100,9 @@ const props = defineProps<{
         penyewa: { nama: string; no_hp: string | null; instansi: string | null } | null;
         items: Array<{ uraian: string; satuan: string; qty: number; line_total: number }>;
         jenis_sewa?: 'reguler' | 'event';
+        surat_permohonan_url: string | null;
+        surat_permohonan_name: string | null;
+        surat_permohonan_submitted_at: string | null;
         can_review: boolean;
         can_verify_payment: boolean;
         surats: Array<{
@@ -513,7 +516,7 @@ onUnmounted(() => {
                         <SbStatusBadge :status="booking.status" audience="admin" />
                         <span v-if="booking.priority_flag" class="sb-badge sb-tone-neutral">Prioritas {{ booking.priority_flag }}</span>
                         <span v-if="booking.jenis_sewa" class="sb-badge" :class="isReguler ? 'sb-tone-info' : 'sb-tone-meeting'">
-                            {{ isReguler ? 'Sewa latihan · tanpa meeting' : 'Sewa event · perlu meeting' }}
+                            {{ isReguler ? 'Sewa per jam · langsung booking' : 'Sewa per hari · surat + meeting' }}
                         </span>
                     </div>
                     <h1 class="text-foreground mt-3 text-2xl font-bold tracking-tight text-balance sm:text-3xl">
@@ -687,6 +690,31 @@ onUnmounted(() => {
                             </div>
                         </dl>
                     </div>
+                </section>
+
+                <section v-if="!isReguler" aria-labelledby="surat-permohonan-heading" class="sb-card p-5 sm:p-6">
+                    <h2 id="surat-permohonan-heading" class="text-foreground flex items-center gap-2 text-base font-semibold tracking-tight">
+                        <FontAwesomeIcon :icon="['fas', 'file-pdf']" class="size-3.5 text-(--wp-accent)" aria-hidden="true" />
+                        Surat permohonan penyewa
+                    </h2>
+                    <div v-if="booking.surat_permohonan_url" class="mt-4 flex flex-col gap-3 rounded-2xl p-4 text-sm ring-1 ring-(--wp-hairline) sm:flex-row sm:items-center">
+                        <span class="wp-icon size-10 shrink-0">
+                            <FontAwesomeIcon :icon="['fas', 'file-pdf']" class="size-4" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-foreground font-semibold">{{ booking.surat_permohonan_name ?? 'Surat permohonan' }}</p>
+                            <p v-if="booking.surat_permohonan_submitted_at" class="text-muted-foreground text-xs tabular-nums">
+                                Diunggah {{ booking.surat_permohonan_submitted_at }}
+                            </p>
+                        </div>
+                        <a :href="booking.surat_permohonan_url" target="_blank" rel="noopener" class="wp-btn wp-btn-quiet shrink-0 px-3.5 py-2 text-xs">
+                            <FontAwesomeIcon :icon="['fas', 'download']" class="size-3" aria-hidden="true" />
+                            Lihat PDF
+                        </a>
+                    </div>
+                    <p v-else class="text-muted-foreground mt-4 text-sm">
+                        Penyewa belum melampirkan surat permohonan (mis. pengajuan via API mobile). Minta lewat klarifikasi jika diperlukan.
+                    </p>
                 </section>
 
                 <section aria-labelledby="surat-heading" class="sb-card p-5 sm:p-6">
@@ -1044,7 +1072,7 @@ onUnmounted(() => {
                         <div v-if="!showMeetingFields" class="sb-callout sb-tone-info p-3 text-xs">
                             <FontAwesomeIcon :icon="['fas', 'circle-info']" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                             <span>
-                                Sewa latihan tidak perlu meeting. Setelah disetujui, penyewa langsung menerima petunjuk pembayaran lewat email.
+                                Sewa per jam langsung terbooking tanpa meeting. Bila pengajuan ini tetap ditinjau, setelah disetujui penyewa langsung menerima petunjuk pembayaran.
                                 <button
                                     type="button"
                                     class="mt-1 block rounded-sm font-semibold underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"

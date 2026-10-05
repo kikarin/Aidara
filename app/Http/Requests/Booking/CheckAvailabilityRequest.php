@@ -22,6 +22,7 @@ class CheckAvailabilityRequest extends FormRequest
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'exclude_booking_id' => ['nullable', 'integer', 'exists:bookings,id'],
+            'is_per_hari' => ['nullable', 'boolean'],
         ];
     }
 }

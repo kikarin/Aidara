@@ -36,6 +36,10 @@ class BookingMultiAreaTest extends TestCase
 
     private BookingTarif $tarifB;
 
+    private BookingTarif $tarifA_hari;
+
+    private BookingTarif $tarifB_hari;
+
     private BookingTarif $tarifVenueWide;
 
     private User $penyewa;
@@ -95,7 +99,7 @@ class BookingMultiAreaTest extends TestCase
     public function pengajuan_does_not_block_but_sets_flag(): void
     {
         app(BookingSubmitService::class)->submit($this->penyewa, $this->payload([
-            'areas' => [['area_id' => $this->areaA->id, 'tarif_id' => $this->tarifA->id]],
+            'areas' => [['area_id' => $this->areaA->id, 'tarif_id' => $this->tarifA_hari->id]],
         ]));
 
         $check = app(AvailabilityService::class)->check([
@@ -115,11 +119,11 @@ class BookingMultiAreaTest extends TestCase
     public function second_pengajuan_same_slot_still_allowed(): void
     {
         app(BookingSubmitService::class)->submit($this->penyewa, $this->payload([
-            'areas' => [['area_id' => $this->areaA->id, 'tarif_id' => $this->tarifA->id]],
+            'areas' => [['area_id' => $this->areaA->id, 'tarif_id' => $this->tarifA_hari->id]],
         ]));
 
         $second = app(BookingSubmitService::class)->submit($this->penyewa, $this->payload([
-            'areas' => [['area_id' => $this->areaB->id, 'tarif_id' => $this->tarifB->id]],
+            'areas' => [['area_id' => $this->areaB->id, 'tarif_id' => $this->tarifB_hari->id]],
         ]));
 
         $this->assertSame(BookingStatus::MENUNGGU_APPROVAL, $second->status);
@@ -260,7 +264,7 @@ class BookingMultiAreaTest extends TestCase
     public function day_slots_mark_pengajuan_flag(): void
     {
         app(BookingSubmitService::class)->submit($this->penyewa, $this->payload([
-            'areas' => [['area_id' => $this->areaA->id, 'tarif_id' => $this->tarifA->id]],
+            'areas' => [['area_id' => $this->areaA->id, 'tarif_id' => $this->tarifA_hari->id]],
         ]));
 
         $date = now()->addDays(2)->toDateString();
@@ -277,6 +281,35 @@ class BookingMultiAreaTest extends TestCase
         $this->assertSame('hijau', $slot['status']);
         $this->assertTrue($slot['bookable']);
         $this->assertTrue($slot['pengajuan']);
+    }
+
+    #[Test]
+    public function pengajuan_per_hari_blocks_per_jam_only_in_same_area(): void
+    {
+        app(BookingSubmitService::class)->submit($this->penyewa, $this->payload([
+            'areas' => [['area_id' => $this->areaA->id, 'tarif_id' => $this->tarifA_hari->id]],
+        ]));
+
+        $date = now()->addDays(2)->toDateString();
+
+        $jamA = app(AvailabilityService::class)->check([
+            'venue_id' => $this->venue->id,
+            'area_ids' => [$this->areaA->id],
+            'starts_at' => $date.' 08:00:00',
+            'ends_at' => $date.' 09:00:00',
+            'is_per_hari' => false,
+        ]);
+        $this->assertSame('merah', $jamA['status']);
+        $this->assertFalse($jamA['bookable']);
+
+        $jamB = app(AvailabilityService::class)->check([
+            'venue_id' => $this->venue->id,
+            'area_ids' => [$this->areaB->id],
+            'starts_at' => $date.' 08:00:00',
+            'ends_at' => $date.' 09:00:00',
+            'is_per_hari' => false,
+        ]);
+        $this->assertSame('hijau', $jamB['status']);
     }
 
     /** @param  array<string, mixed>  $overrides */
@@ -335,12 +368,12 @@ class BookingMultiAreaTest extends TestCase
             'sort_order' => 2,
         ]);
 
-        $tarifFactory = fn (BookingArea $area, string $code) => BookingTarif::query()->create([
+        $tarifFactory = fn (BookingArea $area, string $code, string $satuan = BookingSatuan::PER_HOUR) => BookingTarif::query()->create([
             'venue_id' => $this->venue->id,
             'area_id' => $area->id,
             'code' => $code,
             'uraian' => 'Latihan '.$area->name,
-            'satuan' => BookingSatuan::PER_HOUR,
+            'satuan' => $satuan,
             'tarif_pemerintah' => 100_000,
             'tarif_non_pemerintah' => 150_000,
             'category' => 'olahraga',
@@ -349,6 +382,8 @@ class BookingMultiAreaTest extends TestCase
 
         $this->tarifA = $tarifFactory($this->areaA, 'tarif_a_'.$suffix);
         $this->tarifB = $tarifFactory($this->areaB, 'tarif_b_'.$suffix);
+        $this->tarifA_hari = $tarifFactory($this->areaA, 'tarif_a_hari_'.$suffix, BookingSatuan::PER_DAY);
+        $this->tarifB_hari = $tarifFactory($this->areaB, 'tarif_b_hari_'.$suffix, BookingSatuan::PER_DAY);
 
         $this->tarifVenueWide = BookingTarif::query()->create([
             'venue_id' => $this->venue->id,

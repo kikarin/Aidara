@@ -22,7 +22,7 @@ class BookingUserSeeder extends Seeder
         $penyewaRole = Role::query()->where('name', 'penyewa')->where('guard_name', 'web')->firstOrFail();
 
         $admin = User::query()->updateOrCreate(
-            ['email' => 'admin.upt@test.local'],
+            ['email' => 'nikoagustio@gmail.com'],
             [
                 'name'              => 'Admin UPT E-Booking',
                 'password'          => Hash::make('Sewdaq123'),
@@ -38,28 +38,28 @@ class BookingUserSeeder extends Seeder
         }
         $admin->forceFill(['current_role_id' => $adminRole->id])->save();
 
-        $penyewa = User::query()->updateOrCreate(
-            ['email' => 'penyewa.demo@test.local'],
-            [
-                'name'              => 'Penyewa Demo',
-                'password'          => Hash::make('password123'),
-                'no_hp'             => '081234567890',
-                'is_active'         => 1,
-                'email_verified_at' => now(),
-                'is_verifikasi'     => 1,
-                'current_role_id'   => $penyewaRole->id,
-            ],
-            //  ['email' => 'nikoagustio22@gmail.com'],
-            // [
-            //     'name' => 'Admin UPT E-Booking',
-            //     'password' => Hash::make('Sewdaq123'),
-            //     'no_hp' => '085777183633',
-            //     'is_active' => 1,
-            //     'email_verified_at' => now(),
-            //     'is_verifikasi' => 1,
-            //     'current_role_id' => $adminRole->id,
-            // ]
-        );
+        // $penyewa = User::query()->updateOrCreate(
+        //     // ['email' => 'penyewa.demo@test.local'],
+        //     // [
+        //     //     'name'              => 'Penyewa Demo',
+        //     //     'password'          => Hash::make('password123'),
+        //     //     'no_hp'             => '081234567890',
+        //     //     'is_active'         => 1,
+        //     //     'email_verified_at' => now(),
+        //     //     'is_verifikasi'     => 1,
+        //     //     'current_role_id'   => $penyewaRole->id,
+        //     // ],
+        //     //  ['email' => 'nikoagustio22@gmail.com'],
+        //     // [
+        //     //     'name' => 'Admin UPT E-Booking',
+        //     //     'password' => Hash::make('Sewdaq123'),
+        //     //     'no_hp' => '085777183633',
+        //     //     'is_active' => 1,
+        //     //     'email_verified_at' => now(),
+        //     //     'is_verifikasi' => 1,
+        //     //     'current_role_id' => $adminRole->id,
+        //     // ]
+        // );
 
         $penyewa = User::query()->updateOrCreate(
             // ['email' => 'penyewa.demo@test.local'],
@@ -74,7 +74,7 @@ class BookingUserSeeder extends Seeder
             // ],
             ['email' => 'nikoagustio22@gmail.com'],
             [
-                'name'              => 'Admin UPT E-Booking',
+                'name'              => 'niko',
                 'password'          => Hash::make('Sewdaq123'),
                 'no_hp'             => '62895337152486',
                 'is_active'         => 1,
