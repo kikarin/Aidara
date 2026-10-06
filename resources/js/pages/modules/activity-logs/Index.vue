@@ -17,7 +17,7 @@ const columns = [
     { key: 'data', label: 'Data', searchable: true, orderable: true, visible: true },
     { key: 'causer_name', label: 'Causer', searchable: false, orderable: false, visible: true },
     { key: 'causer_role', label: 'Causer Role', searchable: false, orderable: false, visible: true },
-    { key: 'created_at', label: 'Created At', searchable: false, orderable: true, visible: true },
+    { key: 'created_at', label: 'Dibuat Pada', searchable: false, orderable: true, visible: true },
 ];
 
 const selected = ref<number[]>([]);
@@ -33,7 +33,7 @@ const actions = (row: any) => [
         permission: 'Activity Log Detail',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Activity Log Delete',
     },

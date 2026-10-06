@@ -60,8 +60,8 @@ const handleSubmit = () => {
             <p class="text-muted-foreground mt-2">
                 Pilih jenis peserta yang sesuai dengan Anda. Setelah memilih, Anda akan diarahkan ke halaman edit profil untuk melengkapi data diri Anda.
             </p>
-            <div class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                <p class="text-sm text-blue-800">
+            <div class="mt-4 rounded-lg border border-border bg-muted p-4">
+                <p class="text-foreground text-sm">
                     <strong>Catatan:</strong> Setelah memilih jenis peserta, Anda akan langsung diarahkan ke halaman edit profil. 
                     Silakan lengkapi data diri Anda dan tunggu persetujuan dari administrator sebelum dapat mengakses fitur lainnya.
                 </p>

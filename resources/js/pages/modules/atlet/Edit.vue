@@ -7,7 +7,6 @@ import Form from './Form.vue';
 import FormAkun from './FormAkun.vue';
 import FormKesehatan from './FormKesehatan.vue';
 import FormOrangTua from './FormOrangTua.vue';
-import FormParameterUmum from './FormParameterUmum.vue';
 
 const props = defineProps<{ item: Record<string, any> }>();
 
@@ -64,8 +63,6 @@ const dynamicTitle = computed(() => {
         return `Kesehatan : ${props.item.nama || '-'}`;
     } else if (activeTab.value === 'akun-data') {
         return `Akun : ${props.item.nama || '-'}`;
-    } else if (activeTab.value === 'parameter-umum-data') {
-        return `Parameter Umum : ${props.item.nama || '-'}`;
     }
     return 'Edit Atlet';
 });
@@ -84,13 +81,6 @@ const tabsConfig = computed(() => {
             component: Form,
             props: { mode: 'edit', initialData: props.item },
             allowedForPending: true, // Data diri bisa diakses
-        },
-        {
-            value: 'parameter-umum-data',
-            label: 'Parameter Umum',
-            component: FormParameterUmum,
-            props: { mode: 'edit', atletId: atletId.value },
-            allowedForPending: false, // TIDAK bisa diakses untuk pending
         },
         {
             value: 'orang-tua-data',

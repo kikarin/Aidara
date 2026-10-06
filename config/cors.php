@@ -5,13 +5,11 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:3002',
-        'https://dispora.vercel.app',
-        'https://dispora-mobile.summitbreak.com',
-    ],
+    'allowed_origins' => array_values(array_filter([
+        env('FRONTEND_URL'),
+        env('FRONTEND_URL_ALT'),
+        env('FRONTEND_URL_PROD'),
+    ])),
 
     'allowed_origins_patterns' => [],
 
@@ -21,5 +19,5 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => true,
+    'supports_credentials' => true, // Penting untuk Sanctum
 ];

@@ -16,7 +16,13 @@ use App\Http\Controllers\CaborKategoriTenagaPendukungController;
 use App\Http\Controllers\CategoryPermissionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DesaController;
+use App\Http\Controllers\LegalController;
+use App\Http\Controllers\ManualBookController;
+use App\Http\Controllers\SeleksiPpopmController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\KecamatanController;
+use App\Http\Controllers\Settings\WorldCupSettingController;
+use App\Http\Controllers\WorldCupController;
 use App\Http\Controllers\MstJenisDokumenController;
 use App\Http\Controllers\MstJenisPelatihController;
 use App\Http\Controllers\MstJenisTenagaPendukungController;
@@ -27,6 +33,24 @@ use App\Http\Controllers\MstKategoriPesertaController;
 use App\Http\Controllers\MstKategoriPrestasiPelatihController;
 use App\Http\Controllers\MstJuaraController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\Booking\Web\Admin\AuthController as EBookingAdminAuthController;
+use App\Http\Controllers\Booking\Web\Admin\AddonController as EBookingAdminAddonController;
+use App\Http\Controllers\Booking\Web\Admin\BookingController as EBookingAdminBookingController;
+use App\Http\Controllers\Booking\Web\Admin\ClosureController as EBookingAdminClosureController;
+use App\Http\Controllers\Booking\Web\Admin\DashboardController as EBookingAdminDashboardController;
+use App\Http\Controllers\Booking\Web\Admin\DocumentTypeController as EBookingAdminDocumentTypeController;
+use App\Http\Controllers\Booking\Web\Admin\FacilityController as EBookingAdminFacilityController;
+use App\Http\Controllers\Booking\Web\Admin\PriorityRuleController as EBookingAdminPriorityRuleController;
+use App\Http\Controllers\Booking\Web\Admin\SettingsController as EBookingAdminSettingsController;
+use App\Http\Controllers\Booking\Web\Admin\SuratController as EBookingAdminSuratController;
+use App\Http\Controllers\Booking\Web\Admin\TermsController as EBookingAdminTermsController;
+use App\Http\Controllers\Booking\Web\Admin\VenueController as EBookingAdminVenueController;
+use App\Http\Controllers\Booking\Web\AuthController as EBookingAuthController;
+use App\Http\Controllers\Booking\Web\BookingController as EBookingBookingController;
+use App\Http\Controllers\Booking\Web\CatalogController as EBookingCatalogController;
+use App\Http\Controllers\Booking\Web\SuratSharedController as EBookingSuratSharedController;
+use App\Http\Controllers\Booking\Web\VenueController as EBookingVenueController;
+use App\Http\Controllers\PublicEventController;
 use App\Http\Controllers\PelatihController;
 use App\Http\Controllers\PelatihDokumenController;
 use App\Http\Controllers\PelatihKesehatanController;
@@ -38,7 +62,9 @@ use App\Http\Controllers\PemeriksaanParameterController;
 use App\Http\Controllers\PemeriksaanPesertaController;
 use App\Http\Controllers\PemeriksaanPesertaParameterController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\PrestasiController;
 use App\Http\Controllers\ProgramLatihanController;
+use App\Http\Controllers\Api\ProgramLatihanAbsenAtletController;
 use App\Http\Controllers\RekapAbsenProgramLatihanController;
 use App\Http\Controllers\RefStatusPemeriksaanController;
 use App\Http\Controllers\RoleController;
@@ -48,6 +74,7 @@ use App\Http\Controllers\TenagaPendukungKesehatanController;
 use App\Http\Controllers\TenagaPendukungPrestasiController;
 use App\Http\Controllers\TenagaPendukungSertifikatController;
 use App\Http\Controllers\UsersController;
+use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\UsersMenuController;
 use App\Http\Controllers\MstJenisUnitPendukungController;
 use App\Http\Controllers\MstParameterController;
@@ -72,15 +99,256 @@ use App\Models\MstParameter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Mail;
 
 // =====================
 // ROUTE UTAMA
 // =====================
-Route::get('/', function () {
-    return Inertia::render('Welcome');
-})->name('home');
+Route::get('/', HomeController::class)->name('home');
+
+Route::get('/legal/{slug}', [LegalController::class, 'show'])
+    ->whereIn('slug', ['terms', 'privacy', 'pdp'])
+    ->name('legal.show');
+
+Route::get('/piala-dunia', [WorldCupController::class, 'index'])->name('worldcup.index');
+Route::get('/event-publik', [PublicEventController::class, 'index'])->name('event.public.index');
+Route::get('/event-publik/{id}', [PublicEventController::class, 'show'])->whereNumber('id')->name('event.public.show');
+
+Route::get('/booking', EBookingCatalogController::class)->name('e-booking.catalog');
+Route::get('/booking/venues/{id}', [EBookingVenueController::class, 'show'])
+    ->whereNumber('id')
+    ->name('e-booking.venues.show');
+Route::get('/booking/venues/{id}/day-slots', [EBookingVenueController::class, 'daySlots'])
+    ->whereNumber('id')
+    ->name('e-booking.venues.day-slots');
+Route::get('/booking/venues/{id}/month-overview', [EBookingVenueController::class, 'monthOverview'])
+    ->whereNumber('id')
+    ->name('e-booking.venues.month-overview');
+
+Route::prefix('booking')->group(function () {
+    Route::get('/login', [EBookingAuthController::class, 'showLogin'])->name('e-booking.login');
+    Route::post('/login', [EBookingAuthController::class, 'login'])->name('e-booking.login.store');
+    Route::get('/register', [EBookingAuthController::class, 'showRegister'])->name('e-booking.register');
+    Route::post('/register', [EBookingAuthController::class, 'register'])->name('e-booking.register.store');
+});
+
+Route::post('/booking/quote', [EBookingBookingController::class, 'quote'])->name('e-booking.quote');
+
+Route::get('/booking/surat/{surat}', EBookingSuratSharedController::class)
+    ->whereNumber('surat')
+    ->middleware('signed')
+    ->name('e-booking.surat.shared');
+
+Route::middleware(['booking.web:penyewa,admin_upt'])->prefix('booking')->group(function () {
+    Route::post('/logout', [EBookingAuthController::class, 'logout'])->name('e-booking.logout');
+    Route::get('/bookings', [EBookingBookingController::class, 'index'])->name('e-booking.bookings.index');
+    Route::post('/bookings', [EBookingBookingController::class, 'store'])->name('e-booking.bookings.store');
+    Route::get('/bookings/{id}', [EBookingBookingController::class, 'show'])
+        ->whereNumber('id')
+        ->name('e-booking.bookings.show');
+    Route::get('/bookings/{id}/surat/{surat}', [EBookingBookingController::class, 'downloadSurat'])
+        ->whereNumber(['id', 'surat'])
+        ->name('e-booking.bookings.surat.download');
+    Route::post('/bookings/{id}/payment/bukti', [EBookingBookingController::class, 'uploadBukti'])
+        ->whereNumber('id')
+        ->name('e-booking.bookings.bukti');
+});
+
+Route::prefix('booking/admin')->group(function () {
+    Route::get('/login', [EBookingAdminAuthController::class, 'showLogin'])->name('e-booking.admin.login');
+    Route::post('/login', [EBookingAdminAuthController::class, 'login'])->name('e-booking.admin.login.store');
+});
+
+Route::middleware(['booking.web:admin_upt'])->prefix('booking/admin')->group(function () {
+    Route::post('/logout', [EBookingAdminAuthController::class, 'logout'])->name('e-booking.admin.logout');
+    Route::get('/', EBookingAdminDashboardController::class)->name('e-booking.admin.dashboard');
+    Route::get('/bookings', [EBookingAdminBookingController::class, 'index'])->name('e-booking.admin.bookings.index');
+    Route::get('/bookings/{id}', [EBookingAdminBookingController::class, 'show'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.bookings.show');
+    Route::post('/bookings/{id}/approve', [EBookingAdminBookingController::class, 'approve'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.bookings.approve');
+    Route::post('/bookings/{id}/reject', [EBookingAdminBookingController::class, 'reject'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.bookings.reject');
+    Route::post('/bookings/{id}/klarifikasi', [EBookingAdminBookingController::class, 'klarifikasi'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.bookings.klarifikasi');
+    Route::post('/bookings/{id}/surat', [EBookingAdminSuratController::class, 'store'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.bookings.surat.store');
+    Route::get('/surat/{surat}/download', [EBookingAdminSuratController::class, 'download'])
+        ->whereNumber('surat')
+        ->name('e-booking.admin.bookings.surat.download');
+    Route::post('/surat/{surat}/email', [EBookingAdminSuratController::class, 'sendEmail'])
+        ->whereNumber('surat')
+        ->name('e-booking.admin.bookings.surat.email');
+    Route::post('/surat/{surat}/whatsapp', [EBookingAdminSuratController::class, 'shareWhatsApp'])
+        ->whereNumber('surat')
+        ->name('e-booking.admin.bookings.surat.whatsapp');
+    Route::post('/payments/{paymentId}/verify', [EBookingAdminBookingController::class, 'verifyPayment'])
+        ->whereNumber('paymentId')
+        ->name('e-booking.admin.payments.verify');
+    Route::post('/payments/{paymentId}/reject', [EBookingAdminBookingController::class, 'rejectPayment'])
+        ->whereNumber('paymentId')
+        ->name('e-booking.admin.payments.reject');
+    Route::get('/settings', [EBookingAdminSettingsController::class, 'edit'])->name('e-booking.admin.settings');
+    Route::put('/settings', [EBookingAdminSettingsController::class, 'update'])->name('e-booking.admin.settings.update');
+    Route::get('/closures', [EBookingAdminClosureController::class, 'index'])->name('e-booking.admin.closures.index');
+    Route::post('/closures', [EBookingAdminClosureController::class, 'store'])->name('e-booking.admin.closures.store');
+    Route::delete('/closures/batch/{batchId}', [EBookingAdminClosureController::class, 'destroyBatch'])
+        ->name('e-booking.admin.closures.destroyBatch');
+    Route::delete('/closures/{id}', [EBookingAdminClosureController::class, 'destroy'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.closures.destroy');
+
+    Route::get('/venues', [EBookingAdminVenueController::class, 'index'])->name('e-booking.admin.venues.index');
+    Route::get('/venues/new', [EBookingAdminVenueController::class, 'create'])->name('e-booking.admin.venues.create');
+    Route::post('/venues', [EBookingAdminVenueController::class, 'store'])->name('e-booking.admin.venues.store');
+    Route::get('/venues/{id}', [EBookingAdminVenueController::class, 'show'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.show');
+    Route::get('/venues/{id}/edit', [EBookingAdminVenueController::class, 'edit'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.edit');
+    Route::put('/venues/{id}', [EBookingAdminVenueController::class, 'update'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.update');
+    Route::post('/venues/{id}/toggle', [EBookingAdminVenueController::class, 'toggle'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.toggle');
+    Route::post('/venues/{id}/cover', [EBookingAdminVenueController::class, 'uploadCover'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.cover');
+
+    Route::post('/venues/{venueId}/areas', [EBookingAdminVenueController::class, 'storeArea'])
+        ->whereNumber('venueId')
+        ->name('e-booking.admin.areas.store');
+    Route::put('/areas/{id}', [EBookingAdminVenueController::class, 'updateArea'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.areas.update');
+    Route::post('/areas/{id}/toggle', [EBookingAdminVenueController::class, 'toggleArea'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.areas.toggle');
+
+    Route::post('/venues/{venueId}/tarifs', [EBookingAdminVenueController::class, 'storeTarif'])
+        ->whereNumber('venueId')
+        ->name('e-booking.admin.tarifs.store');
+    Route::put('/tarifs/{id}', [EBookingAdminVenueController::class, 'updateTarif'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.tarifs.update');
+    Route::post('/tarifs/{id}/toggle', [EBookingAdminVenueController::class, 'toggleTarif'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.tarifs.toggle');
+
+    Route::put('/venues/{id}/rules', [EBookingAdminVenueController::class, 'updateRules'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.rules.update');
+    Route::post('/venues/{id}/rules', [EBookingAdminVenueController::class, 'storeRule'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.venues.rules.store');
+    Route::delete('/rules/{id}', [EBookingAdminVenueController::class, 'destroyRule'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.rules.destroy');
+
+    Route::get('/addons', [EBookingAdminAddonController::class, 'index'])->name('e-booking.admin.addons.index');
+    Route::post('/addons', [EBookingAdminAddonController::class, 'store'])->name('e-booking.admin.addons.store');
+    Route::put('/addons/{id}', [EBookingAdminAddonController::class, 'update'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.addons.update');
+    Route::post('/addons/{id}/toggle', [EBookingAdminAddonController::class, 'toggle'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.addons.toggle');
+
+    Route::get('/document-types', [EBookingAdminDocumentTypeController::class, 'index'])->name('e-booking.admin.document-types.index');
+    Route::post('/document-types', [EBookingAdminDocumentTypeController::class, 'store'])->name('e-booking.admin.document-types.store');
+    Route::put('/document-types/{id}', [EBookingAdminDocumentTypeController::class, 'update'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.document-types.update');
+    Route::post('/document-types/{id}/toggle', [EBookingAdminDocumentTypeController::class, 'toggle'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.document-types.toggle');
+
+    Route::get('/facilities', [EBookingAdminFacilityController::class, 'index'])->name('e-booking.admin.facilities.index');
+    Route::post('/facilities', [EBookingAdminFacilityController::class, 'store'])->name('e-booking.admin.facilities.store');
+    Route::put('/facilities/{id}', [EBookingAdminFacilityController::class, 'update'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.facilities.update');
+    Route::post('/facilities/{id}/toggle', [EBookingAdminFacilityController::class, 'toggle'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.facilities.toggle');
+
+    Route::get('/terms', [EBookingAdminTermsController::class, 'index'])->name('e-booking.admin.terms.index');
+    Route::post('/terms', [EBookingAdminTermsController::class, 'store'])->name('e-booking.admin.terms.store');
+    Route::put('/terms/{key}', [EBookingAdminTermsController::class, 'update'])
+        ->where('key', '[A-Za-z0-9_]+')
+        ->name('e-booking.admin.terms.update');
+
+    Route::get('/priority-rules', [EBookingAdminPriorityRuleController::class, 'index'])->name('e-booking.admin.priority-rules.index');
+    Route::post('/priority-rules', [EBookingAdminPriorityRuleController::class, 'store'])->name('e-booking.admin.priority-rules.store');
+    Route::put('/priority-rules/{id}', [EBookingAdminPriorityRuleController::class, 'update'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.priority-rules.update');
+    Route::post('/priority-rules/{id}/toggle', [EBookingAdminPriorityRuleController::class, 'toggle'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.priority-rules.toggle');
+});
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/api/worldcup/preview', [WorldCupController::class, 'preview'])->name('worldcup.preview');
+    Route::get('/api/worldcup/live', [WorldCupController::class, 'live'])->name('worldcup.live');
+    Route::get('/api/worldcup/schedule', [WorldCupController::class, 'schedule'])->name('worldcup.schedule');
+    Route::get('/api/worldcup/groups', [WorldCupController::class, 'groups'])->name('worldcup.groups');
+});
+
+Route::middleware(['auth', 'verified'])->prefix('dashboard/settings')->group(function () {
+    Route::get('/worldcup', [WorldCupSettingController::class, 'edit'])->name('settings.worldcup.edit');
+    Route::put('/worldcup', [WorldCupSettingController::class, 'update'])->name('settings.worldcup.update');
+});
 
 Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'ensure.email.verified', 'check.registration.status'])->name('dashboard');
+
+Route::get('/manual-book', [ManualBookController::class, 'index'])
+    ->middleware(['auth', 'ensure.email.verified', 'check.registration.status'])
+    ->name('manual-book.index');
+
+Route::middleware(['auth', 'verified', 'check.registration.status'])->group(function () {
+    Route::get('/seleksi-ppopm', [SeleksiPpopmController::class, 'index'])->name('seleksi-ppopm.index');
+    Route::get('/seleksi-ppopm/syarat', [SeleksiPpopmController::class, 'syarat'])->name('seleksi-ppopm.syarat');
+    Route::get('/seleksi-ppopm/pendaftar', [SeleksiPpopmController::class, 'pendaftarIndex'])->name('seleksi-ppopm.pendaftar.index');
+    Route::get('/seleksi-ppopm/pendaftar/create', [SeleksiPpopmController::class, 'create'])->name('seleksi-ppopm.pendaftar.create');
+    Route::post('/seleksi-ppopm/pendaftar', [SeleksiPpopmController::class, 'store'])->name('seleksi-ppopm.pendaftar.store');
+    Route::get('/seleksi-ppopm/pendaftar/{id}', [SeleksiPpopmController::class, 'show'])->whereNumber('id')->name('seleksi-ppopm.pendaftar.show');
+    Route::post('/seleksi-ppopm/pendaftar/{id}/verify', [SeleksiPpopmController::class, 'verify'])->whereNumber('id')->name('seleksi-ppopm.pendaftar.verify');
+    Route::post('/seleksi-ppopm/pendaftar/{id}/reject', [SeleksiPpopmController::class, 'reject'])->whereNumber('id')->name('seleksi-ppopm.pendaftar.reject');
+    Route::post('/seleksi-ppopm/pendaftar/{id}/tes', [SeleksiPpopmController::class, 'updateTes'])->whereNumber('id')->name('seleksi-ppopm.pendaftar.tes');
+    Route::post('/seleksi-ppopm/pendaftar/{id}/promote', [SeleksiPpopmController::class, 'promote'])->whereNumber('id')->name('seleksi-ppopm.pendaftar.promote');
+    Route::delete('/seleksi-ppopm/pendaftar/{id}', [SeleksiPpopmController::class, 'destroy'])->whereNumber('id')->name('seleksi-ppopm.pendaftar.destroy');
+    Route::get('/seleksi-ppopm/pleno', [SeleksiPpopmController::class, 'pleno'])->name('seleksi-ppopm.pleno');
+    Route::post('/seleksi-ppopm/pleno', [SeleksiPpopmController::class, 'runPleno'])->name('seleksi-ppopm.pleno.run');
+    Route::get('/api/seleksi-ppopm/pendaftar', [SeleksiPpopmController::class, 'apiPendaftar'])->name('api.seleksi-ppopm.pendaftar');
+});
+
+// Chatbot bantuan Aplikasi (Gemini)
+Route::middleware(['auth', 'verified', 'check.registration.status', 'throttle:gemini-chat'])->group(function () {
+    Route::post('/api/chatbot/message', [ChatbotController::class, 'message'])->name('chatbot.message');
+});
+
+// Prestasi
+Route::middleware(['auth', 'verified', 'check.registration.status'])->group(function () {
+    Route::get('/prestasi', [PrestasiController::class, 'index'])->name('prestasi.index');
+    Route::get('/api/prestasi', [PrestasiController::class, 'apiIndex'])->name('prestasi.apiIndex');
+    Route::get('/api/prestasi/summary', [PrestasiController::class, 'apiSummary'])->name('prestasi.apiSummary');
+});
 
 // =====================
 // REGISTRATION (Multi-step)
@@ -119,25 +387,67 @@ Route::get('/api/parameter', [MstParameterController::class, 'apiIndex']);
 
 // select
 Route::get('/api/tingkat-list', function () {
-    return MstTingkat::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstTingkat::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/tingkat-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kategori-atlet-list', function () {
-    return MstKategoriPeserta::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstKategoriPeserta::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kategori-atlet-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kategori-peserta-list', function () {
-    return MstKategoriPeserta::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstKategoriPeserta::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kategori-peserta-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kategori-prestasi-pelatih-list', function () {
-    return MstKategoriPrestasiPelatih::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstKategoriPrestasiPelatih::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kategori-prestasi-pelatih-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/jenis-dokumen-list', function () {
-    return MstJenisDokumen::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstJenisDokumen::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/jenis-dokumen-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kecamatan-list', function () {
-    return MstKecamatan::select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstKecamatan::select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kecamatan-list: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/kelurahan-by-kecamatan/{id_kecamatan}', function ($id_kecamatan) {
-    return MstDesa::where('id_kecamatan', $id_kecamatan)->select('id', 'nama')->orderBy('nama')->get();
+    try {
+        $data = MstDesa::where('id_kecamatan', $id_kecamatan)->select('id', 'nama')->orderBy('nama')->get();
+        return response()->json($data->toArray());
+    } catch (\Exception $e) {
+        \Log::error('Error in /api/kelurahan-by-kecamatan: ' . $e->getMessage());
+        return response()->json([]);
+    }
 });
 Route::get('/api/posisi-atlet-list', function () {
     return MstPosisiAtlet::select('id', 'nama')->orderBy('nama')->get();
@@ -182,6 +492,7 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::get('/users/{id}/login-as', [UsersController::class, 'login_as'])->name('users.login-as');
     Route::post('/users/switch-role', [UsersController::class, 'switchRole'])->name('users.switch-role');
     Route::get('/api/users', [UsersController::class, 'apiIndex']);
+    Route::get('/api/users/peserta-options', [UsersController::class, 'pesertaOptions'])->name('api.users.peserta-options');
     Route::post('/users/destroy-selected', [UsersController::class, 'destroy_selected'])->name('users.destroy_selected');
 
     Route::resource('/menu-permissions/menus', UsersMenuController::class)->names('menus');
@@ -222,10 +533,11 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::get('/atlet/karakteristik', [AtletController::class, 'karakteristik'])->name('atlet.karakteristik');
     Route::post('/atlet/api-karakteristik', [AtletController::class, 'apiKarakteristik'])->name('atlet.api-karakteristik');
 
-    Route::resource('/atlet', AtletController::class)->names('atlet');
     Route::get('/api/atlet', [AtletController::class, 'apiIndex']);
-    Route::post('/atlet/destroy-selected', [AtletController::class, 'destroy_selected'])->name('atlet.destroy_selected');
+    Route::get('/atlet/export', [AtletController::class, 'export'])->name('atlet.export');
     Route::post('/atlet/import', [AtletController::class, 'import'])->name('atlet.import');
+    Route::post('/atlet/destroy-selected', [AtletController::class, 'destroy_selected'])->name('atlet.destroy_selected');
+    Route::resource('/atlet', AtletController::class)->names('atlet');
     Route::prefix('atlet/{atlet_id}')->group(function () {
         Route::get('orang-tua', [AtletOrangTuaController::class, 'getByAtletId'])->name('atlet.orang-tua.show');
         Route::post('orang-tua', [AtletOrangTuaController::class, 'store'])->name('atlet.orang-tua.store');
@@ -377,9 +689,11 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::get('/cabor/{id}/peserta/{tipe}', [CaborController::class, 'getPeserta'])->name('cabor.peserta');
     Route::get('/cabor/{id}/peserta/{tipe}/create', [CaborController::class, 'createMultiplePeserta'])->name('cabor.peserta.create');
     Route::post('/cabor/{id}/peserta/{tipe}/store', [CaborController::class, 'storeMultiplePeserta'])->name('cabor.peserta.store');
+    Route::delete('/cabor/{id}/peserta/{tipe}/{pesertaId}', [CaborController::class, 'destroyPeserta'])->name('cabor.peserta.destroy');
     Route::get('/api/cabor', [CaborController::class, 'apiIndex']);
     Route::get('/api/cabor/{cabor_id}/perbandingan-multi-tes', [CaborController::class, 'apiPerbandinganMultiTes'])->name('api.cabor.perbandingan-multi-tes');
     Route::get('/api/cabor/{cabor_id}/ranking', [CaborController::class, 'apiRanking'])->name('api.cabor.ranking');
+    Route::get('/api/cabor/{cabor_id}/atlet/{atlet_id}/last-three-pemeriksaan', [CaborController::class, 'apiGetLastThreePemeriksaan'])->name('api.cabor.atlet.last-three-pemeriksaan');
     Route::post('/cabor/destroy-selected', [CaborController::class, 'destroy_selected'])->name('cabor.destroy_selected');
     // KATEGORI (CaborKategori)
     Route::resource('/cabor-kategori', CaborKategoriController::class)->names('cabor-kategori');
@@ -387,7 +701,75 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::post('/cabor-kategori/destroy-selected', [CaborKategoriController::class, 'destroy_selected'])->name('cabor-kategori.destroy_selected');
     // API select option
     Route::get('/api/cabor-list', function () {
-        return Cabor::select('id', 'nama')->orderBy('nama')->get();
+        try {
+            $query = Cabor::select('id', 'nama', 'kategori_peserta_id')
+                ->orderBy('nama');
+            
+            // Filter berdasarkan kategori_peserta_id jika ada (untuk filtering saat tambah peserta ke cabor)
+            $kategoriPesertaId = request('kategori_peserta_id');
+            if ($kategoriPesertaId && $kategoriPesertaId !== 'all') {
+                $query->where('kategori_peserta_id', $kategoriPesertaId);
+            }
+            
+            // Filter berdasarkan cabor yang dimiliki pelatih/tenaga pendukung
+            // Kecuali jika dipanggil dari form pelatih/tenaga pendukung (parameter for_peserta_form)
+            $forPesertaForm = request('for_peserta_form', false);
+            if (!$forPesertaForm) {
+                $auth = Auth::user();
+                if ($auth && (int) $auth->current_role_id === 36) {
+                    // Pelatih hanya melihat cabor yang mereka miliki
+                    if ($auth->pelatih && $auth->pelatih->id) {
+                        $caborIds = DB::table('cabor_kategori_pelatih')
+                            ->where('pelatih_id', $auth->pelatih->id)
+                            ->whereNull('deleted_at')
+                            ->pluck('cabor_id')
+                            ->unique()
+                            ->toArray();
+                        
+                        if (!empty($caborIds)) {
+                            $query->whereIn('id', $caborIds);
+                        } else {
+                            // Jika pelatih tidak punya cabor, return empty
+                            return response()->json([]);
+                        }
+                    }
+                } elseif ($auth && (int) $auth->current_role_id === 37) {
+                    // Tenaga Pendukung hanya melihat cabor yang mereka miliki
+                    if ($auth->tenagaPendukung && $auth->tenagaPendukung->id) {
+                        $caborIds = DB::table('cabor_kategori_tenaga_pendukung')
+                            ->where('tenaga_pendukung_id', $auth->tenagaPendukung->id)
+                            ->whereNull('deleted_at')
+                            ->pluck('cabor_id')
+                            ->unique()
+                            ->toArray();
+                        
+                        if (!empty($caborIds)) {
+                            $query->whereIn('id', $caborIds);
+                        } else {
+                            // Jika tenaga pendukung tidak punya cabor, return empty
+                            return response()->json([]);
+                        }
+                    }
+                }
+            }
+            
+            $data = $query->get();
+            // Pastikan selalu return array dengan kategori_peserta_id
+            return response()->json($data->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama' => $item->nama,
+                    'kategori_peserta_id' => $item->kategori_peserta_id,
+                ];
+            })->toArray());
+        } catch (\Exception $e) {
+            \Log::error('Error in /api/cabor-list: ' . $e->getMessage());
+            return response()->json([]);
+        }
+    });
+    Route::get('/api/cabor/{id}', function ($id) {
+        $cabor = Cabor::select('id', 'nama', 'kategori_peserta_id')->find($id);
+        return response()->json($cabor);
     });
     Route::get('/api/cabor-kategori-list', [CaborKategoriController::class, 'list']);
     Route::get('/api/cabor-kategori-by-cabor/{cabor_id}', [CaborKategoriController::class, 'listByCabor']);
@@ -430,11 +812,17 @@ Route::get('/api/atlet/{atlet_id}/dokumen', [AtletDokumenController::class, 'api
 Route::get('/api/atlet/{atlet_id}/riwayat-pemeriksaan', [AtletController::class, 'apiRiwayatPemeriksaan']);
 Route::get('/api/atlet/{id}/parameter-umum', [AtletController::class, 'apiParameterUmum']);
 Route::get('/api/atlet/{id}/rekap-parameter-khusus', [AtletController::class, 'apiRekapParameterKhusus']);
+Route::get('/api/atlet/{id}/pemeriksaan-khusus', [AtletController::class, 'apiPemeriksaanKhusus'])->name('api.atlet.pemeriksaan-khusus');
+Route::get('/api/atlet/{id}/last-three-pemeriksaan-khusus', [AtletController::class, 'apiLastThreePemeriksaanKhusus'])->name('api.atlet.last-three-pemeriksaan-khusus');
+Route::get('/api/atlet/{id}/cabor', [AtletController::class, 'apiGetCabor'])->name('api.atlet.cabor');
+Route::get('/api/atlet/{id}/beregu/available', [AtletController::class, 'apiGetBereguAvailable'])->name('api.atlet.beregu.available');
 Route::post('/api/atlet/{id}/parameter-umum', [AtletController::class, 'apiUpdateParameterUmum']);
 Route::get('/api/pelatih/{pelatih_id}/sertifikat', [PelatihSertifikatController::class, 'apiIndex']);
 Route::get('/api/pelatih/{pelatih_id}/prestasi', [PelatihPrestasiController::class, 'apiIndex']);
 Route::get('/api/pelatih/{pelatih_id}/dokumen', [PelatihDokumenController::class, 'apiIndex']);
 Route::get('/api/pelatih/{pelatih_id}/riwayat-pemeriksaan', [PelatihController::class, 'apiRiwayatPemeriksaan']);
+Route::get('/api/pelatih/{id}/cabor', [PelatihController::class, 'apiGetCabor'])->name('api.pelatih.cabor');
+Route::get('/api/pelatih/{id}/beregu/available', [PelatihController::class, 'apiGetBereguAvailable'])->name('api.pelatih.beregu.available');
 
 // API endpoint untuk sertifikat tenaga pendukung
 Route::get('/api/tenaga-pendukung/{tenaga_pendukung_id}/sertifikat', [TenagaPendukungSertifikatController::class, 'apiIndex']);
@@ -453,6 +841,7 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     // Rekap Absen Program Latihan (harus SEBELUM resource route)
     Route::prefix('program-latihan/{program_id}/rekap-absen')->group(function () {
         Route::get('/', [RekapAbsenProgramLatihanController::class, 'index'])->name('program-latihan.rekap-absen.index');
+        Route::get('/detail', [RekapAbsenProgramLatihanController::class, 'show'])->name('program-latihan.rekap-absen.show');
         Route::post('/', [RekapAbsenProgramLatihanController::class, 'store'])->name('program-latihan.rekap-absen.store');
         Route::put('/{rekap_id}', [RekapAbsenProgramLatihanController::class, 'update'])->name('program-latihan.rekap-absen.update');
     });
@@ -462,8 +851,12 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
         ->name('program-latihan.rekap-absen.delete-media');
     
     Route::resource('/program-latihan', ProgramLatihanController::class)->names('program-latihan');
+    Route::get('/api/program-latihan/pelatih-by-kategori/{cabor_kategori_id}', [ProgramLatihanController::class, 'apiPelatihByKategori']);
     Route::get('/api/program-latihan', [ProgramLatihanController::class, 'apiIndex']);
+    Route::get('/api/program-latihan/{program_id}/absen-atlet', [ProgramLatihanAbsenAtletController::class, 'index']);
+    Route::get('/api/program-latihan/{program_id}/kehadiran/atlet/{atlet_id}', [ProgramLatihanAbsenAtletController::class, 'riwayatAtlet']);
     Route::post('/program-latihan/destroy-selected', [ProgramLatihanController::class, 'destroy_selected'])->name('program-latihan.destroy_selected');
+
 });
 
 // =====================
@@ -536,7 +929,6 @@ Route::middleware(['auth', 'verified', 'check.registration.status'])->group(func
     Route::prefix('pemeriksaan-parameter')->group(function () {
         Route::get('AllParameter', [AllParameterController::class, 'index'])->name('all.parameter.index');
         Route::get('AllParameter/{parameter_id}/statistik', [AllParameterController::class, 'show'])->name('all.parameter.statistik');
-        Route::get('AllParameter/{parameter_id}/chart', [AllParameterController::class, 'chart'])->name('all.parameter.chart');
     });
 
     // Nested Pemeriksaan Peserta - Web Routes
@@ -581,9 +973,6 @@ Route::get('/api/pemeriksaan/{pemeriksaan}/peserta/{peserta}/parameter', [Pemeri
 
 // API untuk Pemeriksaan Peserta
 Route::get('/api/pemeriksaan/{pemeriksaan}/peserta/{jenis_peserta?}', [PemeriksaanPesertaController::class, 'apiIndex'])->name('api.pemeriksaan.peserta.index');
-Route::put('/pemeriksaan/{pemeriksaan}/peserta/{peserta}', [PemeriksaanPesertaController::class, 'update'])->name('pemeriksaan.peserta.update');
-Route::delete('/pemeriksaan/{pemeriksaan}/peserta/{peserta}', [PemeriksaanPesertaController::class, 'destroy'])->name('pemeriksaan.peserta.destroy');
-Route::post('/pemeriksaan/{pemeriksaan}/peserta/{peserta}', [PemeriksaanPesertaController::class, 'update']);
 
 // API untuk detail atlet, pelatih, dan tenaga pendukung
 Route::get('/api/atlet/{id}', [AtletController::class, 'apiShow']);
@@ -624,6 +1013,9 @@ Route::post('/api/pemeriksaan-khusus/clone-from-template', [PemeriksaanKhususCon
 Route::post('/api/pemeriksaan-khusus/save-aspek-item-tes', [PemeriksaanKhususController::class, 'apiSaveAspekItemTes'])->name('api.pemeriksaan-khusus.save-aspek-item-tes');
 Route::post('/api/pemeriksaan-khusus/save-as-template', [PemeriksaanKhususController::class, 'apiSaveAsTemplate'])->name('api.pemeriksaan-khusus.save-as-template');
 Route::get('/api/pemeriksaan-khusus/{id}/peserta', [PemeriksaanKhususController::class, 'apiGetPeserta'])->name('api.pemeriksaan-khusus.get-peserta');
+Route::get('/api/pemeriksaan-khusus/{id}/peserta/available', [PemeriksaanKhususController::class, 'apiAvailablePeserta'])->name('api.pemeriksaan-khusus.peserta.available');
+Route::post('/pemeriksaan-khusus/{id}/peserta', [PemeriksaanKhususController::class, 'storePeserta'])->name('pemeriksaan-khusus.peserta.store');
+Route::delete('/pemeriksaan-khusus/{id}/peserta/{pesertaId}', [PemeriksaanKhususController::class, 'destroyPeserta'])->name('pemeriksaan-khusus.peserta.destroy');
 Route::get('/api/pemeriksaan-khusus/{id}/hasil-tes', [PemeriksaanKhususController::class, 'apiGetHasilTes'])->name('api.pemeriksaan-khusus.get-hasil-tes');
 Route::post('/api/pemeriksaan-khusus/save-hasil-tes', [PemeriksaanKhususController::class, 'apiSaveHasilTes'])->name('api.pemeriksaan-khusus.save-hasil-tes');
 Route::get('/api/pemeriksaan-khusus/{id}/visualisasi', [PemeriksaanKhususController::class, 'apiGetVisualisasi'])->name('api.pemeriksaan-khusus.get-visualisasi');

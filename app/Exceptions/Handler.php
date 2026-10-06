@@ -39,13 +39,7 @@ class Handler extends ExceptionHandler
             return $this->handleApiException($request, $exception);
         }
 
-        // Handle web requests
-        if (
-            $exception instanceof AuthorizationException || ($exception instanceof HttpException && $exception->getStatusCode() === 403)
-        ) {
-            return Inertia::render('errors/Error403')->toResponse($request)->setStatusCode(403);
-        }
-
+        // Handle web requests (legacy fallback; primary handling is in bootstrap/app.php)
         return parent::render($request, $exception);
     }
 

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Notifications\EmailOtpNotification;
+use App\Services\OtpMailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -19,8 +19,13 @@ class EmailOtpVerificationController extends Controller
     {
         $user = auth()->user();
         
-        // IMPORTANT: Jika user sudah verified (users existing), skip OTP verification
+        // IMPORTANT: Jika user sudah verified, cek apakah masih dalam proses registrasi
         if ($user->email_verified_at) {
+            // Jika user belum punya peserta_id atau masih pending, redirect ke registration steps
+            if (!$user->peserta_id || !$user->peserta_type || $user->registration_status === 'pending') {
+                return redirect()->route('registration.steps', ['step' => 1]);
+            }
+            // Jika sudah approved, redirect ke dashboard
             return redirect()->route('dashboard');
         }
 
@@ -36,8 +41,13 @@ class EmailOtpVerificationController extends Controller
     {
         $user = auth()->user();
 
-        // IMPORTANT: Jika user sudah verified, tidak perlu kirim OTP lagi
+        // IMPORTANT: Jika user sudah verified, cek apakah masih dalam proses registrasi
         if ($user->email_verified_at) {
+            // Jika user belum punya peserta_id atau masih pending, redirect ke registration steps
+            if (!$user->peserta_id || !$user->peserta_type || $user->registration_status === 'pending') {
+                return redirect()->route('registration.steps', ['step' => 1]);
+            }
+            // Jika sudah approved, redirect ke dashboard
             return redirect()->route('dashboard');
         }
 
@@ -47,7 +57,7 @@ class EmailOtpVerificationController extends Controller
         
         // Hanya cek cooldown jika sudah pernah klik resend sebelumnya
         if ($lastOtpSent && now()->diffInSeconds($lastOtpSent) < $cooldownSeconds) {
-            $remainingSeconds = $cooldownSeconds - now()->diffInSeconds($lastOtpSent);
+            $remainingSeconds = (int) ceil($cooldownSeconds - now()->diffInSeconds($lastOtpSent));
             return back()->withErrors(['otp' => "Tunggu {$remainingSeconds} detik sebelum meminta kode OTP baru."]);
         }
 
@@ -59,8 +69,7 @@ class EmailOtpVerificationController extends Controller
             'email_otp_expires_at' => now()->addMinutes(10),
         ]);
 
-        // Kirim email OTP
-        $user->notify(new EmailOtpNotification($otpCode));
+        app(OtpMailService::class)->send($user->email, $otpCode, 'web-resend');
 
         // Simpan waktu terakhir OTP dikirim
         $request->session()->put('otp_last_sent', now());
@@ -79,8 +88,13 @@ class EmailOtpVerificationController extends Controller
 
         $user = auth()->user();
 
-        // IMPORTANT: Jika user sudah verified, langsung redirect
+        // IMPORTANT: Jika user sudah verified, cek apakah masih dalam proses registrasi
         if ($user->email_verified_at) {
+            // Jika user belum punya peserta_id atau masih pending, redirect ke registration steps
+            if (!$user->peserta_id || !$user->peserta_type || $user->registration_status === 'pending') {
+                return redirect()->route('registration.steps', ['step' => 1]);
+            }
+            // Jika sudah approved, redirect ke dashboard
             return redirect()->route('dashboard');
         }
 

@@ -3,249 +3,239 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Repositories\ProgramLatihanRepository;
-use Illuminate\Http\Request;
+use App\Http\Requests\Api\StoreProgramLatihanRequest;
+use App\Http\Requests\Api\UpdateProgramLatihanRequest;
+use App\Models\ProgramLatihan;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 
 class ProgramLatihanController extends Controller
 {
-    protected $repository;
-
-    public function __construct(ProgramLatihanRepository $repository)
-    {
-        $this->repository = $repository;
-    }
-
     /**
-     * Get list of program latihan with search and filters
+     * Get list program latihan
      */
     public function index(Request $request): JsonResponse
     {
         try {
-            // Add logging untuk debug
-            Log::info('Program Latihan Mobile API called', [
-                'user'            => auth()->user(),
-                'user_id'         => auth()->id(),
-                'current_role_id' => auth()->user()->current_role_id ?? 'no role',
-                'headers'         => $request->headers->all(),
-            ]);
-
-            $data = $this->repository->getForMobile($request);
-
-            return response()->json([
-                'status'  => 'success',
-                'message' => 'Data program latihan berhasil diambil',
-                'data'    => $data['data'],
-                'meta'    => [
-                    'total'        => $data['total'],
-                    'current_page' => $data['currentPage'],
-                    'per_page'     => $data['perPage'],
-                    'search'       => $data['search'],
-                    'filters'      => [
-                        'cabor_id'   => $data['filters']['cabor_id']   ?? null,
-                        'start_date' => $data['filters']['start_date'] ?? null,
-                        'end_date'   => $data['filters']['end_date']   ?? null,
-                    ],
-                ],
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Gagal mengambil data program latihan: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Get detail program latihan by ID
-     */
-    public function show($id): JsonResponse
-    {
-        try {
-            $program = $this->repository->getDetailWithRelations($id);
-
-            if (!$program) {
+            $user = $request->user()->fresh();
+            
+            // Load relasi user dulu untuk memastikan tersedia
+            $user->load(['atlet', 'pelatih', 'tenagaPendukung']);
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            if (!Gate::allows('Program Latihan Show')) {
                 return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Program latihan tidak ditemukan',
-                ], 404);
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk melihat program latihan.',
+                ], 403);
             }
 
-            return response()->json([
-                'status'  => 'success',
-                'message' => 'Detail program latihan berhasil diambil',
-                'data'    => [
-                    'id'           => $program->id,
-                    'nama_program' => $program->nama_program,
-                    'cabor'        => [
-                        'id'   => $program->cabor->id   ?? null,
-                        'nama' => $program->cabor->nama ?? null,
-                    ],
-                    'kategori' => [
-                        'id'   => $program->caborKategori->id   ?? null,
-                        'nama' => $program->caborKategori->nama ?? null,
-                    ],
-                    'periode' => [
-                        'mulai'     => $program->periode_mulai,
-                        'selesai'   => $program->periode_selesai,
-                        'formatted' => $this->formatPeriode($program->periode_mulai, $program->periode_selesai),
-                    ],
-                    'keterangan'             => $program->keterangan,
-                    'created_at'             => $program->created_at,
-                    'updated_at'             => $program->updated_at,
-                ],
+            // Query dasar - untuk mobile API, lebih sederhana
+            // Pastikan tidak ada filter yang menghilangkan data
+            // Gunakan withoutGlobalScopes() untuk memastikan tidak ada scope yang menghilangkan data
+            // Tapi tetap exclude soft deleted records
+            $query = ProgramLatihan::withoutGlobalScopes()
+                ->whereNull('program_latihan.deleted_at');
+            
+            // Apply role-based filtering (hanya untuk peserta, admin/superadmin bisa lihat semua)
+            // Untuk mobile API - lebih fleksibel, tidak terlalu ketat seperti web
+            // HARUS dilakukan SEBELUM search untuk memastikan query yang benar
+            $this->applyRoleBasedFiltering($query, $user);
+
+            // Search - dilakukan setelah role-based filtering
+            if ($request->has('search') && !empty(trim($request->search))) {
+                $search = trim($request->search);
+                
+                // Semua kondisi search dalam satu closure untuk memastikan query yang benar
+                $query->where(function ($q) use ($search) {
+                    // Search di field utama program latihan
+                    $q->where('program_latihan.nama_program', 'like', "%{$search}%")
+                        ->orWhere('program_latihan.keterangan', 'like', "%{$search}%")
+                        ->orWhere('program_latihan.tahap', 'like', "%{$search}%")
+                        // Search di relasi cabor
+                        ->orWhereHas('cabor', function ($caborQuery) use ($search) {
+                            $caborQuery->where('cabor.nama', 'like', "%{$search}%")
+                                ->whereNull('cabor.deleted_at');
+                        })
+                        // Search di relasi caborKategori
+                        ->orWhereHas('caborKategori', function ($kategoriQuery) use ($search) {
+                            $kategoriQuery->where('cabor_kategori.nama', 'like', "%{$search}%")
+                                ->whereNull('cabor_kategori.deleted_at');
+                        });
+                });
+            }
+            
+            // Load relasi - dilakukan setelah semua filter dan search
+            // Untuk mobile API, load relasi tanpa filter soft deletes
+            $query->with([
+                'cabor' => function($q) {
+                    $q->whereNull('cabor.deleted_at');
+                },
+                'caborKategori' => function($q) {
+                    $q->whereNull('cabor_kategori.deleted_at');
+                },
+                'pelatih' => function($q) {
+                    $q->whereNull('pelatihs.deleted_at');
+                },
+                'pelatihs' => function($q) {
+                    $q->whereNull('pelatihs.deleted_at');
+                },
             ]);
+
+            // Filter by cabor_id
+            if ($request->has('cabor_id') && $request->cabor_id && $request->cabor_id !== 'all') {
+                $query->where('cabor_id', $request->cabor_id);
+            }
+
+            // Filter by cabor_kategori_id
+            if ($request->has('cabor_kategori_id') && $request->cabor_kategori_id && $request->cabor_kategori_id !== 'all') {
+                $query->where('cabor_kategori_id', $request->cabor_kategori_id);
+            }
+
+            // Filter by date range
+            if ($request->has('filter_start_date') && $request->has('filter_end_date')) {
+                $query->whereBetween('created_at', [
+                    $request->filter_start_date . ' 00:00:00',
+                    $request->filter_end_date . ' 23:59:59',
+                ]);
+            }
+
+            // Sorting
+            $sortField = $request->get('sort', 'id');
+            $sortOrder = $request->get('order', 'desc');
+            $validColumns = ['id', 'nama_program', 'periode_mulai', 'periode_selesai', 'created_at', 'updated_at'];
+            
+            if (in_array($sortField, $validColumns)) {
+                $query->orderBy($sortField, $sortOrder);
+            } else {
+                $query->orderBy('id', 'desc');
+            }
+
+            // Pagination
+            $perPage = (int) $request->get('per_page', 10);
+            $page = (int) $request->get('page', 1);
+            
+            // Jika ada search dengan whereHas, perlu distinct untuk menghindari duplicate
+            if ($request->has('search') && !empty(trim($request->search))) {
+                $query->distinct();
+            }
+            
+            // Pagination - langsung execute
+            if ($perPage === -1) {
+                $items = $query->get();
+            } else {
+                $items = $query->paginate($perPage, ['*'], 'page', $page);
+            }
+            
+            // Format response
+            $itemsArray = $items instanceof \Illuminate\Pagination\LengthAwarePaginator ? $items->items() : $items->all();
+            
+            $formattedData = collect($itemsArray)
+                ->map(fn ($item) => $this->formatProgramLatihanItem($item));
+
+            $response = [
+                'status' => 'success',
+                'data' => $formattedData,
+                'permissions' => $permissions,
+            ];
+
+            if ($items instanceof \Illuminate\Pagination\LengthAwarePaginator) {
+                $response['meta'] = [
+                    'total' => $items->total(),
+                    'current_page' => $items->currentPage(),
+                    'per_page' => $items->perPage(),
+                    'last_page' => $items->lastPage(),
+                ];
+            } else {
+                $response['meta'] = [
+                    'total' => $formattedData->count(),
+                    'current_page' => 1,
+                    'per_page' => -1,
+                    'last_page' => 1,
+                ];
+            }
+
+            return response()->json($response);
         } catch (\Exception $e) {
+            Log::error('Get Program Latihan error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
             return response()->json([
-                'status'  => 'error',
-                'message' => 'Gagal mengambil detail program latihan: ' . $e->getMessage(),
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil program latihan.',
             ], 500);
         }
     }
 
     /**
-     * Get list of cabor for filter options
+     * Store program latihan
      */
-    public function getCaborList(): JsonResponse
+    public function store(StoreProgramLatihanRequest $request): JsonResponse
     {
         try {
-            $caborList = $this->repository->getCaborList();
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            if (!Gate::allows('Program Latihan Add')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk menambah program latihan.',
+                ], 403);
+            }
 
-            return response()->json([
-                'status'  => 'success',
-                'message' => 'Data cabor berhasil diambil',
-                'data'    => $caborList,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Gagal mengambil data cabor: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
+            $data = $request->validated();
+            $pelatihIds = array_values(array_unique(array_map('intval', $data['pelatih_ids'] ?? [])));
 
-    /**
-     * Get list of cabor kategori by cabor ID
-     */
-    public function getCaborKategoriByCabor(int $caborId): JsonResponse
-    {
-        try {
-            $caborKategoriList = $this->repository->getCaborKategoriByCabor($caborId);
-
-            return response()->json([
-                'status'  => 'success',
-                'message' => 'Data kategori cabor berhasil diambil',
-                'data'    => $caborKategoriList,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Gagal mengambil data kategori cabor: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Get list of cabor for form create program latihan
-     * Filtered by user role - peserta only see their cabor
-     */
-    public function getCaborListForCreate(): JsonResponse
-    {
-        try {
-            $caborList = $this->repository->getCaborListForCreate();
-
-            return response()->json([
-                'status'  => 'success',
-                'message' => 'Data cabor untuk form create berhasil diambil',
-                'data'    => $caborList,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Gagal mengambil data cabor untuk form create: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Create new program latihan
-     */
-    public function store(Request $request): JsonResponse
-    {
-        try {
-            // Validate request
-            $request->validate([
-                'cabor_id'          => 'required|exists:cabor,id',
-                'nama_program'      => 'required|string|max:255',
-                'cabor_kategori_id' => 'required|exists:cabor_kategori,id',
-                'periode_mulai'     => 'required|date',
-                'periode_selesai'   => 'required|date|after_or_equal:periode_mulai',
-                'keterangan'        => 'nullable|string',
-            ], [
-                'cabor_id.required'              => 'Cabor wajib dipilih.',
-                'cabor_id.exists'                => 'Cabor tidak valid.',
-                'nama_program.required'          => 'Nama program wajib diisi.',
-                'nama_program.max'               => 'Nama program maksimal 255 karakter.',
-                'cabor_kategori_id.required'     => 'Kategori wajib dipilih.',
-                'cabor_kategori_id.exists'       => 'Kategori tidak valid.',
-                'periode_mulai.required'         => 'Periode mulai wajib diisi.',
-                'periode_mulai.date'             => 'Periode mulai harus berupa tanggal.',
-                'periode_selesai.required'       => 'Periode selesai wajib diisi.',
-                'periode_selesai.date'           => 'Periode selesai harus berupa tanggal.',
-                'periode_selesai.after_or_equal' => 'Periode selesai harus setelah atau sama dengan periode mulai.',
+            // Create program latihan
+            $programLatihan = ProgramLatihan::create([
+                'cabor_id' => $data['cabor_id'],
+                'nama_program' => $data['nama_program'],
+                'cabor_kategori_id' => $data['cabor_kategori_id'],
+                'mode_pelatih' => $data['mode_pelatih'],
+                'pelatih_id' => $pelatihIds[0] ?? null,
+                'wajib_absen_atlet' => $data['wajib_absen_atlet'] ?? false,
+                'absen_jam_mulai' => $data['absen_jam_mulai'] ?? null,
+                'absen_jam_selesai' => $data['absen_jam_selesai'] ?? null,
+                'periode_mulai' => $data['periode_mulai'],
+                'periode_selesai' => $data['periode_selesai'],
+                'tahap' => $data['tahap'] ?? null,
+                'keterangan' => $data['keterangan'] ?? null,
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
             ]);
 
-            $data = $request->only([
-                'cabor_id',
-                'nama_program',
-                'cabor_kategori_id',
-                'periode_mulai',
-                'periode_selesai',
-                'keterangan',
-            ]);
+            $programLatihan->pelatihs()->sync($pelatihIds);
 
-            $program = $this->repository->create($data);
+            // Reload with relations
+            $programLatihan->load(['cabor', 'caborKategori', 'pelatih', 'pelatihs']);
 
             return response()->json([
-                'status'  => 'success',
-                'message' => 'Program latihan berhasil dibuat',
-                'data'    => [
-                    'id'           => $program->id,
-                    'nama_program' => $program->nama_program,
-                    'cabor'        => [
-                        'id'   => $program->cabor->id   ?? null,
-                        'nama' => $program->cabor->nama ?? null,
-                    ],
-                    'kategori' => [
-                        'id'   => $program->caborKategori->id   ?? null,
-                        'nama' => $program->caborKategori->nama ?? null,
-                    ],
-                    'periode' => [
-                        'mulai'     => $program->periode_mulai,
-                        'selesai'   => $program->periode_selesai,
-                        'formatted' => $this->formatPeriode($program->periode_mulai, $program->periode_selesai),
-                    ],
-                    'keterangan' => $program->keterangan,
-                    'created_at' => $program->created_at,
-                    'updated_at' => $program->updated_at,
+                'status' => 'success',
+                'message' => 'Program latihan berhasil ditambahkan.',
+                'data' => [
+                    'program_latihan' => $this->formatProgramLatihanItem($programLatihan),
+                    'permissions' => $permissions,
                 ],
             ], 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Validasi gagal',
-                'errors'  => $e->errors(),
-            ], 422);
         } catch (\Exception $e) {
-            Log::error('Gagal membuat program latihan: ' . $e->getMessage(), [
+            Log::error('Store Program Latihan error: ' . $e->getMessage(), [
                 'exception' => $e,
-                'user_id'   => auth()->id(),
+                'user_id' => $request->user()->id ?? null,
             ]);
 
             return response()->json([
-                'status'  => 'error',
-                'message' => 'Gagal membuat program latihan: ' . $e->getMessage(),
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat menambah program latihan.',
             ], 500);
         }
     }
@@ -253,92 +243,106 @@ class ProgramLatihanController extends Controller
     /**
      * Update program latihan
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(UpdateProgramLatihanRequest $request, $id): JsonResponse
     {
         try {
-            $program = $this->repository->getById($id);
-
-            if (!$program) {
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            if (!Gate::allows('Program Latihan Edit')) {
                 return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Program latihan tidak ditemukan',
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk mengedit program latihan.',
+                ], 403);
+            }
+
+            $programLatihan = ProgramLatihan::find($id);
+
+            if (!$programLatihan) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Program latihan tidak ditemukan.',
                 ], 404);
             }
 
-            // Validate request
-            $request->validate([
-                'cabor_id'          => 'required|exists:cabor,id',
-                'nama_program'      => 'required|string|max:255',
-                'cabor_kategori_id' => 'required|exists:cabor_kategori,id',
-                'periode_mulai'     => 'required|date',
-                'periode_selesai'   => 'required|date|after_or_equal:periode_mulai',
-                'keterangan'        => 'nullable|string',
-            ], [
-                'cabor_id.required'              => 'Cabor wajib dipilih.',
-                'cabor_id.exists'                => 'Cabor tidak valid.',
-                'nama_program.required'          => 'Nama program wajib diisi.',
-                'nama_program.max'               => 'Nama program maksimal 255 karakter.',
-                'cabor_kategori_id.required'     => 'Kategori wajib dipilih.',
-                'cabor_kategori_id.exists'       => 'Kategori tidak valid.',
-                'periode_mulai.required'         => 'Periode mulai wajib diisi.',
-                'periode_mulai.date'             => 'Periode mulai harus berupa tanggal.',
-                'periode_selesai.required'       => 'Periode selesai wajib diisi.',
-                'periode_selesai.date'           => 'Periode selesai harus berupa tanggal.',
-                'periode_selesai.after_or_equal' => 'Periode selesai harus setelah atau sama dengan periode mulai.',
-            ]);
+            $data = $request->validated();
 
-            $data = $request->only([
-                'cabor_id',
-                'nama_program',
-                'cabor_kategori_id',
-                'periode_mulai',
-                'periode_selesai',
-                'keterangan',
-            ]);
+            // Update program latihan (support partial update)
+            $updateData = [];
+            if (isset($data['cabor_id'])) {
+                $updateData['cabor_id'] = $data['cabor_id'];
+            }
+            if (isset($data['nama_program'])) {
+                $updateData['nama_program'] = $data['nama_program'];
+            }
+            if (isset($data['cabor_kategori_id'])) {
+                $updateData['cabor_kategori_id'] = $data['cabor_kategori_id'];
+            }
+            if (isset($data['mode_pelatih'])) {
+                $updateData['mode_pelatih'] = $data['mode_pelatih'];
+            }
+            if (isset($data['pelatih_ids'])) {
+                $pelatihIds = array_values(array_unique(array_map('intval', $data['pelatih_ids'])));
+                $updateData['pelatih_id'] = $pelatihIds[0] ?? null;
+            } elseif (isset($data['pelatih_id'])) {
+                $updateData['pelatih_id'] = $data['pelatih_id'];
+            }
+            if (array_key_exists('wajib_absen_atlet', $data)) {
+                $updateData['wajib_absen_atlet'] = $data['wajib_absen_atlet'] ?? false;
+            }
+            if (array_key_exists('absen_jam_mulai', $data)) {
+                $updateData['absen_jam_mulai'] = $data['absen_jam_mulai'];
+            }
+            if (array_key_exists('absen_jam_selesai', $data)) {
+                $updateData['absen_jam_selesai'] = $data['absen_jam_selesai'];
+            }
+            if (isset($data['periode_mulai'])) {
+                $updateData['periode_mulai'] = $data['periode_mulai'];
+            }
+            if (isset($data['periode_selesai'])) {
+                $updateData['periode_selesai'] = $data['periode_selesai'];
+            }
+            if (isset($data['tahap'])) {
+                $updateData['tahap'] = $data['tahap'];
+            }
+            if (isset($data['keterangan'])) {
+                $updateData['keterangan'] = $data['keterangan'];
+            }
+            $updateData['updated_by'] = $user->id;
 
-            $this->repository->update($id, $data);
-            $updatedProgram = $this->repository->getDetailWithRelations($id);
+            $programLatihan->update($updateData);
+
+            if (isset($data['pelatih_ids'])) {
+                $programLatihan->pelatihs()->sync(
+                    array_values(array_unique(array_map('intval', $data['pelatih_ids'])))
+                );
+            }
+
+            // Reload with relations
+            $programLatihan->refresh();
+            $programLatihan->load(['cabor', 'caborKategori', 'pelatih', 'pelatihs']);
 
             return response()->json([
-                'status'  => 'success',
-                'message' => 'Program latihan berhasil diperbarui',
-                'data'    => [
-                    'id'           => $updatedProgram->id,
-                    'nama_program' => $updatedProgram->nama_program,
-                    'cabor'        => [
-                        'id'   => $updatedProgram->cabor->id   ?? null,
-                        'nama' => $updatedProgram->cabor->nama ?? null,
-                    ],
-                    'kategori' => [
-                        'id'   => $updatedProgram->caborKategori->id   ?? null,
-                        'nama' => $updatedProgram->caborKategori->nama ?? null,
-                    ],
-                    'periode' => [
-                        'mulai'     => $updatedProgram->periode_mulai,
-                        'selesai'   => $updatedProgram->periode_selesai,
-                        'formatted' => $this->formatPeriode($updatedProgram->periode_mulai, $updatedProgram->periode_selesai),
-                    ],
-                    'keterangan' => $updatedProgram->keterangan,
-                    'created_at' => $updatedProgram->created_at,
-                    'updated_at' => $updatedProgram->updated_at,
+                'status' => 'success',
+                'message' => 'Program latihan berhasil diperbarui.',
+                'data' => [
+                    'program_latihan' => $this->formatProgramLatihanItem($programLatihan),
+                    'permissions' => $permissions,
                 ],
             ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Validasi gagal',
-                'errors'  => $e->errors(),
-            ], 422);
         } catch (\Exception $e) {
-            Log::error('Gagal memperbarui program latihan: ' . $e->getMessage(), [
-                'exception'  => $e,
-                'user_id'    => auth()->id(),
-                'program_id' => $id,
+            Log::error('Update Program Latihan error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+                'program_latihan_id' => $id,
             ]);
 
             return response()->json([
-                'status'  => 'error',
-                'message' => 'Gagal memperbarui program latihan: ' . $e->getMessage(),
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat memperbarui program latihan.',
             ], 500);
         }
     }
@@ -346,94 +350,381 @@ class ProgramLatihanController extends Controller
     /**
      * Delete program latihan
      */
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, $id): JsonResponse
     {
         try {
-            $program = $this->repository->getById($id);
-
-            if (!$program) {
+            $user = $request->user()->fresh();
+            
+            // Get permissions
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            
+            // Check permission
+            if (!Gate::allows('Program Latihan Delete')) {
                 return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Program latihan tidak ditemukan',
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki izin untuk menghapus program latihan.',
+                ], 403);
+            }
+
+            $programLatihan = ProgramLatihan::find($id);
+
+            if (!$programLatihan) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Program latihan tidak ditemukan.',
                 ], 404);
             }
 
-            $this->repository->delete($id);
+            $programLatihan->forceDelete();
 
             return response()->json([
-                'status'  => 'success',
-                'message' => 'Program latihan berhasil dihapus',
+                'status' => 'success',
+                'message' => 'Program latihan berhasil dihapus.',
+                'data' => [
+                    'permissions' => $permissions,
+                ],
             ]);
         } catch (\Exception $e) {
-            Log::error('Gagal menghapus program latihan: ' . $e->getMessage(), [
-                'exception'  => $e,
-                'user_id'    => auth()->id(),
-                'program_id' => $id,
+            Log::error('Delete Program Latihan error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+                'program_latihan_id' => $id,
             ]);
 
             return response()->json([
-                'status'  => 'error',
-                'message' => 'Gagal menghapus program latihan: ' . $e->getMessage(),
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat menghapus program latihan.',
             ], 500);
         }
     }
 
     /**
-     * Format periode tanggal untuk mobile app
+     * Apply role-based filtering
+     * Untuk mobile API - lebih sederhana dan fleksibel
+     * Hanya filter jika user adalah peserta DAN memiliki relasi yang valid
+     * Jika relasi tidak ada, tidak di-filter (bisa lihat semua untuk mobile)
      */
-    private function formatPeriode($startDate, $endDate): string
+    private function applyRoleBasedFiltering($query, $user): void
     {
-        if (!$startDate || !$endDate) {
-            return '-';
+        $roleId = $user->current_role_id ?? null;
+
+        // Jika bukan peserta (admin/superadmin), tidak perlu filter - bisa lihat semua
+        if (!in_array($roleId, [35, 36, 37])) {
+            return;
         }
 
-        $start = new \DateTime($startDate);
-        $end   = new \DateTime($endDate);
+        // Load relasi user dulu dengan fresh
+        $user->load(['atlet', 'pelatih', 'tenagaPendukung']);
 
-        $startDay   = $start->format('j');
-        $startMonth = $this->getIndonesianMonth($start->format('n'));
-        $startYear  = $start->format('Y');
-
-        $endDay   = $end->format('j');
-        $endMonth = $this->getIndonesianMonth($end->format('n'));
-        $endYear  = $end->format('Y');
-
-        // Jika tahun sama
-        if ($startYear === $endYear) {
-            // Jika bulan sama
-            if ($startMonth === $endMonth) {
-                return "{$startDay}-{$endDay} {$startMonth} {$startYear}";
-            } else {
-                // Jika bulan berbeda
-                return "{$startDay} {$startMonth} - {$endDay} {$endMonth} {$startYear}";
+        if ($roleId == 35) { // Atlet
+            // Hanya filter jika atlet relasi ada dan valid
+            if ($user->atlet && $user->atlet->id) {
+                $query->whereHas('caborKategori', function ($subQuery) use ($user) {
+                    $subQuery->whereHas('caborKategoriAtlet', function ($subSubQuery) use ($user) {
+                        $subSubQuery->where('atlet_id', $user->atlet->id)
+                            ->where('is_active', 1)
+                            ->whereNull('cabor_kategori_atlet.deleted_at');
+                    });
+                });
             }
-        } else {
-            // Jika tahun berbeda
-            return "{$startDay} {$startMonth} {$startYear} - {$endDay} {$endMonth} {$endYear}";
+            // Jika tidak ada relasi atlet, tidak di-filter (untuk mobile lebih fleksibel)
+        }
+
+        if ($roleId == 36) { // Pelatih
+            // Hanya filter jika pelatih relasi ada dan valid
+            if ($user->pelatih && $user->pelatih->id) {
+                $query->whereHas('caborKategori', function ($subQuery) use ($user) {
+                    $subQuery->whereHas('caborKategoriPelatih', function ($subSubQuery) use ($user) {
+                        $subSubQuery->where('pelatih_id', $user->pelatih->id)
+                            ->where('is_active', 1)
+                            ->whereNull('cabor_kategori_pelatih.deleted_at');
+                    });
+                });
+            }
+            // Jika tidak ada relasi pelatih, tidak di-filter (untuk mobile lebih fleksibel)
+        }
+
+        if ($roleId == 37) { // Tenaga Pendukung
+            // Hanya filter jika tenaga pendukung relasi ada dan valid
+            if ($user->tenagaPendukung && $user->tenagaPendukung->id) {
+                $query->whereHas('caborKategori', function ($subQuery) use ($user) {
+                    $subQuery->whereHas('caborKategoriTenagaPendukung', function ($subSubQuery) use ($user) {
+                        $subSubQuery->where('tenaga_pendukung_id', $user->tenagaPendukung->id)
+                            ->where('is_active', 1)
+                            ->whereNull('cabor_kategori_tenaga_pendukung.deleted_at');
+                    });
+                });
+            }
+            // Jika tidak ada relasi tenaga pendukung, tidak di-filter (untuk mobile lebih fleksibel)
         }
     }
 
     /**
-     * Get Indonesian month name
+     * Get list cabor untuk filter
+     * Peserta hanya melihat cabor yang mereka miliki
      */
-    private function getIndonesianMonth($monthNumber): string
+    public function getCaborList(Request $request): JsonResponse
     {
-        $months = [
-            1  => 'Januari',
-            2  => 'Februari',
-            3  => 'Maret',
-            4  => 'April',
-            5  => 'Mei',
-            6  => 'Juni',
-            7  => 'Juli',
-            8  => 'Agustus',
-            9  => 'September',
-            10 => 'Oktober',
-            11 => 'November',
-            12 => 'Desember',
-        ];
+        try {
+            $user = $request->user()->fresh();
+            $user->load(['atlet', 'pelatih', 'tenagaPendukung']);
+            
+            $roleId = $user->current_role_id ?? null;
+            
+            // Non-peserta (Superadmin, Admin) - lihat semua cabor
+            if (!in_array($roleId, [35, 36, 37])) {
+                $cabors = \App\Models\Cabor::select('id', 'nama')
+                    ->orderBy('nama')
+                    ->get()
+                    ->map(function ($item) {
+                        return [
+                            'id' => $item->id,
+                            'nama' => $item->nama,
+                        ];
+                    });
+            } else {
+                // Peserta (Atlet, Pelatih, Tenaga Pendukung) - hanya cabor mereka
+                $caborIds = collect();
+                
+                if ($roleId == 35 && $user->atlet && $user->atlet->id) { // Atlet
+                    $caborIds = \App\Models\CaborKategoriAtlet::where('cabor_kategori_atlet.atlet_id', $user->atlet->id)
+                        ->where('is_active', 1)
+                        ->whereNull('cabor_kategori_atlet.deleted_at')
+                        ->join('cabor_kategori', 'cabor_kategori_atlet.cabor_kategori_id', '=', 'cabor_kategori.id')
+                        ->whereNull('cabor_kategori.deleted_at')
+                        ->pluck('cabor_kategori.cabor_id')
+                        ->unique();
+                }
+                
+                if ($roleId == 36 && $user->pelatih && $user->pelatih->id) { // Pelatih
+                    // Ambil langsung cabor_id dari tabel cabor_kategori_pelatih (ada kolom cabor_id langsung)
+                    $caborIds = \App\Models\CaborKategoriPelatih::where('cabor_kategori_pelatih.pelatih_id', $user->pelatih->id)
+                        ->where('is_active', 1)
+                        ->whereNull('cabor_kategori_pelatih.deleted_at')
+                        ->pluck('cabor_kategori_pelatih.cabor_id')
+                        ->filter(function ($id) {
+                            return $id !== null;
+                        })
+                        ->unique();
+                }
+                
+                if ($roleId == 37 && $user->tenagaPendukung && $user->tenagaPendukung->id) { // Tenaga Pendukung
+                    // Ambil langsung cabor_id dari tabel cabor_kategori_tenaga_pendukung (ada kolom cabor_id langsung)
+                    $caborIds = \App\Models\CaborKategoriTenagaPendukung::where('cabor_kategori_tenaga_pendukung.tenaga_pendukung_id', $user->tenagaPendukung->id)
+                        ->where('is_active', 1)
+                        ->whereNull('cabor_kategori_tenaga_pendukung.deleted_at')
+                        ->pluck('cabor_kategori_tenaga_pendukung.cabor_id')
+                        ->filter(function ($id) {
+                            return $id !== null;
+                        })
+                        ->unique();
+                }
+                
+                $cabors = \App\Models\Cabor::whereIn('id', $caborIds)
+                    ->select('id', 'nama')
+                    ->orderBy('nama')
+                    ->get()
+                    ->map(function ($item) {
+                        return [
+                            'id' => $item->id,
+                            'nama' => $item->nama,
+                        ];
+                    });
+            }
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $cabors,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get Cabor List error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil daftar cabor.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+    
+    /**
+     * Get list kategori berdasarkan cabor_id
+     * Peserta hanya melihat kategori yang mereka miliki
+     */
+    public function getKategoriByCabor(Request $request, $caborId): JsonResponse
+    {
+        try {
+            $user = $request->user()->fresh();
+            $user->load(['atlet', 'pelatih', 'tenagaPendukung']);
+            
+            $roleId = $user->current_role_id ?? null;
+            
+            // Non-peserta (Superadmin, Admin) - lihat semua kategori dari cabor tersebut
+            if (!in_array($roleId, [35, 36, 37])) {
+                $kategoris = \App\Models\CaborKategori::where('cabor_id', $caborId)
+                    ->select('id', 'nama')
+                    ->orderBy('nama')
+                    ->get()
+                    ->map(function ($item) {
+                        return [
+                            'id' => $item->id,
+                            'nama' => $item->nama,
+                        ];
+                    });
+            } else {
+                // Peserta (Atlet, Pelatih, Tenaga Pendukung) - hanya kategori mereka
+                $kategoriIds = collect();
+                
+                if ($roleId == 35 && $user->atlet && $user->atlet->id) { // Atlet
+                    $kategoriIds = \App\Models\CaborKategoriAtlet::where('atlet_id', $user->atlet->id)
+                        ->where('is_active', 1)
+                        ->whereNull('deleted_at')
+                        ->whereHas('caborKategori', function ($q) use ($caborId) {
+                            $q->where('cabor_id', $caborId)
+                                ->whereNull('deleted_at');
+                        })
+                        ->pluck('cabor_kategori_id')
+                        ->unique();
+                }
+                
+                if ($roleId == 36 && $user->pelatih && $user->pelatih->id) { // Pelatih
+                    $kategoriIds = \App\Models\CaborKategoriPelatih::where('pelatih_id', $user->pelatih->id)
+                        ->where('is_active', 1)
+                        ->whereNull('deleted_at')
+                        ->whereHas('caborKategori', function ($q) use ($caborId) {
+                            $q->where('cabor_id', $caborId)
+                                ->whereNull('deleted_at');
+                        })
+                        ->pluck('cabor_kategori_id')
+                        ->unique();
+                }
+                
+                if ($roleId == 37 && $user->tenagaPendukung && $user->tenagaPendukung->id) { // Tenaga Pendukung
+                    $kategoriIds = \App\Models\CaborKategoriTenagaPendukung::where('tenaga_pendukung_id', $user->tenagaPendukung->id)
+                        ->where('is_active', 1)
+                        ->whereNull('deleted_at')
+                        ->whereHas('caborKategori', function ($q) use ($caborId) {
+                            $q->where('cabor_id', $caborId)
+                                ->whereNull('deleted_at');
+                        })
+                        ->pluck('cabor_kategori_id')
+                        ->unique();
+                }
+                
+                $kategoris = \App\Models\CaborKategori::whereIn('id', $kategoriIds)
+                    ->where('cabor_id', $caborId)
+                    ->select('id', 'nama')
+                    ->orderBy('nama')
+                    ->get()
+                    ->map(function ($item) {
+                        return [
+                            'id' => $item->id,
+                            'nama' => $item->nama,
+                        ];
+                    });
+            }
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $kategoris,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get Kategori By Cabor error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $request->user()->id ?? null,
+                'cabor_id' => $caborId,
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil daftar kategori.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
 
-        return $months[$monthNumber] ?? '';
+    public function getPelatihByKategori(Request $request, $caborKategoriId): JsonResponse
+    {
+        try {
+            $caborId = $request->query('cabor_id');
+
+            $query = \App\Models\CaborKategoriPelatih::query()
+                ->with('pelatih')
+                ->where('cabor_kategori_id', $caborKategoriId)
+                ->whereNull('deleted_at')
+                ->where('is_active', 1);
+
+            if ($caborId) {
+                $query->where('cabor_id', $caborId);
+            }
+
+            $pelatih = $query->get()->map(fn ($row) => [
+                'id' => $row->pelatih_id,
+                'nama' => $row->pelatih?->nama ?? '-',
+                'jenis_pelatih' => $row->jenis_pelatih,
+            ])->values();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $pelatih,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get Pelatih By Kategori error: ' . $e->getMessage(), [
+                'cabor_kategori_id' => $caborKategoriId,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat mengambil daftar pelatih.',
+            ], 500);
+        }
+    }
+
+    private function formatProgramLatihanItem(ProgramLatihan $item): array
+    {
+        $windowService = app(\App\Services\ProgramLatihanAbsenWindowService::class);
+
+        return [
+            'id' => $item->id,
+            'cabor' => $item->cabor ? [
+                'id' => $item->cabor->id,
+                'nama' => $item->cabor->nama,
+            ] : null,
+            'nama_program' => $item->nama_program,
+            'cabor_kategori' => $item->caborKategori ? [
+                'id' => $item->caborKategori->id,
+                'nama' => $item->caborKategori->nama,
+            ] : null,
+            'mode_pelatih' => $item->mode_pelatih ?? 'single',
+            'pelatih' => $item->pelatih ? [
+                'id' => $item->pelatih->id,
+                'nama' => $item->pelatih->nama,
+            ] : null,
+            'pelatihs' => $item->relationLoaded('pelatihs')
+                ? $item->pelatihs->map(fn ($p) => ['id' => $p->id, 'nama' => $p->nama])->values()->all()
+                : [],
+            'pelatih_id' => $item->pelatih_id,
+            'pelatih_ids' => $item->relationLoaded('pelatihs')
+                ? $item->pelatihs->pluck('id')->all()
+                : ($item->pelatih_id ? [$item->pelatih_id] : []),
+            'wajib_absen_atlet' => (bool) $item->wajib_absen_atlet,
+            'absen_jam_mulai' => $item->absen_jam_mulai ? substr((string) $item->absen_jam_mulai, 0, 5) : null,
+            'absen_jam_selesai' => $item->absen_jam_selesai ? substr((string) $item->absen_jam_selesai, 0, 5) : null,
+            'absen_window_label' => $windowService->windowLabel($item),
+            'periode_mulai' => $item->periode_mulai,
+            'periode_selesai' => $item->periode_selesai,
+            'periode_hitung' => $item->periode_hitung,
+            'tahap' => $item->tahap,
+            'keterangan' => $item->keterangan,
+            'created_at' => $item->created_at,
+            'updated_at' => $item->updated_at,
+        ];
     }
 
 }
+

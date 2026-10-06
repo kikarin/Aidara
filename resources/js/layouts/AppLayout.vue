@@ -1,20 +1,27 @@
 <script setup lang="ts">
 import ToastContainer from '@/components/ui/toast/ToastContainer.vue';
-import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
+import { useLayoutBreadcrumbs } from '@/composables/useLayoutBreadcrumbs';
 import type { BreadcrumbItemType } from '@/types';
+import { watch } from 'vue';
 
 interface Props {
     breadcrumbs?: BreadcrumbItemType[];
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
     breadcrumbs: () => [],
 });
+
+const { setBreadcrumbs } = useLayoutBreadcrumbs();
+
+watch(
+    () => props.breadcrumbs,
+    (items) => setBreadcrumbs(items ?? []),
+    { immediate: true, deep: true },
+);
 </script>
 
 <template>
-    <AppLayout :breadcrumbs="breadcrumbs">
-        <ToastContainer />
-        <slot />
-    </AppLayout>
+    <ToastContainer />
+    <slot />
 </template>

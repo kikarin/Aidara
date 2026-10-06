@@ -2,45 +2,61 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { computed } from 'vue';
 
-const props = defineProps<{
-    modelValue: string | number;
-    placeholder?: string;
-    required?: boolean;
-    options: { value: string | number; label: string }[];
+const props = withDefaults(
+    defineProps<{
+        modelValue: string | number | null | undefined;
+        placeholder?: string;
+        required?: boolean;
+        disabled?: boolean;
+        options: Array<{ value: string | number; label: string; disabled?: boolean }>;
+        triggerClass?: string;
+        contentClass?: string;
+    }>(),
+    {
+        placeholder: 'Pilih…',
+        required: false,
+        disabled: false,
+        triggerClass: 'h-11 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 text-sm shadow-none',
+        contentClass: 'z-50 max-h-64 overflow-auto rounded-xl',
+    },
+);
+
+const emit = defineEmits<{
+    'update:modelValue': [value: string | number];
 }>();
 
-const emit = defineEmits(['update:modelValue']);
+const selectValue = computed(() => {
+    if (props.modelValue === null || props.modelValue === undefined || props.modelValue === '') {
+        return undefined;
+    }
 
-// Filter out empty string values untuk SelectItem
-const filteredOptions = computed(() => 
-    props.options.filter(option => option.value !== '')
-);
+    return String(props.modelValue);
+});
 
-// Handle empty string as undefined untuk Select component
-const selectValue = computed(() => 
-    props.modelValue === '' ? undefined : String(props.modelValue)
-);
+const handleUpdate = (value: unknown) => {
+    if (value === undefined || value === null || value === '') {
+        emit('update:modelValue', '');
 
-const handleUpdate = (value: string | undefined) => {
-    // Convert undefined back to empty string jika diperlukan
-    emit('update:modelValue', value || '');
+        return;
+    }
+
+    const asString = String(value);
+    const match = props.options.find((option) => String(option.value) === asString);
+    emit('update:modelValue', match ? match.value : asString);
 };
 </script>
 
 <template>
-    <Select 
-        :model-value="selectValue" 
-        @update:modelValue="handleUpdate" 
-        :required="required"
-    >
-        <SelectTrigger class="w-full min-w-[120px] relative z-10">
+    <Select :model-value="selectValue" :required="required" :disabled="disabled" @update:model-value="handleUpdate">
+        <SelectTrigger :class="triggerClass">
             <SelectValue :placeholder="placeholder" />
         </SelectTrigger>
-        <SelectContent class="z-50 max-h-[200px] overflow-auto">
-            <SelectItem 
-                v-for="option in filteredOptions" 
-                :key="option.value" 
+        <SelectContent :class="contentClass">
+            <SelectItem
+                v-for="option in options"
+                :key="String(option.value)"
                 :value="String(option.value)"
+                :disabled="option.disabled"
                 class="cursor-pointer"
             >
                 {{ option.label }}

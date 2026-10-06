@@ -143,4 +143,27 @@ class ProgramLatihanController extends Controller implements HasMiddleware
 
         return response()->json(['message' => 'Program latihan terpilih berhasil dihapus!']);
     }
+
+    public function apiPelatihByKategori($caborKategoriId)
+    {
+        $caborId = request('cabor_id');
+
+        $query = \App\Models\CaborKategoriPelatih::query()
+            ->with('pelatih')
+            ->where('cabor_kategori_id', $caborKategoriId)
+            ->whereNull('deleted_at')
+            ->where('is_active', 1);
+
+        if ($caborId) {
+            $query->where('cabor_id', $caborId);
+        }
+
+        $pelatih = $query->get()->map(fn ($row) => [
+            'id' => $row->pelatih_id,
+            'nama' => $row->pelatih?->nama ?? '-',
+            'jenis_pelatih' => $row->jenis_pelatih,
+        ])->values();
+
+        return response()->json($pelatih);
+    }
 }
