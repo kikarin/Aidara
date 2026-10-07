@@ -10,7 +10,7 @@ final class BookingStatus
 
     public const PERLU_KLARIFIKASI = 'perlu_klarifikasi';
 
-    /** Undangan meeting sudah dikirim ke penyewa; keputusan akhir menunggu hasil meeting. */
+    /** Surat balasan lanjut dikirim; menunggu pelaksanaan/keputusan setelah meeting. */
     public const MENUNGGU_MEETING = 'menunggu_meeting';
 
     public const APPROVED = 'approved';
@@ -61,22 +61,22 @@ final class BookingStatus
     public static function adminLabel(string $status): string
     {
         return match ($status) {
-            self::DRAFT => 'Draf',
-            self::MENUNGGU_APPROVAL => 'Perlu ditinjau',
-            self::PERLU_KLARIFIKASI => 'Perlu klarifikasi',
-            self::MENUNGGU_MEETING => 'Meeting dijadwalkan',
-            self::APPROVED => 'Disetujui',
-            self::AWAITING_PAYMENT => 'Menunggu bayar',
-            self::PAID => 'Sudah bayar',
-            self::CONFIRMED => 'Dikonfirmasi',
-            self::COMPLETED => 'Selesai',
-            self::REJECTED => 'Ditolak',
-            self::CANCELLED => 'Dibatalkan',
-            self::FORFEITED => 'Hangus',
-            self::EXPIRED => 'Kedaluwarsa',
+            self::DRAFT              => 'Draf',
+            self::MENUNGGU_APPROVAL  => 'Perlu ditinjau',
+            self::PERLU_KLARIFIKASI  => 'Perlu klarifikasi',
+            self::MENUNGGU_MEETING   => 'Menunggu keputusan akhir',
+            self::APPROVED           => 'Disetujui',
+            self::AWAITING_PAYMENT   => 'Menunggu bayar',
+            self::PAID               => 'Sudah bayar',
+            self::CONFIRMED          => 'Dikonfirmasi',
+            self::COMPLETED          => 'Selesai',
+            self::REJECTED           => 'Ditolak',
+            self::CANCELLED          => 'Dibatalkan',
+            self::FORFEITED          => 'Hangus',
+            self::EXPIRED            => 'Kedaluwarsa',
             self::RESCHEDULE_PENDING => 'Menunggu jadwal ulang',
-            self::NO_COMPENSATION => 'Tanpa kompensasi',
-            default => $status,
+            self::NO_COMPENSATION    => 'Tanpa kompensasi',
+            default                  => $status,
         };
     }
 

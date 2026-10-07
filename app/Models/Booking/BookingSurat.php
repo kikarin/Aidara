@@ -47,22 +47,14 @@ class BookingSurat extends Model
     }
 
     /**
-     * Jenis yang boleh dibuat lewat form surat manual. Surat balasan tidak lagi
-     * digenerate di web, melainkan berupa unggahan PDF pada panel keputusan admin.
+     * Jenis surat yang dibuat dari unggahan PDF admin (tidak digenerate di web).
      *
      * @return list<string>
      */
-    public static function jenisList(): array
+    public static function jenisUnggahan(): array
     {
         return [
             self::JENIS_UNDANGAN_MEETING,
-        ];
-    }
-
-    /** Jenis surat balasan yang dibuat dari unggahan PDF admin. */
-    public static function jenisBalasan(): array
-    {
-        return [
             self::JENIS_BALASAN_PERSETUJUAN,
             self::JENIS_BALASAN_PENOLAKAN,
         ];
@@ -72,7 +64,7 @@ class BookingSurat extends Model
     {
         return match ($this->jenis) {
             self::JENIS_UNDANGAN_MEETING    => 'Undangan Meeting',
-            self::JENIS_BALASAN_PERSETUJUAN => 'Balasan Persetujuan',
+            self::JENIS_BALASAN_PERSETUJUAN => 'Surat Balasan (Lanjut ke Meeting)',
             self::JENIS_BALASAN_PENOLAKAN   => 'Balasan Penolakan',
             default                         => $this->jenis,
         };

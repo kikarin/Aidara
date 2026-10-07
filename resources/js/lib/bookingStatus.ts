@@ -5,7 +5,7 @@ export type BookingStatusAudience = 'renter' | 'admin';
 const RENTER_LABELS: Record<string, string> = {
     draft: 'Draf',
     menunggu_approval: 'Menunggu ditinjau',
-    menunggu_meeting: 'Undangan meeting',
+    menunggu_meeting: 'Menunggu keputusan',
     awaiting_payment: 'Menunggu pembayaran',
     awaiting_verification: 'Bukti sedang dicek',
     approved: 'Sudah disetujui',
@@ -22,7 +22,7 @@ const RENTER_LABELS: Record<string, string> = {
 const ADMIN_LABELS: Record<string, string> = {
     draft: 'Draf',
     menunggu_approval: 'Perlu ditinjau',
-    menunggu_meeting: 'Meeting dijadwalkan',
+    menunggu_meeting: 'Menunggu keputusan akhir',
     awaiting_payment: 'Menunggu bayar',
     awaiting_verification: 'Bukti perlu dicek',
     approved: 'Disetujui',

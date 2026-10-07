@@ -3,7 +3,9 @@
 namespace App\Http\Requests\Booking\Admin;
 
 use App\Models\Booking\Booking;
+use App\Models\Booking\BookingSurat;
 use App\Support\Booking\BookingJenisSewa;
+use App\Support\Booking\BookingStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -21,9 +23,18 @@ class RejectBookingRequest extends FormRequest
             ? Booking::query()->with('items')->find($this->route('id'))
             : null;
 
+        // Surat penolakan wajib hanya untuk penolakan dini (sebelum tahap keputusan
+        // akhir). Keputusan akhir setelah meeting cukup tombol tolak.
+        $punyaBalasan = $booking !== null
+            && $booking->surats()->where('jenis', BookingSurat::JENIS_BALASAN_PERSETUJUAN)->exists();
+
+        $finalStage = $booking !== null
+            && ($booking->status === BookingStatus::MENUNGGU_MEETING || $punyaBalasan);
+
         $butuhSurat = $booking !== null
             && BookingJenisSewa::isPerHari($booking)
-            && $this->routeIs('e-booking.admin.bookings.reject');
+            && $this->routeIs('e-booking.admin.bookings.reject')
+            && ! $finalStage;
 
         return [
             'reason'        => ['required', 'string', 'max:1000'],

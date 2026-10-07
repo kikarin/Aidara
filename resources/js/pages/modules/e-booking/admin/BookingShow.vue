@@ -102,9 +102,13 @@ const props = defineProps<{
         surat_permohonan_name: string | null;
         surat_permohonan_submitted_at: string | null;
         can_review: boolean;
+        can_lanjut_meeting: boolean;
+        can_final_decision: boolean;
+        can_send_meeting: boolean;
         can_verify_payment: boolean;
         surats: Array<{
             id: number;
+            jenis: string;
             jenis_label: string;
             nomor_surat: string | null;
             perihal: string | null;
@@ -239,9 +243,18 @@ const approveForm = useForm({
     priority_rule_id: '' as number | '',
     admin_notes: '',
     note: '',
+});
+
+const lanjutForm = useForm({
+    admin_notes: '',
+    surat_balasan: null as File | null,
+});
+
+const meetingForm = useForm({
+    admin_notes: '',
     meeting_at: '',
     meeting_place: '',
-    surat_balasan: null as File | null,
+    surat_meeting: null as File | null,
 });
 
 const rejectForm = useForm({ reason: '', surat_balasan: null as File | null });
@@ -267,32 +280,43 @@ const rejectChips = [
 
 const activeDecision = ref<'' | 'klarifikasi' | 'tolak'>('');
 
-const decisionTabs = [
-    { value: '', label: 'Setujui', icon: 'check' },
+const isReguler = computed(() => props.booking.jenis_sewa === 'reguler');
+
+const isWaitingMeeting = computed(() => props.booking.can_final_decision);
+
+const decisionTabs = computed(() => [
+    {
+        value: '',
+        label: isWaitingMeeting.value ? 'Setujui pemakaian' : 'Surat balasan',
+        icon: isWaitingMeeting.value ? 'check' : 'paper-plane',
+    },
     { value: 'klarifikasi', label: 'Klarifikasi', icon: 'comment-dots' },
     { value: 'tolak', label: 'Tolak', icon: 'circle-xmark' },
-] as const;
+]);
 
 const rejectPayOpen = ref(false);
 
-const isReguler = computed(() => props.booking.jenis_sewa === 'reguler');
-const showMeetingFields = ref(!isReguler.value);
-
 const butuhSuratBalasan = computed(() => !isReguler.value);
+const butuhSuratPenolakan = computed(() => butuhSuratBalasan.value && !isWaitingMeeting.value);
+
+const hasMeetingInvitation = computed(() => props.booking.surats.some((s) => s.jenis === 'undangan_meeting'));
 
 const adaBenturan = computed(() => Boolean(props.conflict?.conflicts?.length));
 
-const submitApprove = async (force = false) => {
-    if (butuhSuratBalasan.value && !approveForm.surat_balasan) {
+const submitLanjut = () => {
+    if (butuhSuratBalasan.value && !lanjutForm.surat_balasan) {
         return;
     }
 
+    lanjutForm.post(route('e-booking.admin.bookings.lanjut', props.booking.id), { preserveScroll: true });
+};
+
+const submitApprove = async (force = false) => {
     if (force) {
         const ok = await confirm({
-            title: 'Paksa lanjut pengajuan ini?',
-            description:
-                'Masih ada benturan jadwal/prioritas. Dengan memaksa lanjut, pengajuan ini disetujui dan benturan diselesaikan secara manual.',
-            confirmText: 'Ya, paksa lanjut',
+            title: 'Paksa setujui pengajuan ini?',
+            description: 'Masih ada benturan jadwal/prioritas. Dengan memaksa, pemakaian lahan disetujui dan benturan diselesaikan secara manual.',
+            confirmText: 'Ya, paksa setujui',
         });
         if (!ok) {
             return;
@@ -308,7 +332,7 @@ const submitReject = async () => {
         return;
     }
 
-    if (butuhSuratBalasan.value && !rejectForm.surat_balasan) {
+    if (butuhSuratPenolakan.value && !rejectForm.surat_balasan) {
         return;
     }
 
@@ -367,8 +391,20 @@ const kirimWhatsappSurat = (suratId: number) => {
     whatsappForm.post(route('e-booking.admin.bookings.surat.whatsapp', suratId), { preserveScroll: true });
 };
 
-const onApproveSurat = (event: Event) => {
-    approveForm.surat_balasan = (event.target as HTMLInputElement).files?.[0] ?? null;
+const onLanjutSurat = (event: Event) => {
+    lanjutForm.surat_balasan = (event.target as HTMLInputElement).files?.[0] ?? null;
+};
+
+const submitMeeting = () => {
+    if (!meetingForm.surat_meeting) {
+        return;
+    }
+
+    meetingForm.post(route('e-booking.admin.bookings.meeting', props.booking.id), { preserveScroll: true });
+};
+
+const onMeetingSurat = (event: Event) => {
+    meetingForm.surat_meeting = (event.target as HTMLInputElement).files?.[0] ?? null;
 };
 
 const onRejectSurat = (event: Event) => {
@@ -618,7 +654,10 @@ onUnmounted(() => {
                         <FontAwesomeIcon :icon="['fas', 'file-pdf']" class="size-3.5 text-(--wp-accent)" aria-hidden="true" />
                         Surat permohonan penyewa
                     </h2>
-                    <div v-if="booking.surat_permohonan_url" class="mt-4 flex flex-col gap-3 rounded-2xl p-4 text-sm ring-1 ring-(--wp-hairline) sm:flex-row sm:items-center">
+                    <div
+                        v-if="booking.surat_permohonan_url"
+                        class="mt-4 flex flex-col gap-3 rounded-2xl p-4 text-sm ring-1 ring-(--wp-hairline) sm:flex-row sm:items-center"
+                    >
                         <span class="wp-icon size-10 shrink-0">
                             <FontAwesomeIcon :icon="['fas', 'file-pdf']" class="size-4" aria-hidden="true" />
                         </span>
@@ -628,7 +667,12 @@ onUnmounted(() => {
                                 Diunggah {{ booking.surat_permohonan_submitted_at }}
                             </p>
                         </div>
-                        <a :href="booking.surat_permohonan_url" target="_blank" rel="noopener" class="wp-btn wp-btn-quiet shrink-0 px-3.5 py-2 text-xs">
+                        <a
+                            :href="booking.surat_permohonan_url"
+                            target="_blank"
+                            rel="noopener"
+                            class="wp-btn wp-btn-quiet shrink-0 px-3.5 py-2 text-xs"
+                        >
                             <FontAwesomeIcon :icon="['fas', 'download']" class="size-3" aria-hidden="true" />
                             Lihat PDF
                         </a>
@@ -758,10 +802,19 @@ onUnmounted(() => {
             <aside class="space-y-6 lg:sticky lg:top-32 lg:self-start" aria-label="Tindakan">
                 <section v-if="booking.can_review" aria-labelledby="review-heading" class="sb-card overflow-hidden">
                     <div class="border-b border-(--wp-hairline) p-5 pb-4">
-                        <h2 id="review-heading" class="text-foreground text-base font-semibold tracking-tight">Keputusan peninjauan</h2>
-                        <p v-if="booking.status === 'menunggu_meeting'" class="sb-callout sb-tone-meeting mt-3 p-3 text-xs">
+                        <h2 id="review-heading" class="text-foreground text-base font-semibold tracking-tight">
+                            {{ isWaitingMeeting ? 'Keputusan akhir' : 'Keputusan peninjauan' }}
+                        </h2>
+                        <p v-if="isWaitingMeeting" class="sb-callout sb-tone-meeting mt-3 p-3 text-xs">
                             <FontAwesomeIcon :icon="['fas', 'circle-info']" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                            <span>Undangan meeting sudah terkirim. Putuskan setelah meeting dengan penyewa selesai.</span>
+                            <span>Surat balasan sudah dikirim. Setelah meeting selesai, putuskan pemakaian lahan di bawah ini.</span>
+                        </p>
+                        <p v-else class="sb-callout sb-tone-info mt-3 p-3 text-xs">
+                            <FontAwesomeIcon :icon="['fas', 'circle-info']" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                            <span>
+                                Kirim surat balasan sebagai persetujuan lanjut ke tahap berikutnya. Undangan meeting (opsional) dan keputusan
+                                pemakaian lahan dilakukan setelah ini.
+                            </span>
                         </p>
                         <div class="bg-muted mt-3 grid grid-cols-3 gap-1 rounded-xl p-1" role="tablist" aria-label="Pilih keputusan">
                             <button
@@ -788,7 +841,7 @@ onUnmounted(() => {
                         </div>
                     </div>
 
-                    <div v-if="activeDecision === ''" class="space-y-4 p-5" role="tabpanel">
+                    <div v-if="activeDecision === '' && isWaitingMeeting" class="space-y-4 p-5" role="tabpanel">
                         <div>
                             <p class="sb-label">Aturan prioritas (opsional)</p>
                             <SimpleSelect
@@ -809,80 +862,19 @@ onUnmounted(() => {
                             />
                         </div>
 
-                        <div v-if="!showMeetingFields" class="sb-callout sb-tone-info p-3 text-xs">
-                            <FontAwesomeIcon :icon="['fas', 'circle-info']" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                            <span>
-                                Sewa per jam langsung terbooking tanpa meeting. Bila pengajuan ini tetap ditinjau, setelah disetujui penyewa langsung menerima petunjuk pembayaran.
-                                <button
-                                    type="button"
-                                    class="mt-1 block rounded-sm font-semibold underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
-                                    @click="showMeetingFields = true"
-                                >
-                                    Tetap undang meeting
-                                </button>
-                            </span>
+                        <div v-if="adaBenturan" class="sb-callout sb-tone-warning p-3 text-xs">
+                            <FontAwesomeIcon :icon="['fas', 'triangle-exclamation']" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                            <span
+                                >Masih ada benturan jadwal/prioritas. Setujui memakai aturan bawaan, pilih aturan lain, atau paksa setujui bila sudah
+                                dikoordinasikan.</span
+                            >
                         </div>
-
-                        <fieldset v-else class="space-y-3 rounded-xl border border-dashed border-(--wp-hairline) p-3.5">
-                            <legend class="px-1 text-xs font-semibold tracking-wide text-(--wp-accent-strong) uppercase">Undangan meeting</legend>
-                            <p class="text-muted-foreground text-xs leading-relaxed">
-                                Opsional. Jika diisi, sistem otomatis membuat dan mengirim undangan meeting lewat <b>WhatsApp</b> dan
-                                <b>email</b> saat pengajuan disetujui.
-                            </p>
-                            <div>
-                                <label class="sb-label" for="approve-meeting-at">Waktu meeting</label>
-                                <input
-                                    id="approve-meeting-at"
-                                    v-model="approveForm.meeting_at"
-                                    type="datetime-local"
-                                    class="sb-input"
-                                    :aria-invalid="approveForm.errors.meeting_at ? 'true' : undefined"
-                                    :aria-describedby="approveForm.errors.meeting_at ? 'approve-meeting-at-error' : undefined"
-                                />
-                                <p v-if="approveForm.errors.meeting_at" id="approve-meeting-at-error" class="sb-error">
-                                    {{ approveForm.errors.meeting_at }}
-                                </p>
-                            </div>
-                            <div>
-                                <label class="sb-label" for="approve-meeting-place">Tempat meeting</label>
-                                <input
-                                    id="approve-meeting-place"
-                                    v-model="approveForm.meeting_place"
-                                    type="text"
-                                    class="sb-input"
-                                    placeholder="Contoh: Ruang Rapat UPT Dispora"
-                                    :aria-invalid="approveForm.errors.meeting_place ? 'true' : undefined"
-                                    :aria-describedby="approveForm.errors.meeting_place ? 'approve-meeting-place-error' : undefined"
-                                />
-                                <p v-if="approveForm.errors.meeting_place" id="approve-meeting-place-error" class="sb-error">
-                                    {{ approveForm.errors.meeting_place }}
-                                </p>
-                            </div>
-                        </fieldset>
-
-                        <fieldset v-if="butuhSuratBalasan" class="space-y-3 rounded-xl border border-dashed border-(--wp-hairline) p-3.5">
-                            <legend class="px-1 text-xs font-semibold tracking-wide text-(--wp-accent-strong) uppercase">Surat persetujuan</legend>
-                            <p class="text-muted-foreground text-xs leading-relaxed">
-                                Wajib. Lampirkan surat persetujuan berformat <b>PDF</b>. Surat otomatis dikirim ke email penyewa setelah disetujui.
-                            </p>
-                            <input
-                                type="file"
-                                accept="application/pdf,.pdf"
-                                class="sb-input"
-                                :aria-invalid="approveForm.errors.surat_balasan ? 'true' : undefined"
-                                :aria-describedby="approveForm.errors.surat_balasan ? 'approve-surat-error' : undefined"
-                                @change="onApproveSurat"
-                            />
-                            <p v-if="approveForm.errors.surat_balasan" id="approve-surat-error" class="sb-error">
-                                {{ approveForm.errors.surat_balasan }}
-                            </p>
-                        </fieldset>
 
                         <div class="space-y-2">
                             <button
                                 type="button"
                                 class="wp-btn wp-btn-primary w-full justify-center px-5 py-2.5 text-sm"
-                                :disabled="approveForm.processing || rejectForm.processing || klarifikasiForm.processing || (butuhSuratBalasan && !approveForm.surat_balasan)"
+                                :disabled="approveForm.processing || rejectForm.processing || klarifikasiForm.processing"
                                 @click="submitApprove(false)"
                             >
                                 <FontAwesomeIcon
@@ -892,7 +884,7 @@ onUnmounted(() => {
                                     aria-hidden="true"
                                 />
                                 <FontAwesomeIcon v-else :icon="['fas', 'check']" class="size-4" aria-hidden="true" />
-                                Setujui pengajuan
+                                Setujui pemakaian lahan
                             </button>
                             <button
                                 v-if="adaBenturan"
@@ -902,8 +894,67 @@ onUnmounted(() => {
                                 @click="submitApprove(true)"
                             >
                                 <FontAwesomeIcon :icon="['fas', 'triangle-exclamation']" class="size-3" aria-hidden="true" />
-                                Paksa lanjut (abaikan benturan)
+                                Paksa setujui (abaikan benturan)
                             </button>
+                            <p class="text-muted-foreground text-center text-xs">Setelah disetujui, penyewa menerima petunjuk pembayaran.</p>
+                        </div>
+                    </div>
+
+                    <div v-else-if="activeDecision === ''" class="space-y-4 p-5" role="tabpanel">
+                        <div>
+                            <label class="sb-label" for="lanjut-admin-notes">Catatan pada surat (opsional)</label>
+                            <textarea
+                                id="lanjut-admin-notes"
+                                v-model="lanjutForm.admin_notes"
+                                rows="2"
+                                placeholder="Tampil di halaman pesanan penyewa"
+                                class="sb-input"
+                            />
+                        </div>
+
+                        <fieldset v-if="butuhSuratBalasan" class="space-y-3 rounded-xl border border-dashed border-(--wp-hairline) p-3.5">
+                            <legend class="px-1 text-xs font-semibold tracking-wide text-(--wp-accent-strong) uppercase">Surat balasan</legend>
+                            <p class="text-muted-foreground text-xs leading-relaxed">
+                                Wajib. Lampirkan surat balasan berformat <b>PDF</b> (persetujuan lanjut ke tahap berikutnya). Surat otomatis dikirim
+                                ke email penyewa.
+                            </p>
+                            <input
+                                type="file"
+                                accept="application/pdf,.pdf"
+                                class="sb-input"
+                                :aria-invalid="lanjutForm.errors.surat_balasan ? 'true' : undefined"
+                                :aria-describedby="lanjutForm.errors.surat_balasan ? 'lanjut-surat-error' : undefined"
+                                @change="onLanjutSurat"
+                            />
+                            <p v-if="lanjutForm.errors.surat_balasan" id="lanjut-surat-error" class="sb-error">
+                                {{ lanjutForm.errors.surat_balasan }}
+                            </p>
+                        </fieldset>
+
+                        <div class="space-y-2">
+                            <button
+                                type="button"
+                                class="wp-btn wp-btn-primary w-full justify-center px-5 py-2.5 text-sm"
+                                :disabled="
+                                    lanjutForm.processing ||
+                                    rejectForm.processing ||
+                                    klarifikasiForm.processing ||
+                                    (butuhSuratBalasan && !lanjutForm.surat_balasan)
+                                "
+                                @click="submitLanjut"
+                            >
+                                <FontAwesomeIcon
+                                    v-if="lanjutForm.processing"
+                                    :icon="['fas', 'circle-notch']"
+                                    class="size-4 animate-spin"
+                                    aria-hidden="true"
+                                />
+                                <FontAwesomeIcon v-else :icon="['fas', 'paper-plane']" class="size-4" aria-hidden="true" />
+                                Kirim surat balasan
+                            </button>
+                            <p class="text-muted-foreground text-center text-xs">
+                                Status pengajuan berubah menjadi "Menunggu keputusan akhir". Undangan meeting dapat dikirim menyusul.
+                            </p>
                         </div>
                     </div>
 
@@ -974,7 +1025,7 @@ onUnmounted(() => {
                             :aria-invalid="rejectForm.errors.reason ? 'true' : undefined"
                         />
                         <p v-if="rejectForm.errors.reason" class="sb-error">{{ rejectForm.errors.reason }}</p>
-                        <fieldset v-if="butuhSuratBalasan" class="space-y-3 rounded-xl border border-dashed border-(--wp-hairline) p-3.5">
+                        <fieldset v-if="butuhSuratPenolakan" class="space-y-3 rounded-xl border border-dashed border-(--wp-hairline) p-3.5">
                             <legend class="px-1 text-xs font-semibold tracking-wide text-(--sb-danger) uppercase">Surat alasan penolakan</legend>
                             <p class="text-muted-foreground text-xs leading-relaxed">
                                 Wajib. Lampirkan surat penolakan berformat <b>PDF</b>. Surat otomatis dikirim ke email penyewa setelah ditolak.
@@ -994,7 +1045,7 @@ onUnmounted(() => {
                         <button
                             type="button"
                             class="wp-btn wp-btn-danger w-full justify-center px-4 py-2.5 text-sm"
-                            :disabled="rejectForm.processing || rejectForm.reason.trim() === '' || (butuhSuratBalasan && !rejectForm.surat_balasan)"
+                            :disabled="rejectForm.processing || rejectForm.reason.trim() === '' || (butuhSuratPenolakan && !rejectForm.surat_balasan)"
                             @click="submitReject"
                         >
                             <FontAwesomeIcon
@@ -1007,6 +1058,85 @@ onUnmounted(() => {
                             Tolak pengajuan
                         </button>
                     </div>
+                </section>
+
+                <section v-if="booking.can_send_meeting" aria-labelledby="meeting-heading" class="sb-card space-y-4 p-5 text-sm">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 id="meeting-heading" class="text-foreground text-base font-semibold tracking-tight">Undangan meeting</h2>
+                            <p class="text-muted-foreground mt-1 text-xs">
+                                Opsional. Unggah PDF undangan meeting lalu kirim ke penyewa (email + WhatsApp).
+                            </p>
+                        </div>
+                        <span class="sb-badge" :class="hasMeetingInvitation ? 'sb-tone-success' : 'sb-tone-neutral'">
+                            {{ hasMeetingInvitation ? 'Terkirim' : 'Belum' }}
+                        </span>
+                    </div>
+
+                    <fieldset class="space-y-3 rounded-xl border border-dashed border-(--wp-hairline) p-3.5">
+                        <legend class="px-1 text-xs font-semibold tracking-wide text-(--wp-accent-strong) uppercase">
+                            {{ hasMeetingInvitation ? 'Unggah undangan baru' : 'Undangan meeting' }}
+                        </legend>
+                        <div>
+                            <label class="sb-label" for="meeting-surat">Berkas undangan (PDF)</label>
+                            <input
+                                id="meeting-surat"
+                                type="file"
+                                accept="application/pdf,.pdf"
+                                class="sb-input"
+                                :aria-invalid="meetingForm.errors.surat_meeting ? 'true' : undefined"
+                                :aria-describedby="meetingForm.errors.surat_meeting ? 'meeting-surat-error' : undefined"
+                                @change="onMeetingSurat"
+                            />
+                            <p v-if="meetingForm.errors.surat_meeting" id="meeting-surat-error" class="sb-error">
+                                {{ meetingForm.errors.surat_meeting }}
+                            </p>
+                        </div>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                                <label class="sb-label" for="meeting-at">Waktu (opsional)</label>
+                                <input id="meeting-at" v-model="meetingForm.meeting_at" type="datetime-local" class="sb-input" />
+                                <p v-if="meetingForm.errors.meeting_at" class="sb-error">{{ meetingForm.errors.meeting_at }}</p>
+                            </div>
+                            <div>
+                                <label class="sb-label" for="meeting-place">Tempat (opsional)</label>
+                                <input
+                                    id="meeting-place"
+                                    v-model="meetingForm.meeting_place"
+                                    type="text"
+                                    class="sb-input"
+                                    placeholder="Contoh: Ruang Rapat UPT"
+                                />
+                                <p v-if="meetingForm.errors.meeting_place" class="sb-error">{{ meetingForm.errors.meeting_place }}</p>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="sb-label" for="meeting-notes">Catatan (opsional)</label>
+                            <textarea
+                                id="meeting-notes"
+                                v-model="meetingForm.admin_notes"
+                                rows="2"
+                                class="sb-input"
+                                placeholder="Tampil di halaman pesanan penyewa"
+                            />
+                        </div>
+                    </fieldset>
+
+                    <button
+                        type="button"
+                        class="wp-btn wp-btn-primary w-full justify-center px-4 py-2.5 text-sm"
+                        :disabled="meetingForm.processing || !meetingForm.surat_meeting"
+                        @click="submitMeeting"
+                    >
+                        <FontAwesomeIcon
+                            v-if="meetingForm.processing"
+                            :icon="['fas', 'circle-notch']"
+                            class="size-4 animate-spin"
+                            aria-hidden="true"
+                        />
+                        <FontAwesomeIcon v-else :icon="['fas', 'paper-plane']" class="size-4" aria-hidden="true" />
+                        {{ hasMeetingInvitation ? 'Unggah & kirim undangan baru' : 'Kirim undangan meeting' }}
+                    </button>
                 </section>
 
                 <section aria-labelledby="payment-heading" class="sb-card space-y-4 p-5 text-sm">

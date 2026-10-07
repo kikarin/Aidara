@@ -59,7 +59,7 @@ class SuratController extends Controller
     {
         return $surat->jenis           === BookingSurat::JENIS_UNDANGAN_MEETING
             && $surat->booking->status === BookingStatus::MENUNGGU_MEETING
-            ? ' Status pengajuan sekarang "Meeting dijadwalkan".'
+            ? ' Status pengajuan sekarang "Menunggu keputusan akhir".'
             : '';
     }
 }

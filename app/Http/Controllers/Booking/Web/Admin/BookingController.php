@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Booking\Web\Admin;
 use App\Exports\BookingExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Booking\Admin\ApproveBookingRequest;
+use App\Http\Requests\Booking\Admin\KirimMeetingRequest;
+use App\Http\Requests\Booking\Admin\LanjutMeetingRequest;
 use App\Http\Requests\Booking\Admin\RejectBookingRequest;
 use App\Http\Requests\Booking\Admin\RejectPaymentRequest;
 use App\Http\Requests\Booking\Admin\VerifyPaymentRequest;
@@ -15,8 +17,8 @@ use App\Models\Booking\BookingPayment;
 use App\Models\Booking\BookingPriorityRule;
 use App\Models\Booking\BookingSurat;
 use App\Services\Booking\AdminApprovalService;
-use App\Services\Booking\BookingInvitationService;
 use App\Services\Booking\BookingPaymentService;
+use App\Services\Booking\BookingStatusService;
 use App\Services\Booking\SuratDeliveryService;
 use App\Services\Booking\SuratService;
 use App\Support\Booking\BookingJenisSewa;
@@ -37,7 +39,7 @@ class BookingController extends Controller
     public function __construct(
         private readonly AdminApprovalService $approval,
         private readonly BookingPaymentService $payments,
-        private readonly BookingInvitationService $invitations,
+        private readonly BookingStatusService $statuses,
         private readonly SuratService $surats,
         private readonly SuratDeliveryService $suratDelivery,
     ) {
@@ -291,6 +293,10 @@ class BookingController extends Controller
         $payment  = $booking->payments->first();
         $conflict = $this->approval->analyze($booking);
 
+        $punyaBalasan = $booking->surats->contains(
+            fn ($surat) => $surat->jenis === BookingSurat::JENIS_BALASAN_PERSETUJUAN
+        );
+
         return Inertia::render('modules/e-booking/admin/BookingShow', [
             'booking' => [
                 'id'             => $booking->id,
@@ -331,12 +337,23 @@ class BookingController extends Controller
                     BookingStatus::PERLU_KLARIFIKASI,
                     BookingStatus::MENUNGGU_MEETING,
                 ], true),
-                'can_verify_payment' => $booking->status === BookingStatus::AWAITING_PAYMENT
+                'can_lanjut_meeting'             => in_array($booking->status, [
+                    BookingStatus::MENUNGGU_APPROVAL,
+                    BookingStatus::PERLU_KLARIFIKASI,
+                ], true) && ! $punyaBalasan,
+                'can_final_decision'             => $booking->status === BookingStatus::MENUNGGU_MEETING
+                    || ($punyaBalasan && $booking->status === BookingStatus::PERLU_KLARIFIKASI),
+                'can_send_meeting'               => $punyaBalasan && in_array($booking->status, [
+                    BookingStatus::MENUNGGU_MEETING,
+                    BookingStatus::PERLU_KLARIFIKASI,
+                ], true),
+                'can_verify_payment'             => $booking->status === BookingStatus::AWAITING_PAYMENT
                     && $payment
                     && $payment->status === 'awaiting_verification'
                     && $payment->bukti_path,
                 'surats' => $booking->surats->map(fn ($s) => [
                     'id'               => $s->id,
+                    'jenis'            => $s->jenis,
                     'jenis_label'      => $s->jenisLabel(),
                     'nomor_surat'      => $s->nomor_surat,
                     'perihal'          => $s->perihal,
@@ -375,6 +392,85 @@ class BookingController extends Controller
         ]);
     }
 
+    /**
+     * Tahap 1: admin mengirim surat balasan (lanjut ke tahap berikutnya).
+     * Pengajuan masuk status menunggu_meeting.
+     */
+    public function lanjutMeeting(LanjutMeetingRequest $request, int $id): RedirectResponse
+    {
+        $booking = Booking::query()->findOrFail($id);
+
+        if (! in_array($booking->status, [BookingStatus::MENUNGGU_APPROVAL, BookingStatus::PERLU_KLARIFIKASI], true)) {
+            return back()->with('error', 'Pengajuan ini tidak bisa dilanjutkan ke tahap meeting.');
+        }
+
+        $booking = $this->statuses->transition(
+            $booking,
+            BookingStatus::MENUNGGU_MEETING,
+            'Surat balasan dikirim, menunggu pelaksanaan meeting',
+            $request->user()->id,
+        );
+
+        $warning = $this->storeUploadedSurat(
+            $booking,
+            $request,
+            'surat_balasan',
+            BookingSurat::JENIS_BALASAN_PERSETUJUAN,
+            $request->validated('admin_notes'),
+        );
+
+        $redirect = redirect()
+            ->route('e-booking.admin.bookings.show', $id)
+            ->with('success', 'Surat balasan terkirim. Pengajuan masuk tahap meeting.');
+
+        if ($warning !== null) {
+            $redirect->with('error', $warning);
+        }
+
+        return $redirect;
+    }
+
+    /**
+     * Tahap 2: kirim undangan meeting (unggahan PDF admin) secara terpisah,
+     * kapan saja setelah surat balasan dan sebelum keputusan akhir.
+     */
+    public function kirimMeeting(KirimMeetingRequest $request, int $id): RedirectResponse
+    {
+        $booking = Booking::query()->findOrFail($id);
+
+        $punyaBalasan = $booking->surats()
+            ->where('jenis', BookingSurat::JENIS_BALASAN_PERSETUJUAN)
+            ->exists();
+
+        if (! $punyaBalasan || ! in_array($booking->status, [BookingStatus::MENUNGGU_MEETING, BookingStatus::PERLU_KLARIFIKASI], true)) {
+            return back()->with('error', 'Kirim surat balasan terlebih dahulu sebelum undangan meeting.');
+        }
+
+        $warning = $this->storeUploadedSurat(
+            $booking,
+            $request,
+            'surat_meeting',
+            BookingSurat::JENIS_UNDANGAN_MEETING,
+            $request->validated('admin_notes'),
+            true,
+            $request->validated('meeting_at'),
+            $request->validated('meeting_place'),
+        );
+
+        $redirect = redirect()
+            ->route('e-booking.admin.bookings.show', $id)
+            ->with('success', 'Undangan meeting terkirim.');
+
+        if ($warning !== null) {
+            $redirect->with('error', $warning);
+        }
+
+        return $redirect;
+    }
+
+    /**
+     * Tahap 2 (keputusan akhir setelah meeting): setujui pemakaian lahan.
+     */
     public function approve(ApproveBookingRequest $request, int $id): RedirectResponse
     {
         try {
@@ -395,7 +491,7 @@ class BookingController extends Controller
             ? 'Pengajuan perlu dikonfirmasi lebih lanjut karena benturan prioritas masih sama.'
             : ($jenisSewa === BookingJenisSewa::REGULER
                 ? 'Sewa reguler disetujui. Penyewa langsung menerima petunjuk pembayaran tanpa meeting.'
-                : 'Pengajuan disetujui. Menunggu pembayaran dari penyewa.');
+                : 'Pemakaian lahan disetujui. Penyewa menerima petunjuk pembayaran.');
 
         $approved = in_array($booking->status, [BookingStatus::APPROVED, BookingStatus::AWAITING_PAYMENT], true);
 
@@ -418,94 +514,60 @@ class BookingController extends Controller
             }
         }
 
-        $warnings = [];
-
-        if ($approved) {
-            $balasanWarning = $this->storeBalasanSurat(
-                $booking,
-                $request,
-                BookingSurat::JENIS_BALASAN_PERSETUJUAN,
-                $request->validated('admin_notes'),
-            );
-
-            if ($balasanWarning !== null) {
-                $warnings[] = $balasanWarning;
-            }
-        }
-
-        $meetingWarning = $this->sendMeetingInvitation($booking, $request);
-
-        if ($meetingWarning !== null) {
-            $warnings[] = $meetingWarning;
-        }
-
-        $redirect = redirect()
+        return redirect()
             ->route('e-booking.admin.bookings.show', $id)
             ->with('success', $message);
-
-        if ($warnings !== []) {
-            $redirect->with('error', implode(' ', $warnings));
-        }
-
-        return $redirect;
     }
 
     /**
-     * Simpan PDF surat balasan unggahan admin lalu kirim ke email penyewa.
+     * Simpan PDF surat unggahan admin lalu kirim ke penyewa (email, atau email + WhatsApp).
      */
-    private function storeBalasanSurat(Booking $booking, Request $request, string $jenis, ?string $catatan): ?string
-    {
-        $file = $request->file('surat_balasan');
+    private function storeUploadedSurat(
+        Booking $booking,
+        Request $request,
+        string $fileKey,
+        string $jenis,
+        ?string $catatan = null,
+        bool $viaWhatsApp = false,
+        ?string $meetingAt = null,
+        ?string $meetingPlace = null,
+    ): ?string {
+        $file = $request->file($fileKey);
 
         if (! $file instanceof \Illuminate\Http\UploadedFile) {
             return null;
         }
 
         try {
-            $surat = $this->surats->storeBalasan($booking, $request->user(), $jenis, $file, $catatan);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return 'Surat balasan gagal disimpan: '.$e->getMessage();
-        }
-
-        try {
-            $this->suratDelivery->sendEmail($surat);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return 'Surat balasan tersimpan, tetapi gagal dikirim ke email penyewa: '.$e->getMessage();
-        }
-
-        return null;
-    }
-
-    private function sendMeetingInvitation(Booking $booking, ApproveBookingRequest $request): ?string
-    {
-        $meetingAt    = $request->validated('meeting_at');
-        $meetingPlace = $request->validated('meeting_place');
-
-        $approved = in_array($booking->status, [BookingStatus::APPROVED, BookingStatus::AWAITING_PAYMENT], true);
-
-        if (! $approved || blank($meetingAt) || blank($meetingPlace)) {
-            return null;
-        }
-
-        try {
-            $result = $this->invitations->sendOnApproval(
+            $surat = $this->surats->storeUpload(
                 $booking,
                 $request->user(),
-                (string) $meetingAt,
-                (string) $meetingPlace,
+                $jenis,
+                $file,
+                $catatan,
+                $meetingAt,
+                $meetingPlace,
             );
         } catch (\Throwable $e) {
             report($e);
 
-            return 'Undangan meeting gagal dibuat/dikirim: '.$e->getMessage();
+            return 'Surat gagal disimpan: '.$e->getMessage();
         }
 
-        if ($result['errors'] !== []) {
-            return 'Undangan meeting dibuat, tetapi sebagian pengiriman gagal — '.implode('; ', $result['errors']);
+        try {
+            if ($viaWhatsApp) {
+                $result = $this->suratDelivery->deliver($surat);
+
+                if ($result['errors'] !== []) {
+                    return 'Surat tersimpan, tetapi sebagian pengiriman gagal — '.implode('; ', $result['errors']);
+                }
+            } else {
+                $this->suratDelivery->sendEmail($surat);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 'Surat tersimpan, tetapi gagal dikirim ke penyewa: '.$e->getMessage();
         }
 
         return null;
@@ -525,9 +587,10 @@ class BookingController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        $warning = $this->storeBalasanSurat(
+        $warning = $this->storeUploadedSurat(
             $booking,
             $request,
+            'surat_balasan',
             BookingSurat::JENIS_BALASAN_PENOLAKAN,
             $request->validated('reason'),
         );

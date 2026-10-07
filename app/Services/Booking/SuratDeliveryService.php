@@ -103,8 +103,9 @@ class SuratDeliveryService
     }
 
     /**
-     * Pengajuan yang masih ditinjau berpindah ke menunggu_meeting begitu undangannya sampai ke penyewa.
-     * Undangan yang dikirim saat approve tidak mengubah status karena booking sudah awaiting_payment.
+     * Safety net: pengajuan yang masih ditinjau berpindah ke menunggu_meeting begitu
+     * undangan sampai ke penyewa. Pada alur normal admin sudah memindahkan status
+     * lebih dulu (lihat BookingController::lanjutMeeting), sehingga ini tidak berefek.
      */
     private function markMeetingInvited(BookingSurat $surat, string $channel): void
     {
@@ -134,9 +135,15 @@ class SuratDeliveryService
 
     private function message(BookingSurat $surat): string
     {
-        $text = "Surat pengajuan {$surat->booking->nomor}\n"
-            .$surat->jenisLabel()." — {$surat->nomor_surat}\n"
-            ."Perihal: {$surat->perihal}";
+        $text = "Surat pengajuan {$surat->booking->nomor}\n".$surat->jenisLabel();
+
+        if (filled($surat->nomor_surat)) {
+            $text .= " — {$surat->nomor_surat}";
+        }
+
+        if (filled($surat->perihal)) {
+            $text .= "\nPerihal: {$surat->perihal}";
+        }
 
         if ($surat->meeting_at || $surat->meeting_place) {
             $text .= "\n\nMeeting: "

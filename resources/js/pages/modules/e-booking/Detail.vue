@@ -118,7 +118,7 @@ const formatRp = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currenc
 const statusLabel = (status: string) => {
     const map: Record<string, string> = {
         menunggu_approval: 'Menunggu ditinjau',
-        menunggu_meeting: 'Undangan meeting',
+        menunggu_meeting: 'Menunggu keputusan',
         awaiting_payment: 'Menunggu pembayaran',
         approved: 'Sudah disetujui',
         paid: 'Pembayaran masuk',
@@ -277,7 +277,7 @@ const title = computed(() => {
         return 'Menunggu ditinjau';
     }
     if (props.booking.status === 'menunggu_meeting') {
-        return 'Hadiri meeting dengan pengelola';
+        return 'Menunggu keputusan pengelola';
     }
 
     return `Pesanan ${props.booking.nomor}`;
@@ -303,7 +303,7 @@ const nextStepText = computed(() => {
         return 'Pengelola perlu konfirmasi tambahan. Mohon cek catatan terbaru.';
     }
     if (props.booking.status === 'menunggu_meeting') {
-        return 'Pengelola mengundang Anda meeting sebelum memutuskan pengajuan. Cek surat undangan dan bawa dokumen yang diminta.';
+        return 'Pengelola sedang menindaklanjuti pengajuan Anda. Jika ada undangan meeting, silakan hadir dan bawa dokumen yang diminta.';
     }
 
     return 'Lihat rincian pesanan dan pantau perkembangannya di halaman ini.';

@@ -193,6 +193,12 @@ Route::middleware(['booking.web:admin_upt'])->prefix('booking/admin')->group(fun
     Route::post('/bookings/{id}/approve', [EBookingAdminBookingController::class, 'approve'])
         ->whereNumber('id')
         ->name('e-booking.admin.bookings.approve');
+    Route::post('/bookings/{id}/lanjut', [EBookingAdminBookingController::class, 'lanjutMeeting'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.bookings.lanjut');
+    Route::post('/bookings/{id}/meeting', [EBookingAdminBookingController::class, 'kirimMeeting'])
+        ->whereNumber('id')
+        ->name('e-booking.admin.bookings.meeting');
     Route::post('/bookings/{id}/reject', [EBookingAdminBookingController::class, 'reject'])
         ->whereNumber('id')
         ->name('e-booking.admin.bookings.reject');
