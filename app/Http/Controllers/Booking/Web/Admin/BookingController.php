@@ -13,11 +13,12 @@ use App\Models\Booking\Booking;
 use App\Models\Booking\BookingDocumentType;
 use App\Models\Booking\BookingPayment;
 use App\Models\Booking\BookingPriorityRule;
-use App\Models\Booking\BookingSetting;
 use App\Models\Booking\BookingSurat;
 use App\Services\Booking\AdminApprovalService;
 use App\Services\Booking\BookingInvitationService;
 use App\Services\Booking\BookingPaymentService;
+use App\Services\Booking\SuratDeliveryService;
+use App\Services\Booking\SuratService;
 use App\Support\Booking\BookingJenisSewa;
 use App\Support\Booking\BookingStatus;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,6 +38,8 @@ class BookingController extends Controller
         private readonly AdminApprovalService $approval,
         private readonly BookingPaymentService $payments,
         private readonly BookingInvitationService $invitations,
+        private readonly SuratService $surats,
+        private readonly SuratDeliveryService $suratDelivery,
     ) {
     }
 
@@ -299,13 +302,13 @@ class BookingController extends Controller
                     'qty'        => $i->qty,
                     'line_total' => (int) $i->line_total,
                 ]),
-                'jenis_sewa' => BookingJenisSewa::of($booking),
+                'jenis_sewa'           => BookingJenisSewa::of($booking),
                 'surat_permohonan_url' => $booking->surat_permohonan_path
                     ? Storage::disk('public')->url($booking->surat_permohonan_path)
                     : null,
-                'surat_permohonan_name' => $booking->surat_permohonan_name,
+                'surat_permohonan_name'         => $booking->surat_permohonan_name,
                 'surat_permohonan_submitted_at' => optional($booking->submitted_surat_permohonan_at)?->format('Y-m-d H:i'),
-                'can_review' => in_array($booking->status, [
+                'can_review'                    => in_array($booking->status, [
                     BookingStatus::MENUNGGU_APPROVAL,
                     BookingStatus::PERLU_KLARIFIKASI,
                     BookingStatus::MENUNGGU_MEETING,
@@ -341,14 +344,6 @@ class BookingController extends Controller
                 'expires_at' => $payment->meta['expires_at'] ?? null,
             ] : null,
             'conflict'       => $conflict,
-            'document_types' => BookingDocumentType::query()
-                ->where('is_active', true)
-                ->orderBy('sort_order')
-                ->orderBy('id')
-                ->get(['id', 'name', 'is_required'])
-                ->map(fn ($d) => ['id' => $d->id, 'name' => $d->name, 'is_required' => (bool) $d->is_required])
-                ->all(),
-            'surat_kop'      => is_array(BookingSetting::getValue('surat_kop')) ? BookingSetting::getValue('surat_kop') : [],
             'priority_rules' => BookingPriorityRule::query()
                 ->where('is_active', true)
                 ->orderBy('priority_order')
@@ -405,17 +400,66 @@ class BookingController extends Controller
             }
         }
 
-        $warning = $this->sendMeetingInvitation($booking, $request);
+        $warnings = [];
+
+        if ($approved) {
+            $balasanWarning = $this->storeBalasanSurat(
+                $booking,
+                $request,
+                BookingSurat::JENIS_BALASAN_PERSETUJUAN,
+                $request->validated('admin_notes'),
+            );
+
+            if ($balasanWarning !== null) {
+                $warnings[] = $balasanWarning;
+            }
+        }
+
+        $meetingWarning = $this->sendMeetingInvitation($booking, $request);
+
+        if ($meetingWarning !== null) {
+            $warnings[] = $meetingWarning;
+        }
 
         $redirect = redirect()
             ->route('e-booking.admin.bookings.show', $id)
             ->with('success', $message);
 
-        if ($warning !== null) {
-            $redirect->with('error', $warning);
+        if ($warnings !== []) {
+            $redirect->with('error', implode(' ', $warnings));
         }
 
         return $redirect;
+    }
+
+    /**
+     * Simpan PDF surat balasan unggahan admin lalu kirim ke email penyewa.
+     */
+    private function storeBalasanSurat(Booking $booking, Request $request, string $jenis, ?string $catatan): ?string
+    {
+        $file = $request->file('surat_balasan');
+
+        if (! $file instanceof \Illuminate\Http\UploadedFile) {
+            return null;
+        }
+
+        try {
+            $surat = $this->surats->storeBalasan($booking, $request->user(), $jenis, $file, $catatan);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 'Surat balasan gagal disimpan: '.$e->getMessage();
+        }
+
+        try {
+            $this->suratDelivery->sendEmail($surat);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 'Surat balasan tersimpan, tetapi gagal dikirim ke email penyewa: '.$e->getMessage();
+        }
+
+        return null;
     }
 
     private function sendMeetingInvitation(Booking $booking, ApproveBookingRequest $request): ?string
@@ -452,8 +496,10 @@ class BookingController extends Controller
     public function reject(RejectBookingRequest $request, int $id): RedirectResponse
     {
         try {
+            $booking = Booking::query()->findOrFail($id);
+
             $this->approval->reject(
-                Booking::query()->findOrFail($id),
+                $booking,
                 $request->user(),
                 $request->validated('reason')
             );
@@ -461,9 +507,22 @@ class BookingController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()
+        $warning = $this->storeBalasanSurat(
+            $booking,
+            $request,
+            BookingSurat::JENIS_BALASAN_PENOLAKAN,
+            $request->validated('reason'),
+        );
+
+        $redirect = redirect()
             ->route('e-booking.admin.bookings.show', $id)
             ->with('success', 'Booking ditolak.');
+
+        if ($warning !== null) {
+            $redirect->with('error', $warning);
+        }
+
+        return $redirect;
     }
 
     public function klarifikasi(RejectBookingRequest $request, int $id): RedirectResponse

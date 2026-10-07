@@ -39,18 +39,30 @@ class BookingSurat extends Model
     protected function casts(): array
     {
         return [
-            'meeting_at' => 'datetime',
-            'dokumen' => 'array',
-            'sent_email_at' => 'datetime',
+            'meeting_at'       => 'datetime',
+            'dokumen'          => 'array',
+            'sent_email_at'    => 'datetime',
             'sent_whatsapp_at' => 'datetime',
         ];
     }
 
-    /** @return list<string> */
+    /**
+     * Jenis yang boleh dibuat lewat form surat manual. Surat balasan tidak lagi
+     * digenerate di web, melainkan berupa unggahan PDF pada panel keputusan admin.
+     *
+     * @return list<string>
+     */
     public static function jenisList(): array
     {
         return [
             self::JENIS_UNDANGAN_MEETING,
+        ];
+    }
+
+    /** Jenis surat balasan yang dibuat dari unggahan PDF admin. */
+    public static function jenisBalasan(): array
+    {
+        return [
             self::JENIS_BALASAN_PERSETUJUAN,
             self::JENIS_BALASAN_PENOLAKAN,
         ];
@@ -59,10 +71,10 @@ class BookingSurat extends Model
     public function jenisLabel(): string
     {
         return match ($this->jenis) {
-            self::JENIS_UNDANGAN_MEETING => 'Undangan Meeting',
+            self::JENIS_UNDANGAN_MEETING    => 'Undangan Meeting',
             self::JENIS_BALASAN_PERSETUJUAN => 'Balasan Persetujuan',
-            self::JENIS_BALASAN_PENOLAKAN => 'Balasan Penolakan',
-            default => $this->jenis,
+            self::JENIS_BALASAN_PENOLAKAN   => 'Balasan Penolakan',
+            default                         => $this->jenis,
         };
     }
 
@@ -73,7 +85,9 @@ class BookingSurat extends Model
 
     public function attachmentName(): string
     {
-        $safe = preg_replace('/[\/\\\\]+/', '-', $this->nomor_surat) ?? 'surat';
+        $nomor = trim((string) ($this->nomor_surat ?? ''));
+        $base  = $nomor !== '' ? $nomor : str($this->jenisLabel())->slug('-')->toString();
+        $safe  = preg_replace('/[\/\\\\]+/', '-', $base) ?: 'surat';
 
         return 'Surat_'.$safe.'.pdf';
     }

@@ -5,6 +5,7 @@ namespace App\Services\Booking;
 use App\Models\Booking\Booking;
 use App\Models\Booking\BookingPriorityRule;
 use App\Models\Booking\BookingSetting;
+use App\Support\Booking\BookingJenisSewa;
 use App\Support\Booking\BookingStatus;
 use Carbon\Carbon;
 
@@ -12,7 +13,8 @@ class ConflictResolver
 {
     public function __construct(
         private readonly RulesEngine $rules,
-    ) {}
+    ) {
+    }
 
     /**
      * @return array{
@@ -28,29 +30,39 @@ class ConflictResolver
      */
     public function resolve(int $bookingId): array
     {
-        $booking = Booking::query()->with(['priorityRule', 'areas'])->findOrFail($bookingId);
+        $booking = Booking::query()->with(['priorityRule', 'areas', 'items'])->findOrFail($bookingId);
 
-        $bufferBefore = (int) ($booking->buffer_before_days ?? 1);
-        $bufferAfter = (int) ($booking->buffer_after_days ?? 1);
-        $windowStart = Carbon::parse($booking->starts_at)->subDays($bufferBefore)->startOfDay();
-        $windowEnd = Carbon::parse($booking->ends_at)->addDays($bufferAfter)->endOfDay();
+        $selfPerHari = BookingJenisSewa::isPerHari($booking);
 
-        $selfAreaIds = $booking->areas->pluck('id')->map(fn ($id) => (int) $id)->all();
+        // Benturan prioritas hanya berlaku antar pengajuan sewa per hari (event).
+        // Sewa per jam (reguler) langsung booking dan tidak pernah dianggap bentrok.
+        if (! $selfPerHari) {
+            $others = collect();
+        } else {
+            $bufferBefore = (int) ($booking->buffer_before_days ?? 1);
+            $bufferAfter  = (int) ($booking->buffer_after_days ?? 1);
+            $windowStart  = Carbon::parse($booking->starts_at)->subDays($bufferBefore)->startOfDay();
+            $windowEnd    = Carbon::parse($booking->ends_at)->addDays($bufferAfter)->endOfDay();
 
-        $others = Booking::query()
-            ->with(['priorityRule', 'areas'])
-            ->where('id', '!=', $booking->id)
-            ->where('venue_id', $booking->venue_id)
-            ->whereIn('status', BookingStatus::locking())
-            ->where('starts_at', '<', $windowEnd)
-            ->where('ends_at', '>', $windowStart)
-            ->when($selfAreaIds !== [], function ($q) use ($selfAreaIds) {
-                $q->where(function ($inner) use ($selfAreaIds) {
-                    $inner->whereHas('areas', fn ($aq) => $aq->whereIn('booking_areas.id', $selfAreaIds))
-                        ->orWhereDoesntHave('areas');
-                });
-            })
-            ->get();
+            $selfAreaIds = $booking->areas->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+            $others = Booking::query()
+                ->with(['priorityRule', 'areas', 'items'])
+                ->where('id', '!=', $booking->id)
+                ->where('venue_id', $booking->venue_id)
+                ->whereIn('status', BookingStatus::locking())
+                ->where('starts_at', '<', $windowEnd)
+                ->where('ends_at', '>', $windowStart)
+                ->when($selfAreaIds !== [], function ($q) use ($selfAreaIds) {
+                    $q->where(function ($inner) use ($selfAreaIds) {
+                        $inner->whereHas('areas', fn ($aq) => $aq->whereIn('booking_areas.id', $selfAreaIds))
+                            ->orWhereDoesntHave('areas');
+                    });
+                })
+                ->get()
+                ->filter(fn (Booking $other) => BookingJenisSewa::isPerHari($other))
+                ->values();
+        }
 
         $tentativeCodes = $this->rules->get('tentative_areas', $booking->venue_id, []) ?? [];
         if (! is_array($tentativeCodes)) {
@@ -59,44 +71,44 @@ class ConflictResolver
         $isTentativeContext = $this->isTentativeArea($booking, $tentativeCodes);
 
         $selfOrder = $this->effectivePriorityOrder($booking, $isTentativeContext);
-        $winners = [];
-        $losers = [];
-        $peers = [];
+        $winners   = [];
+        $losers    = [];
+        $peers     = [];
         $conflicts = [];
 
         foreach ($others as $other) {
             $otherTentative = $isTentativeContext || $this->isTentativeArea($other, $tentativeCodes);
-            $otherOrder = $this->effectivePriorityOrder($other, $otherTentative);
+            $otherOrder     = $this->effectivePriorityOrder($other, $otherTentative);
 
             $relation = 'peer';
             if ($selfOrder < $otherOrder) {
-                $relation = 'self_unggul';
+                $relation  = 'self_unggul';
                 $winners[] = $booking->id;
-                $losers[] = $other->id;
+                $losers[]  = $other->id;
             } elseif ($selfOrder > $otherOrder) {
-                $relation = 'other_unggul';
+                $relation  = 'other_unggul';
                 $winners[] = $other->id;
-                $losers[] = $booking->id;
+                $losers[]  = $booking->id;
             } else {
                 $peers[] = $other->id;
             }
 
             $conflicts[] = [
-                'id' => $other->id,
-                'nomor' => $other->nomor,
-                'status' => $other->status,
-                'priority_flag' => $other->priority_flag,
+                'id'             => $other->id,
+                'nomor'          => $other->nomor,
+                'status'         => $other->status,
+                'priority_flag'  => $other->priority_flag,
                 'priority_order' => $otherOrder,
-                'priority_rule' => $other->priorityRule?->only(['id', 'code', 'name', 'priority_order']),
-                'relation' => $relation,
+                'priority_rule'  => $other->priorityRule?->only(['id', 'code', 'name', 'priority_order']),
+                'relation'       => $relation,
                 'area_tentative' => $this->isTentativeArea($other, $tentativeCodes),
-                'starts_at' => optional($other->starts_at)->toDateTimeString(),
-                'ends_at' => optional($other->ends_at)->toDateTimeString(),
+                'starts_at'      => optional($other->starts_at)->toDateTimeString(),
+                'ends_at'        => optional($other->ends_at)->toDateTimeString(),
             ];
         }
 
         $needsClarification = $peers !== [];
-        $flag = 'normal';
+        $flag               = 'normal';
         if ($needsClarification) {
             $flag = 'normal';
         } elseif (in_array($booking->id, $winners, true) && $conflicts !== []) {
@@ -106,32 +118,32 @@ class ConflictResolver
         }
 
         return [
-            'flag' => $flag,
+            'flag'                => $flag,
             'needs_clarification' => $needsClarification,
-            'winners' => array_values(array_unique($winners)),
-            'losers' => array_values(array_unique($losers)),
-            'peers' => array_values(array_unique($peers)),
-            'conflicts' => $conflicts,
+            'winners'             => array_values(array_unique($winners)),
+            'losers'              => array_values(array_unique($losers)),
+            'peers'               => array_values(array_unique($peers)),
+            'conflicts'           => $conflicts,
             'self_priority_order' => $selfOrder,
-            'tentative_context' => $isTentativeContext,
-            'kontak_klarifikasi' => BookingSetting::getValue('kontak_klarifikasi', '085777183633'),
+            'tentative_context'   => $isTentativeContext,
+            'kontak_klarifikasi'  => BookingSetting::getValue('kontak_klarifikasi', '085777183633'),
         ];
     }
 
     public function suggestPriorityRuleId(Booking $booking): ?int
     {
-        $item = $booking->items()->first();
+        $item       = $booking->items()->first();
         $eventLevel = $item?->snapshot['event_level'] ?? null;
-        $kategori = $booking->kategori_tarif;
+        $kategori   = $booking->kategori_tarif;
 
         $code = 'umum_komersial';
         if ($kategori === 'pemerintah') {
             $code = match ($eventLevel) {
                 'internasional' => 'event_internasional',
-                'nasional' => 'event_nasional',
+                'nasional'      => 'event_nasional',
                 'provinsi', 'provinsi_kabupaten' => 'event_provinsi',
                 'kabupaten' => 'event_kabupaten',
-                default => 'instansi_pemerintah_lain',
+                default     => 'instansi_pemerintah_lain',
             };
         }
 
@@ -144,7 +156,7 @@ class ConflictResolver
     private function effectivePriorityOrder(Booking $booking, bool $tentativeContext): int
     {
         $order = $booking->priorityRule?->priority_order ?? 999;
-        $code = $booking->priorityRule?->code;
+        $code  = $booking->priorityRule?->code;
 
         if ($tentativeContext && $code === 'pemda_dispora_upt') {
             return 0;

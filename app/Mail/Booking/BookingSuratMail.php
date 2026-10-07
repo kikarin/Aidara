@@ -19,12 +19,15 @@ class BookingSuratMail extends Mailable
         public BookingSurat $surat,
         public string $unduhUrl,
         public string $pdfContent,
-    ) {}
+    ) {
+    }
 
     public function envelope(): Envelope
     {
+        $judul = $this->surat->perihal ?: $this->surat->jenisLabel();
+
         return new Envelope(
-            subject: 'Surat balasan pengajuan '.$this->surat->booking->nomor.' — '.$this->surat->perihal,
+            subject: $judul.' — '.$this->surat->booking->nomor,
         );
     }
 

@@ -27,6 +27,7 @@ use App\Services\Booking\AvailabilityService;
 use App\Services\Booking\BookingPaymentExpireService;
 use App\Services\Booking\BookingPaymentService;
 use App\Services\Booking\BookingSubmitService;
+use App\Services\Booking\ConflictResolver;
 use App\Services\Booking\PricingService;
 use App\Services\Booking\VenuePolicyService;
 use App\Support\Booking\BookingSatuan;
@@ -83,11 +84,11 @@ class BookingCoreTest extends TestCase
         $this->venue->addons()->syncWithoutDetaching([$addon->id]);
 
         $quote = app(PricingService::class)->quote([
-            'tarif_id' => $this->tarif->id,
+            'tarif_id'       => $this->tarif->id,
             'kategori_tarif' => 'non_pemerintah',
-            'starts_at' => now()->addDay()->setTime(8, 0)->toDateTimeString(),
-            'ends_at' => now()->addDay()->setTime(10, 0)->toDateTimeString(),
-            'addon_ids' => [['id' => $addon->id, 'qty' => 1]],
+            'starts_at'      => now()->addDay()->setTime(8, 0)->toDateTimeString(),
+            'ends_at'        => now()->addDay()->setTime(10, 0)->toDateTimeString(),
+            'addon_ids'      => [['id' => $addon->id, 'qty' => 1]],
         ]);
 
         $this->assertSame(2 * 150_000, $quote['subtotal']);
@@ -133,10 +134,10 @@ class BookingCoreTest extends TestCase
         $this->expectExceptionMessage('7 hari');
 
         app(AvailabilityService::class)->assertBookable([
-            'venue_id' => $this->venue->id,
-            'area_id' => $this->area->id,
+            'venue_id'  => $this->venue->id,
+            'area_id'   => $this->area->id,
             'starts_at' => now()->addDays(10)->setTime(8, 0)->toDateTimeString(),
-            'ends_at' => now()->addDays(10)->setTime(9, 0)->toDateTimeString(),
+            'ends_at'   => now()->addDays(10)->setTime(9, 0)->toDateTimeString(),
         ]);
     }
 
@@ -148,22 +149,22 @@ class BookingCoreTest extends TestCase
         }
 
         $start = now()->addDay()->setTime(8, 0);
-        $end = now()->addDay()->setTime(10, 0);
+        $end   = now()->addDay()->setTime(10, 0);
 
         BookingVenueClosure::query()->create([
-            'venue_id' => $this->venue->id,
-            'area_id' => null,
+            'venue_id'  => $this->venue->id,
+            'area_id'   => null,
             'starts_at' => $start->copy()->subHour(),
-            'ends_at' => $end->copy()->addHour(),
-            'reason' => 'Maintenance',
+            'ends_at'   => $end->copy()->addHour(),
+            'reason'    => 'Maintenance',
             'is_active' => true,
         ]);
 
         $check = app(AvailabilityService::class)->check([
-            'venue_id' => $this->venue->id,
-            'area_id' => $this->area->id,
+            'venue_id'  => $this->venue->id,
+            'area_id'   => $this->area->id,
             'starts_at' => $start->toDateTimeString(),
-            'ends_at' => $end->toDateTimeString(),
+            'ends_at'   => $end->toDateTimeString(),
         ]);
 
         $this->assertSame('merah', $check['status']);
@@ -174,10 +175,10 @@ class BookingCoreTest extends TestCase
         $this->expectExceptionMessage('Maintenance');
 
         app(AvailabilityService::class)->assertBookable([
-            'venue_id' => $this->venue->id,
-            'area_id' => $this->area->id,
+            'venue_id'  => $this->venue->id,
+            'area_id'   => $this->area->id,
             'starts_at' => $start->toDateTimeString(),
-            'ends_at' => $end->toDateTimeString(),
+            'ends_at'   => $end->toDateTimeString(),
         ]);
     }
 
@@ -190,10 +191,10 @@ class BookingCoreTest extends TestCase
         $this->expectExceptionMessage('minimal');
 
         app(PricingService::class)->quote([
-            'tarif_id' => $this->tarif->id,
+            'tarif_id'       => $this->tarif->id,
             'kategori_tarif' => 'non_pemerintah',
-            'starts_at' => now()->addDay()->setTime(8, 0)->toDateTimeString(),
-            'ends_at' => now()->addDay()->setTime(10, 0)->toDateTimeString(),
+            'starts_at'      => now()->addDay()->setTime(8, 0)->toDateTimeString(),
+            'ends_at'        => now()->addDay()->setTime(10, 0)->toDateTimeString(),
         ]);
     }
 
@@ -206,10 +207,10 @@ class BookingCoreTest extends TestCase
         $this->expectExceptionMessage('maksimal');
 
         app(PricingService::class)->quote([
-            'tarif_id' => $this->tarif->id,
+            'tarif_id'       => $this->tarif->id,
             'kategori_tarif' => 'non_pemerintah',
-            'starts_at' => now()->addDay()->setTime(8, 0)->toDateTimeString(),
-            'ends_at' => now()->addDay()->setTime(11, 0)->toDateTimeString(),
+            'starts_at'      => now()->addDay()->setTime(8, 0)->toDateTimeString(),
+            'ends_at'        => now()->addDay()->setTime(11, 0)->toDateTimeString(),
         ]);
     }
 
@@ -223,18 +224,18 @@ class BookingCoreTest extends TestCase
         $date = now()->addDay()->toDateString();
 
         BookingVenueClosure::query()->create([
-            'venue_id' => $this->venue->id,
-            'area_id' => null,
+            'venue_id'  => $this->venue->id,
+            'area_id'   => null,
             'starts_at' => $date.' 10:00:00',
-            'ends_at' => $date.' 12:00:00',
-            'reason' => 'Maintenance',
+            'ends_at'   => $date.' 12:00:00',
+            'reason'    => 'Maintenance',
             'is_active' => true,
         ]);
 
         $result = app(AvailabilityService::class)->daySlots([
-            'venue_id' => $this->venue->id,
-            'area_id' => $this->area->id,
-            'date' => $date,
+            'venue_id'       => $this->venue->id,
+            'area_id'        => $this->area->id,
+            'date'           => $date,
             'duration_hours' => 1,
         ]);
 
@@ -289,12 +290,12 @@ class BookingCoreTest extends TestCase
             ['name' => 'Umum', 'priority_order' => 7, 'is_active' => true]
         );
 
-        $a = $this->makeSubmittedBooking(['priority_rule_id' => $rule->id]);
+        $a     = $this->makeSubmittedBooking(['priority_rule_id' => $rule->id]);
         $bUser = $this->makePenyewa('peer.'.uniqid().'@test.local');
-        $b = $this->makeSubmittedBooking([
-            'user_id' => $bUser->id,
+        $b     = $this->makeSubmittedBooking([
+            'user_id'            => $bUser->id,
             'penyewa_profile_id' => BookingPenyewaProfile::query()->where('user_id', $bUser->id)->value('id'),
-            'priority_rule_id' => $rule->id,
+            'priority_rule_id'   => $rule->id,
         ]);
 
         $result = app(AdminApprovalService::class)->approve($a, $this->admin);
@@ -302,6 +303,62 @@ class BookingCoreTest extends TestCase
         $this->assertSame(BookingStatus::AWAITING_PAYMENT, $result['booking']->fresh()->status);
         $this->assertFalse($result['conflict']['needs_clarification']);
         $this->assertSame(BookingStatus::MENUNGGU_APPROVAL, $b->fresh()->status);
+    }
+
+    #[Test]
+    public function per_jam_same_day_different_hours_do_not_conflict(): void
+    {
+        BookingPriorityRule::query()->updateOrCreate(
+            ['code' => 'umum_komersial'],
+            ['name' => 'Umum', 'priority_order' => 7, 'is_active' => true]
+        );
+
+        $day = now()->addDay();
+
+        $a = app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload([
+            'starts_at' => $day->copy()->setTime(7, 0)->toDateTimeString(),
+            'ends_at'   => $day->copy()->setTime(11, 0)->toDateTimeString(),
+        ]));
+
+        $b = app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload([
+            'starts_at' => $day->copy()->setTime(11, 0)->toDateTimeString(),
+            'ends_at'   => $day->copy()->setTime(15, 0)->toDateTimeString(),
+        ]));
+
+        $this->assertSame(BookingStatus::AWAITING_PAYMENT, $a->fresh()->status);
+        $this->assertSame(BookingStatus::AWAITING_PAYMENT, $b->fresh()->status);
+
+        $result = app(ConflictResolver::class)->resolve($b->id);
+
+        $this->assertSame([], $result['conflicts']);
+        $this->assertFalse($result['needs_clarification']);
+    }
+
+    #[Test]
+    public function per_hari_overlap_is_peer_and_needs_clarification(): void
+    {
+        $rule = BookingPriorityRule::query()->updateOrCreate(
+            ['code' => 'umum_komersial'],
+            ['name' => 'Umum', 'priority_order' => 7, 'is_active' => true]
+        );
+
+        $a = $this->makeSubmittedBooking(['priority_rule_id' => $rule->id]);
+
+        $bUser = $this->makePenyewa('peer2.'.uniqid().'@test.local');
+        $b     = $this->makeSubmittedBooking([
+            'user_id'            => $bUser->id,
+            'penyewa_profile_id' => BookingPenyewaProfile::query()->where('user_id', $bUser->id)->value('id'),
+            'priority_rule_id'   => $rule->id,
+        ]);
+
+        app(AdminApprovalService::class)->approve($a, $this->admin, ['force' => true]);
+        $this->assertSame(BookingStatus::AWAITING_PAYMENT, $a->fresh()->status);
+
+        $result = app(ConflictResolver::class)->resolve($b->id);
+
+        $this->assertNotEmpty($result['conflicts']);
+        $this->assertContains($a->id, $result['peers']);
+        $this->assertTrue($result['needs_clarification']);
     }
 
     #[Test]
@@ -345,10 +402,10 @@ class BookingCoreTest extends TestCase
             $start = now()->addDay()->addDays($offset)->setTime(18, 0);
 
             return app(AvailabilityService::class)->check([
-                'venue_id' => $this->venue->id,
-                'area_ids' => [$this->area->id],
-                'starts_at' => $start->toDateTimeString(),
-                'ends_at' => $start->copy()->addHour()->toDateTimeString(),
+                'venue_id'    => $this->venue->id,
+                'area_ids'    => [$this->area->id],
+                'starts_at'   => $start->toDateTimeString(),
+                'ends_at'     => $start->copy()->addHour()->toDateTimeString(),
                 'is_per_hari' => false,
             ]);
         };
@@ -360,10 +417,10 @@ class BookingCoreTest extends TestCase
 
         // Sewa per hari tetap boleh diajukan (bukan diblokir sesama per hari).
         $perHari = app(AvailabilityService::class)->check([
-            'venue_id' => $this->venue->id,
-            'area_ids' => [$this->area->id],
-            'starts_at' => now()->addDay()->setTime(10, 0)->toDateTimeString(),
-            'ends_at' => now()->addDay()->setTime(11, 0)->toDateTimeString(),
+            'venue_id'    => $this->venue->id,
+            'area_ids'    => [$this->area->id],
+            'starts_at'   => now()->addDay()->setTime(10, 0)->toDateTimeString(),
+            'ends_at'     => now()->addDay()->setTime(11, 0)->toDateTimeString(),
             'is_per_hari' => true,
         ]);
         $this->assertSame('hijau', $perHari['status']);
@@ -449,19 +506,92 @@ class BookingCoreTest extends TestCase
         );
     }
 
+    #[Test]
+    public function penyewa_can_resubmit_bukti_after_rejection(): void
+    {
+        Mail::fake();
+
+        $booking = app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload());
+        app(BookingPaymentService::class)->uploadBukti(
+            $booking->fresh(),
+            $this->penyewa,
+            UploadedFile::fake()->image('bukti.jpg'),
+        );
+        $payment = BookingPayment::query()->where('booking_id', $booking->id)->firstOrFail();
+
+        app(BookingPaymentService::class)->rejectBukti($payment, $this->admin, 'Nominal tidak sesuai');
+
+        $resubmitted = app(BookingPaymentService::class)->uploadBukti(
+            $booking->fresh(),
+            $this->penyewa,
+            UploadedFile::fake()->image('bukti-baru.jpg'),
+        );
+
+        $this->assertSame('awaiting_verification', $resubmitted->status);
+        $this->assertNotNull($resubmitted->bukti_path);
+        $this->assertNull($resubmitted->verified_at);
+        $this->assertNull($resubmitted->verified_by);
+        $this->assertSame($booking->id, $resubmitted->booking_id);
+    }
+
+    #[Test]
+    public function penyewa_cannot_upload_bukti_while_awaiting_verification(): void
+    {
+        Mail::fake();
+
+        $booking = app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload());
+        app(BookingPaymentService::class)->uploadBukti(
+            $booking->fresh(),
+            $this->penyewa,
+            UploadedFile::fake()->image('bukti.jpg'),
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        app(BookingPaymentService::class)->uploadBukti(
+            $booking->fresh(),
+            $this->penyewa,
+            UploadedFile::fake()->image('bukti-lain.jpg'),
+        );
+    }
+
+    #[Test]
+    public function penyewa_cannot_upload_bukti_after_verified(): void
+    {
+        Mail::fake();
+
+        $booking = app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload());
+        app(BookingPaymentService::class)->uploadBukti(
+            $booking->fresh(),
+            $this->penyewa,
+            UploadedFile::fake()->image('bukti.jpg'),
+        );
+        $payment = BookingPayment::query()->where('booking_id', $booking->id)->firstOrFail();
+
+        app(BookingPaymentService::class)->verify($payment, $this->admin);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        app(BookingPaymentService::class)->uploadBukti(
+            $booking->fresh(),
+            $this->penyewa,
+            UploadedFile::fake()->image('bukti-lagi.jpg'),
+        );
+    }
+
     /** @param  array<string, mixed>  $overrides */
     private function validSubmitPayload(array $overrides = []): array
     {
         $start = now()->addDay()->setTime(8, 0);
-        $end = now()->addDay()->setTime(9, 0);
+        $end   = now()->addDay()->setTime(9, 0);
 
         return array_merge([
-            'tarif_id' => $this->tarif->id,
-            'area_id' => $this->area->id,
+            'tarif_id'       => $this->tarif->id,
+            'area_id'        => $this->area->id,
             'kategori_tarif' => 'non_pemerintah',
-            'tujuan' => 'Latihan demo',
-            'starts_at' => $start->toDateTimeString(),
-            'ends_at' => $end->toDateTimeString(),
+            'tujuan'         => 'Latihan demo',
+            'starts_at'      => $start->toDateTimeString(),
+            'ends_at'        => $end->toDateTimeString(),
             'terms_accepted' => true,
         ], $overrides);
     }
@@ -470,7 +600,7 @@ class BookingCoreTest extends TestCase
     private function makeSubmittedBooking(array $attrs = []): Booking
     {
         $payload = $this->validSubmitPayload(['tarif_id' => $this->tarifHari->id]);
-        $userId = $attrs['user_id'] ?? $this->penyewa->id;
+        $userId  = $attrs['user_id'] ?? $this->penyewa->id;
 
         $booking = app(BookingSubmitService::class)->submit(
             User::query()->findOrFail($userId),
@@ -491,7 +621,7 @@ class BookingCoreTest extends TestCase
         $booking->refresh();
 
         $booking->forceFill([
-            'status' => BookingStatus::CONFIRMED,
+            'status'       => BookingStatus::CONFIRMED,
             'confirmed_at' => now(),
         ])->save();
 
@@ -512,44 +642,44 @@ class BookingCoreTest extends TestCase
         $suffix = substr(uniqid(), -6);
 
         $this->venue = BookingVenue::query()->create([
-            'code' => 'test_venue_'.$suffix,
-            'name' => 'Venue Test '.$suffix,
-            'is_active' => true,
+            'code'       => 'test_venue_'.$suffix,
+            'name'       => 'Venue Test '.$suffix,
+            'is_active'  => true,
             'sort_order' => 99,
         ]);
 
         $this->area = BookingArea::query()->create([
-            'venue_id' => $this->venue->id,
-            'code' => 'court_a',
-            'name' => 'Court A',
+            'venue_id'     => $this->venue->id,
+            'code'         => 'court_a',
+            'name'         => 'Court A',
             'is_tentative' => false,
-            'is_active' => true,
-            'sort_order' => 1,
+            'is_active'    => true,
+            'sort_order'   => 1,
         ]);
 
         $this->tarif = BookingTarif::query()->create([
-            'venue_id' => $this->venue->id,
-            'area_id' => $this->area->id,
-            'code' => 'tarif_'.$suffix,
-            'uraian' => 'Latihan Test',
-            'satuan' => BookingSatuan::PER_HOUR,
-            'tarif_pemerintah' => 100_000,
+            'venue_id'             => $this->venue->id,
+            'area_id'              => $this->area->id,
+            'code'                 => 'tarif_'.$suffix,
+            'uraian'               => 'Latihan Test',
+            'satuan'               => BookingSatuan::PER_HOUR,
+            'tarif_pemerintah'     => 100_000,
             'tarif_non_pemerintah' => 150_000,
-            'category' => 'olahraga',
-            'is_active' => true,
+            'category'             => 'olahraga',
+            'is_active'            => true,
         ]);
 
         // Tarif per hari → pengajuan event (masuk menunggu_approval, bukan auto-approve).
         $this->tarifHari = BookingTarif::query()->create([
-            'venue_id' => $this->venue->id,
-            'area_id' => $this->area->id,
-            'code' => 'tarif_hari_'.$suffix,
-            'uraian' => 'Kegiatan Test',
-            'satuan' => BookingSatuan::PER_DAY,
-            'tarif_pemerintah' => 100_000,
+            'venue_id'             => $this->venue->id,
+            'area_id'              => $this->area->id,
+            'code'                 => 'tarif_hari_'.$suffix,
+            'uraian'               => 'Kegiatan Test',
+            'satuan'               => BookingSatuan::PER_DAY,
+            'tarif_pemerintah'     => 100_000,
             'tarif_non_pemerintah' => 150_000,
-            'category' => 'olahraga',
-            'is_active' => true,
+            'category'             => 'olahraga',
+            'is_active'            => true,
         ]);
 
         BookingRule::query()->updateOrCreate(
@@ -567,8 +697,8 @@ class BookingCoreTest extends TestCase
 
         BookingSetting::setValue('payment_expire_hours', 48);
         BookingSetting::setValue('rekening_transfer', [
-            'bank' => 'BJB',
-            'rekening' => '123',
+            'bank'      => 'BJB',
+            'rekening'  => '123',
             'atas_nama' => 'RKUD',
         ]);
         BookingSetting::setValue('kontak_klarifikasi', '085777183633');
@@ -579,12 +709,12 @@ class BookingCoreTest extends TestCase
         );
 
         $this->admin = User::query()->create([
-            'name' => 'Admin Test '.$suffix,
-            'email' => 'admin.'.$suffix.'@test.local',
-            'password' => Hash::make('password123'),
-            'is_active' => 1,
+            'name'              => 'Admin Test '.$suffix,
+            'email'             => 'admin.'.$suffix.'@test.local',
+            'password'          => Hash::make('password123'),
+            'is_active'         => 1,
             'email_verified_at' => now(),
-            'current_role_id' => $adminRole->id,
+            'current_role_id'   => $adminRole->id,
         ]);
         $this->admin->assignRole($adminRole);
 
@@ -597,21 +727,21 @@ class BookingCoreTest extends TestCase
         $role ??= Role::query()->where('name', 'penyewa')->where('guard_name', 'web')->firstOrFail();
 
         $user = User::query()->create([
-            'name' => 'Penyewa '.$email,
-            'email' => $email,
-            'password' => Hash::make('password123'),
-            'is_active' => 1,
+            'name'              => 'Penyewa '.$email,
+            'email'             => $email,
+            'password'          => Hash::make('password123'),
+            'is_active'         => 1,
             'email_verified_at' => now(),
-            'current_role_id' => $role->id,
+            'current_role_id'   => $role->id,
         ]);
         $user->assignRole($role);
 
         BookingPenyewaProfile::query()->create([
-            'user_id' => $user->id,
-            'nama' => $user->name,
-            'nik' => '3201010101010001',
-            'no_hp' => '081234567890',
-            'alamat' => 'Bogor',
+            'user_id'          => $user->id,
+            'nama'             => $user->name,
+            'nik'              => '3201010101010001',
+            'no_hp'            => '081234567890',
+            'alamat'           => 'Bogor',
             'kategori_default' => 'non_pemerintah',
         ]);
 

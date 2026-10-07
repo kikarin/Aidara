@@ -20,12 +20,8 @@ class AuthController extends Controller
 
     public function showLogin(): Response|RedirectResponse
     {
-        $user = Auth::user();
-        if ($user?->hasRole('admin_upt')) {
-            return redirect()->route('e-booking.admin.dashboard');
-        }
-        if ($user?->hasRole('penyewa')) {
-            return redirect()->intended(route('e-booking.catalog'));
+        if ($redirect = $this->redirectAuthenticatedUser()) {
+            return $redirect;
         }
 
         return Inertia::render('modules/e-booking/Login');
@@ -42,6 +38,10 @@ class AuthController extends Controller
         Auth::login($result['user'], true);
         $request->session()->regenerate();
 
+        if (! $result['user']->email_verified_at) {
+            return $this->sendOtpAndRedirect($request, $result['user'], 'Email Anda belum diverifikasi. Silakan masukkan kode OTP yang telah dikirim ke email Anda.');
+        }
+
         if ($result['user']->hasRole('admin_upt') && ! $result['user']->hasRole('penyewa')) {
             return redirect()->intended(route('e-booking.admin.dashboard'));
         }
@@ -51,8 +51,8 @@ class AuthController extends Controller
 
     public function showRegister(): Response|RedirectResponse
     {
-        if ($this->alreadyBookingUser()) {
-            return redirect()->route('e-booking.catalog');
+        if ($redirect = $this->redirectAuthenticatedUser()) {
+            return $redirect;
         }
 
         return Inertia::render('modules/e-booking/Register');
@@ -63,14 +63,75 @@ class AuthController extends Controller
         $data = $request->validated();
         $data['device_name'] = $data['device_name'] ?? 'booking-web';
 
-        $result = $this->auth->register($data);
+        $result = $this->auth->register($data, emailVerified: false);
 
         Auth::login($result['user'], true);
         $request->session()->regenerate();
 
-        return redirect()
-            ->route('e-booking.catalog')
-            ->with('success', 'Akun penyewa berhasil dibuat. Silakan pilih venue untuk booking.');
+        return $this->sendOtpAndRedirect($request, $result['user'], 'Akun berhasil dibuat. Kode OTP telah dikirim ke email Anda untuk verifikasi.');
+    }
+
+    public function showOtp(): Response|RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return redirect()->route('e-booking.login');
+        }
+
+        if ($user->email_verified_at) {
+            return $this->redirectVerifiedUser($user);
+        }
+
+        return Inertia::render('modules/e-booking/VerifyOtp', [
+            'email' => $user->email,
+        ]);
+    }
+
+    public function verifyOtp(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'otp' => ['required', 'string', 'size:6'],
+        ]);
+
+        $user = Auth::user();
+
+        if (! $user) {
+            return redirect()->route('e-booking.login');
+        }
+
+        if ($user->email_verified_at) {
+            return $this->redirectVerifiedUser($user);
+        }
+
+        if (! $this->auth->verifyEmailOtp($user, $request->input('otp'))) {
+            return back()->withErrors(['otp' => 'Kode OTP tidak valid atau sudah kedaluwarsa.']);
+        }
+
+        return $this->redirectVerifiedUser($user->fresh())
+            ->with('success', 'Email berhasil diverifikasi. Selamat menggunakan Si Bola.');
+    }
+
+    public function resendOtp(Request $request): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return redirect()->route('e-booking.login');
+        }
+
+        if ($user->email_verified_at) {
+            return $this->redirectVerifiedUser($user);
+        }
+
+        $lastSent = $request->session()->get('booking_otp_last_sent');
+        if ($lastSent && now()->diffInSeconds($lastSent) < 60) {
+            $remaining = (int) ceil(60 - now()->diffInSeconds($lastSent));
+
+            return back()->withErrors(['otp' => "Tunggu {$remaining} detik sebelum meminta kode OTP baru."]);
+        }
+
+        return $this->sendOtpAndRedirect($request, $user, 'Kode OTP baru telah dikirim ke email Anda.');
     }
 
     public function logout(Request $request): RedirectResponse
@@ -82,10 +143,39 @@ class AuthController extends Controller
         return redirect()->route('e-booking.catalog');
     }
 
-    private function alreadyBookingUser(): bool
+    private function sendOtpAndRedirect(Request $request, $user, string $message): RedirectResponse
+    {
+        $this->auth->issueEmailOtp($user);
+        $request->session()->put('booking_otp_last_sent', now());
+
+        return redirect()->route('e-booking.otp.show')->with('success', $message);
+    }
+
+    private function redirectVerifiedUser($user): RedirectResponse
+    {
+        if ($user->hasRole('admin_upt') && ! $user->hasRole('penyewa')) {
+            return redirect()->route('e-booking.admin.dashboard');
+        }
+
+        return redirect()->intended(route('e-booking.catalog'));
+    }
+
+    private function redirectAuthenticatedUser(): ?RedirectResponse
     {
         $user = Auth::user();
 
-        return $user !== null && $user->hasAnyRole(['penyewa', 'admin_upt']);
+        if (! $user) {
+            return null;
+        }
+
+        if (! $user->email_verified_at) {
+            return redirect()->route('e-booking.otp.show');
+        }
+
+        if ($user->hasAnyRole(['penyewa', 'admin_upt'])) {
+            return $this->redirectVerifiedUser($user);
+        }
+
+        return null;
     }
 }

@@ -24,13 +24,12 @@ import {
     faFileArrowDown,
     faFileLines,
     faLocationDot,
-    faPlus,
     faReceipt,
     faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { Link, useForm } from '@inertiajs/vue3';
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onUnmounted, ref } from 'vue';
 
 library.add(
     faArrowLeft,
@@ -49,7 +48,6 @@ library.add(
     faFileArrowDown,
     faFileLines,
     faLocationDot,
-    faPlus,
     faReceipt,
     faTriangleExclamation,
 );
@@ -108,8 +106,8 @@ const props = defineProps<{
         surats: Array<{
             id: number;
             jenis_label: string;
-            nomor_surat: string;
-            perihal: string;
+            nomor_surat: string | null;
+            perihal: string | null;
             meeting_at: string | null;
             meeting_place: string | null;
             dokumen: string[] | null;
@@ -131,8 +129,6 @@ const props = defineProps<{
     } | null;
     conflict: ConflictSummary | null;
     priority_rules: Array<{ id: number; name: string; priority_order: number; code: string }>;
-    document_types: Array<{ id: number; name: string; is_required: boolean }>;
-    surat_kop: Record<string, string>;
     status_logs: Array<{
         from_status: string | null;
         to_status: string | null;
@@ -245,9 +241,10 @@ const approveForm = useForm({
     note: '',
     meeting_at: '',
     meeting_place: '',
+    surat_balasan: null as File | null,
 });
 
-const rejectForm = useForm({ reason: '' });
+const rejectForm = useForm({ reason: '', surat_balasan: null as File | null });
 const klarifikasiForm = useForm({ reason: '' });
 const verifyForm = useForm({ notes: '' });
 const rejectPayForm = useForm({ reason: '' });
@@ -281,9 +278,15 @@ const rejectPayOpen = ref(false);
 const isReguler = computed(() => props.booking.jenis_sewa === 'reguler');
 const showMeetingFields = ref(!isReguler.value);
 
+const butuhSuratBalasan = computed(() => !isReguler.value);
+
 const adaBenturan = computed(() => Boolean(props.conflict?.conflicts?.length));
 
 const submitApprove = async (force = false) => {
+    if (butuhSuratBalasan.value && !approveForm.surat_balasan) {
+        return;
+    }
+
     if (force) {
         const ok = await confirm({
             title: 'Paksa lanjut pengajuan ini?',
@@ -302,6 +305,10 @@ const submitApprove = async (force = false) => {
 
 const submitReject = async () => {
     if (rejectForm.reason.trim() === '') {
+        return;
+    }
+
+    if (butuhSuratBalasan.value && !rejectForm.surat_balasan) {
         return;
     }
 
@@ -348,98 +355,6 @@ const submitRejectPay = () => {
     rejectPayForm.post(route('e-booking.admin.payments.reject', props.payment.id), { preserveScroll: true });
 };
 
-const jenisOptions = [
-    { value: 'undangan_meeting', label: 'Undangan Meeting' },
-    { value: 'balasan_persetujuan', label: 'Balasan Persetujuan' },
-    { value: 'balasan_penolakan', label: 'Balasan Penolakan' },
-];
-
-const suratTemplate = (jenis: string) => {
-    const venue = props.booking.venue?.name ?? 'venue';
-    const jadwal = `${props.booking.starts_at ?? '-'} s.d. ${props.booking.ends_at ?? '-'}`;
-
-    if (jenis === 'balasan_persetujuan') {
-        return {
-            perihal: 'Persetujuan Pengajuan Sewa Fasilitas',
-            isi: `Menindaklanjuti pengajuan sewa ${venue} (${jadwal}), dengan ini kami sampaikan bahwa pengajuan Anda telah disetujui.\n\nSilakan melakukan pembayaran sesuai petunjuk pada halaman detail pesanan Anda sebelum batas waktu berakhir.`,
-        };
-    }
-    if (jenis === 'balasan_penolakan') {
-        return {
-            perihal: 'Balasan Pengajuan Sewa Fasilitas',
-            isi: `Menindaklanjuti pengajuan sewa ${venue} (${jadwal}), dengan ini kami sampaikan bahwa pengajuan Anda belum dapat kami setujui.\n\nApabila terdapat keperluan lain, silakan ajukan kembali melalui sistem E-Booking.`,
-        };
-    }
-
-    return {
-        perihal: 'Undangan Meeting Penyewaan Fasilitas',
-        isi: `Menindaklanjuti pengajuan sewa ${venue} (${jadwal}), kami mengundang Anda untuk hadir pada meeting pembahasan pengajuan sesuai waktu dan tempat tercantum di bawah.\n\nMohon membawa dokumen yang tercantum pada surat ini serta siap dengan informasi kegiatan yang akan dilaksanakan.`,
-    };
-};
-
-const defaultPenandatangan = () => ({
-    nama: props.surat_kop.penandatangan_nama ?? '',
-    jabatan: props.surat_kop.penandatangan_jabatan ?? '',
-});
-
-const suratForm = useForm({
-    jenis: 'undangan_meeting' as string,
-    nomor_surat: '',
-    perihal: '',
-    isi: '',
-    meeting_at: '',
-    meeting_place: '',
-    dokumen: props.document_types.filter((d) => d.is_required).map((d) => d.id) as number[],
-    penandatangan_nama: defaultPenandatangan().nama,
-    penandatangan_jabatan: defaultPenandatangan().jabatan,
-});
-
-const jenisSebelumnya = ref('');
-watch(
-    () => suratForm.jenis,
-    (jenis) => {
-        if (!jenis || jenis === jenisSebelumnya.value) return;
-        jenisSebelumnya.value = jenis;
-        if (suratForm.isi.trim() === '') {
-            const tpl = suratTemplate(jenis);
-            suratForm.perihal = tpl.perihal;
-            suratForm.isi = tpl.isi;
-        }
-        if (jenis !== 'undangan_meeting') {
-            suratForm.meeting_at = '';
-            suratForm.meeting_place = '';
-        }
-    },
-);
-
-const toggleDokumen = (id: number) => {
-    suratForm.dokumen = suratForm.dokumen.includes(id) ? suratForm.dokumen.filter((d) => d !== id) : [...suratForm.dokumen, id];
-};
-
-const fillTemplate = () => {
-    const tpl = suratTemplate(suratForm.jenis);
-    suratForm.perihal = tpl.perihal;
-    suratForm.isi = tpl.isi;
-};
-
-const namaDokumenTerpilih = computed(() => {
-    const map = new Map(props.document_types.map((d) => [d.id, d.name]));
-
-    return suratForm.dokumen.map((id) => map.get(id) ?? '').filter((n) => n !== '');
-});
-
-const submitSurat = () => {
-    suratForm.post(route('e-booking.admin.bookings.surat.store', props.booking.id), {
-        preserveScroll: true,
-        onSuccess: () => {
-            suratForm.reset();
-            suratForm.dokumen = props.document_types.filter((d) => d.is_required).map((d) => d.id);
-            suratForm.penandatangan_nama = defaultPenandatangan().nama;
-            suratForm.penandatangan_jabatan = defaultPenandatangan().jabatan;
-        },
-    });
-};
-
 const emailForm = useForm({});
 
 const kirimEmailSurat = (suratId: number) => {
@@ -452,7 +367,13 @@ const kirimWhatsappSurat = (suratId: number) => {
     whatsappForm.post(route('e-booking.admin.bookings.surat.whatsapp', suratId), { preserveScroll: true });
 };
 
-const showSuratForm = ref(props.booking.surats.length === 0);
+const onApproveSurat = (event: Event) => {
+    approveForm.surat_balasan = (event.target as HTMLInputElement).files?.[0] ?? null;
+};
+
+const onRejectSurat = (event: Event) => {
+    rejectForm.surat_balasan = (event.target as HTMLInputElement).files?.[0] ?? null;
+};
 
 const penyewaNama = computed(() => props.booking.penyewa?.nama || props.booking.user?.name || '-');
 
@@ -717,32 +638,16 @@ onUnmounted(() => {
                     </p>
                 </section>
 
-                <section aria-labelledby="surat-heading" class="sb-card p-5 sm:p-6">
+                <section v-if="booking.surats.length" aria-labelledby="surat-heading" class="sb-card p-5 sm:p-6">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <h2 id="surat-heading" class="text-foreground flex items-center gap-2 text-base font-semibold tracking-tight">
                             <FontAwesomeIcon :icon="['fas', 'file-lines']" class="size-3.5 text-(--wp-accent)" aria-hidden="true" />
-                            Surat balasan
-                            <span v-if="booking.surats.length" class="sb-badge sb-tone-neutral tabular-nums">{{ booking.surats.length }}</span>
+                            Surat
+                            <span class="sb-badge sb-tone-neutral tabular-nums">{{ booking.surats.length }}</span>
                         </h2>
-                        <button
-                            type="button"
-                            class="wp-btn px-3.5 py-2 text-xs"
-                            :class="showSuratForm ? 'wp-btn-quiet' : 'wp-btn-primary'"
-                            :aria-expanded="showSuratForm ? 'true' : 'false'"
-                            aria-controls="surat-form"
-                            @click="showSuratForm = !showSuratForm"
-                        >
-                            <FontAwesomeIcon
-                                :icon="['fas', showSuratForm ? 'chevron-down' : 'plus']"
-                                class="size-3 transition-transform"
-                                :class="showSuratForm ? 'rotate-180' : ''"
-                                aria-hidden="true"
-                            />
-                            {{ showSuratForm ? 'Tutup formulir' : 'Buat surat baru' }}
-                        </button>
                     </div>
 
-                    <ul v-if="booking.surats.length" class="mt-4 space-y-3">
+                    <ul class="mt-4 space-y-3">
                         <li v-for="s in booking.surats" :key="s.id" class="rounded-2xl p-4 text-sm ring-1 ring-(--wp-hairline)">
                             <div class="flex items-start gap-3">
                                 <span class="wp-icon size-10 shrink-0">
@@ -750,8 +655,10 @@ onUnmounted(() => {
                                 </span>
                                 <div class="min-w-0 flex-1">
                                     <p class="text-foreground font-semibold">{{ s.jenis_label }}</p>
-                                    <p class="text-muted-foreground text-xs">
-                                        <span class="font-mono tabular-nums">{{ s.nomor_surat }}</span> · {{ s.perihal }}
+                                    <p v-if="s.nomor_surat || s.perihal" class="text-muted-foreground text-xs">
+                                        <span v-if="s.nomor_surat" class="font-mono tabular-nums">{{ s.nomor_surat }}</span>
+                                        <template v-if="s.nomor_surat && s.perihal"> · </template>
+                                        <span v-if="s.perihal">{{ s.perihal }}</span>
                                     </p>
                                     <p v-if="s.meeting_at || s.meeting_place" class="text-foreground mt-1 text-xs">
                                         Meeting: {{ s.meeting_at?.replace('T', ' ') }}{{ s.meeting_place ? ' · ' + s.meeting_place : '' }}
@@ -810,173 +717,6 @@ onUnmounted(() => {
                             </div>
                         </li>
                     </ul>
-                    <p v-else-if="!showSuratForm" class="text-muted-foreground mt-2 text-sm">Belum ada surat untuk pengajuan ini.</p>
-
-                    <div v-show="showSuratForm" id="surat-form" class="mt-6 space-y-5 border-t border-(--wp-hairline) pt-5">
-                        <fieldset>
-                            <legend class="sb-label">Jenis surat</legend>
-                            <div class="grid gap-2 sm:grid-cols-3">
-                                <label
-                                    v-for="opt in jenisOptions"
-                                    :key="opt.value"
-                                    class="flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition focus-within:ring-2 focus-within:ring-(--wp-accent)"
-                                    :class="
-                                        suratForm.jenis === opt.value
-                                            ? 'bg-(--wp-accent-soft) font-semibold text-(--wp-accent-strong) ring-2 ring-(--wp-accent)'
-                                            : 'text-foreground hover:bg-muted/60 ring-1 ring-(--wp-hairline)'
-                                    "
-                                >
-                                    <input v-model="suratForm.jenis" type="radio" name="surat-jenis" :value="opt.value" class="sr-only" />
-                                    <span
-                                        class="grid size-4 shrink-0 place-items-center rounded-full"
-                                        :class="suratForm.jenis === opt.value ? 'bg-(--wp-accent)' : 'ring-1 ring-(--wp-hairline)'"
-                                        aria-hidden="true"
-                                    >
-                                        <span v-if="suratForm.jenis === opt.value" class="size-1.5 rounded-full bg-(--wp-accent-contrast)"></span>
-                                    </span>
-                                    {{ opt.label }}
-                                </label>
-                            </div>
-                            <p v-if="suratForm.errors.jenis" class="sb-error">{{ suratForm.errors.jenis }}</p>
-                        </fieldset>
-
-                        <div class="grid gap-4 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-                            <div>
-                                <label class="sb-label" for="surat-nomor">Nomor surat (manual)</label>
-                                <input
-                                    id="surat-nomor"
-                                    v-model="suratForm.nomor_surat"
-                                    type="text"
-                                    placeholder="cth: 042/E-BK/IX/2026"
-                                    class="sb-input font-mono"
-                                    :aria-invalid="suratForm.errors.nomor_surat ? 'true' : undefined"
-                                />
-                                <p v-if="suratForm.errors.nomor_surat" class="sb-error">{{ suratForm.errors.nomor_surat }}</p>
-                            </div>
-                            <div>
-                                <div class="mb-1.5 flex items-center justify-between gap-3">
-                                    <label class="text-foreground text-sm font-medium" for="surat-perihal">Perihal</label>
-                                    <button
-                                        type="button"
-                                        class="rounded-sm text-xs font-medium text-(--wp-accent) hover:text-(--wp-accent-strong) hover:underline focus-visible:ring-2 focus-visible:ring-(--wp-accent) focus-visible:outline-none"
-                                        @click="fillTemplate"
-                                    >
-                                        Isi otomatis dari template
-                                    </button>
-                                </div>
-                                <input
-                                    id="surat-perihal"
-                                    v-model="suratForm.perihal"
-                                    type="text"
-                                    class="sb-input"
-                                    :aria-invalid="suratForm.errors.perihal ? 'true' : undefined"
-                                />
-                                <p v-if="suratForm.errors.perihal" class="sb-error">{{ suratForm.errors.perihal }}</p>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="sb-label" for="surat-isi">Isi surat</label>
-                            <textarea
-                                id="surat-isi"
-                                v-model="suratForm.isi"
-                                rows="6"
-                                class="sb-input leading-relaxed"
-                                :aria-invalid="suratForm.errors.isi ? 'true' : undefined"
-                            />
-                            <p v-if="suratForm.errors.isi" class="sb-error">{{ suratForm.errors.isi }}</p>
-                        </div>
-
-                        <div v-if="suratForm.jenis === 'undangan_meeting'" class="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <label class="sb-label" for="surat-meeting-at">Waktu meeting</label>
-                                <input
-                                    id="surat-meeting-at"
-                                    v-model="suratForm.meeting_at"
-                                    type="datetime-local"
-                                    class="sb-input"
-                                    :aria-invalid="suratForm.errors.meeting_at ? 'true' : undefined"
-                                />
-                                <p v-if="suratForm.errors.meeting_at" class="sb-error">{{ suratForm.errors.meeting_at }}</p>
-                            </div>
-                            <div>
-                                <label class="sb-label" for="surat-meeting-place">Tempat meeting</label>
-                                <input
-                                    id="surat-meeting-place"
-                                    v-model="suratForm.meeting_place"
-                                    type="text"
-                                    placeholder="cth: Ruang rapat UPT"
-                                    class="sb-input"
-                                    :aria-invalid="suratForm.errors.meeting_place ? 'true' : undefined"
-                                />
-                                <p v-if="suratForm.errors.meeting_place" class="sb-error">{{ suratForm.errors.meeting_place }}</p>
-                            </div>
-                        </div>
-
-                        <fieldset v-if="document_types.length">
-                            <legend class="sb-label">Dokumen yang harus disiapkan penyewa</legend>
-                            <div class="flex flex-wrap gap-2">
-                                <label
-                                    v-for="d in document_types"
-                                    :key="d.id"
-                                    class="flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 text-sm transition focus-within:ring-2 focus-within:ring-(--wp-accent)"
-                                    :class="
-                                        suratForm.dokumen.includes(d.id)
-                                            ? 'bg-(--wp-accent-soft) text-(--wp-accent-strong) ring-1 ring-(--wp-accent)'
-                                            : 'text-foreground hover:bg-muted/60 ring-1 ring-(--wp-hairline)'
-                                    "
-                                >
-                                    <input
-                                        type="checkbox"
-                                        class="sr-only"
-                                        :checked="suratForm.dokumen.includes(d.id)"
-                                        @change="toggleDokumen(d.id)"
-                                    />
-                                    <FontAwesomeIcon
-                                        :icon="['fas', suratForm.dokumen.includes(d.id) ? 'check' : 'plus']"
-                                        class="size-3"
-                                        aria-hidden="true"
-                                    />
-                                    <span>{{ d.name }}</span>
-                                    <span v-if="d.is_required" class="sb-badge sb-tone-warning px-1.5 py-0 text-[0.6875rem]">wajib</span>
-                                </label>
-                            </div>
-                            <p class="sb-hint">Diatur dinamis di menu Jenis Dokumen.</p>
-                        </fieldset>
-
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <label class="sb-label" for="surat-ttd-nama">Nama penandatangan</label>
-                                <input id="surat-ttd-nama" v-model="suratForm.penandatangan_nama" type="text" class="sb-input" />
-                            </div>
-                            <div>
-                                <label class="sb-label" for="surat-ttd-jabatan">Jabatan</label>
-                                <input id="surat-ttd-jabatan" v-model="suratForm.penandatangan_jabatan" type="text" class="sb-input" />
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col gap-3 border-t border-(--wp-hairline) pt-4 sm:flex-row sm:items-center sm:justify-between">
-                            <p class="text-muted-foreground text-xs">
-                                <template v-if="namaDokumenTerpilih.length">Akan tercantum di surat: {{ namaDokumenTerpilih.join(', ') }}</template>
-                                <template v-else>Belum ada dokumen yang dipilih.</template>
-                            </p>
-                            <button
-                                type="button"
-                                class="wp-btn wp-btn-primary shrink-0 justify-center px-5 py-2.5 text-sm"
-                                :disabled="suratForm.processing"
-                                @click="submitSurat"
-                            >
-                                <FontAwesomeIcon
-                                    v-if="suratForm.processing"
-                                    :icon="['fas', 'circle-notch']"
-                                    class="size-4 animate-spin"
-                                    aria-hidden="true"
-                                />
-                                <FontAwesomeIcon v-else :icon="['fas', 'file-lines']" class="size-4" aria-hidden="true" />
-                                Buat surat (PDF)
-                            </button>
-                        </div>
-                    </div>
                 </section>
 
                 <section v-if="status_logs.length" aria-labelledby="history-heading" class="sb-card p-5 sm:p-6">
@@ -1120,11 +860,29 @@ onUnmounted(() => {
                             </div>
                         </fieldset>
 
+                        <fieldset v-if="butuhSuratBalasan" class="space-y-3 rounded-xl border border-dashed border-(--wp-hairline) p-3.5">
+                            <legend class="px-1 text-xs font-semibold tracking-wide text-(--wp-accent-strong) uppercase">Surat persetujuan</legend>
+                            <p class="text-muted-foreground text-xs leading-relaxed">
+                                Wajib. Lampirkan surat persetujuan berformat <b>PDF</b>. Surat otomatis dikirim ke email penyewa setelah disetujui.
+                            </p>
+                            <input
+                                type="file"
+                                accept="application/pdf,.pdf"
+                                class="sb-input"
+                                :aria-invalid="approveForm.errors.surat_balasan ? 'true' : undefined"
+                                :aria-describedby="approveForm.errors.surat_balasan ? 'approve-surat-error' : undefined"
+                                @change="onApproveSurat"
+                            />
+                            <p v-if="approveForm.errors.surat_balasan" id="approve-surat-error" class="sb-error">
+                                {{ approveForm.errors.surat_balasan }}
+                            </p>
+                        </fieldset>
+
                         <div class="space-y-2">
                             <button
                                 type="button"
                                 class="wp-btn wp-btn-primary w-full justify-center px-5 py-2.5 text-sm"
-                                :disabled="approveForm.processing || rejectForm.processing || klarifikasiForm.processing"
+                                :disabled="approveForm.processing || rejectForm.processing || klarifikasiForm.processing || (butuhSuratBalasan && !approveForm.surat_balasan)"
                                 @click="submitApprove(false)"
                             >
                                 <FontAwesomeIcon
@@ -1216,10 +974,27 @@ onUnmounted(() => {
                             :aria-invalid="rejectForm.errors.reason ? 'true' : undefined"
                         />
                         <p v-if="rejectForm.errors.reason" class="sb-error">{{ rejectForm.errors.reason }}</p>
+                        <fieldset v-if="butuhSuratBalasan" class="space-y-3 rounded-xl border border-dashed border-(--wp-hairline) p-3.5">
+                            <legend class="px-1 text-xs font-semibold tracking-wide text-(--sb-danger) uppercase">Surat alasan penolakan</legend>
+                            <p class="text-muted-foreground text-xs leading-relaxed">
+                                Wajib. Lampirkan surat penolakan berformat <b>PDF</b>. Surat otomatis dikirim ke email penyewa setelah ditolak.
+                            </p>
+                            <input
+                                type="file"
+                                accept="application/pdf,.pdf"
+                                class="sb-input"
+                                :aria-invalid="rejectForm.errors.surat_balasan ? 'true' : undefined"
+                                :aria-describedby="rejectForm.errors.surat_balasan ? 'reject-surat-error' : undefined"
+                                @change="onRejectSurat"
+                            />
+                            <p v-if="rejectForm.errors.surat_balasan" id="reject-surat-error" class="sb-error">
+                                {{ rejectForm.errors.surat_balasan }}
+                            </p>
+                        </fieldset>
                         <button
                             type="button"
                             class="wp-btn wp-btn-danger w-full justify-center px-4 py-2.5 text-sm"
-                            :disabled="rejectForm.processing || rejectForm.reason.trim() === ''"
+                            :disabled="rejectForm.processing || rejectForm.reason.trim() === '' || (butuhSuratBalasan && !rejectForm.surat_balasan)"
                             @click="submitReject"
                         >
                             <FontAwesomeIcon

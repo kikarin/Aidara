@@ -88,8 +88,8 @@ const props = defineProps<{
         surats: Array<{
             id: number;
             jenis_label: string;
-            nomor_surat: string;
-            perihal: string;
+            nomor_surat: string | null;
+            perihal: string | null;
             meeting_at: string | null;
             meeting_place: string | null;
             dokumen: string[] | null;
@@ -198,11 +198,11 @@ const paymentStatusLabel = (status: string) => {
     return map[status] ?? statusLabel(status);
 };
 
-const awaitingTransfer = computed(
-    () => props.booking.status === 'awaiting_payment' && ['pending', 'rejected'].includes(props.booking.payment?.status ?? ''),
-);
+const awaitingTransfer = computed(() => props.booking.status === 'awaiting_payment' && props.booking.payment?.status === 'pending');
 
 const awaitingVerification = computed(() => props.booking.status === 'awaiting_payment' && props.booking.payment?.status === 'awaiting_verification');
+
+const paymentRejected = computed(() => props.booking.status === 'awaiting_payment' && props.booking.payment?.status === 'rejected');
 
 const updateCountdown = () => {
     const raw = props.booking.payment?.expires_at;
@@ -267,6 +267,9 @@ const title = computed(() => {
     if (awaitingVerification.value) {
         return 'Bukti sedang diperiksa';
     }
+    if (paymentRejected.value) {
+        return 'Bukti ditolak';
+    }
     if (props.booking.status === 'awaiting_payment') {
         return 'Menunggu pembayaran';
     }
@@ -283,6 +286,9 @@ const title = computed(() => {
 const nextStepText = computed(() => {
     if (awaitingVerification.value) {
         return 'Bukti pembayaran Anda sudah masuk dan sedang diperiksa pengelola. Anda tidak perlu transfer lagi.';
+    }
+    if (paymentRejected.value) {
+        return 'Bukti pembayaran Anda ditolak pengelola. Silakan cek alasan penolakan, lalu unggah ulang bukti yang benar.';
     }
     if (props.booking.status === 'awaiting_payment') {
         return 'Silakan transfer sesuai petunjuk di bawah, lalu kirim bukti pembayaran.';
@@ -626,7 +632,12 @@ const progressPercent = computed(() => {
                                     Diunggah {{ booking.surat_permohonan_submitted_at }}
                                 </p>
                             </div>
-                            <a :href="booking.surat_permohonan_url" target="_blank" rel="noopener" class="wp-btn wp-btn-quiet shrink-0 px-4 py-2 text-sm">
+                            <a
+                                :href="booking.surat_permohonan_url"
+                                target="_blank"
+                                rel="noopener"
+                                class="wp-btn wp-btn-quiet shrink-0 px-4 py-2 text-sm"
+                            >
                                 <FontAwesomeIcon :icon="['fas', 'download']" class="size-3.5" aria-hidden="true" />
                                 Lihat PDF
                             </a>
@@ -646,8 +657,10 @@ const progressPercent = computed(() => {
                                 </span>
                                 <div class="min-w-0 flex-1">
                                     <p class="font-semibold">{{ s.jenis_label }}</p>
-                                    <p class="text-muted-foreground mt-0.5 text-xs">
-                                        <span class="font-mono tabular-nums">{{ s.nomor_surat }}</span> · {{ s.perihal }}
+                                    <p v-if="s.nomor_surat || s.perihal" class="text-muted-foreground mt-0.5 text-xs">
+                                        <span v-if="s.nomor_surat" class="font-mono tabular-nums">{{ s.nomor_surat }}</span>
+                                        <template v-if="s.nomor_surat && s.perihal"> · </template>
+                                        <span v-if="s.perihal">{{ s.perihal }}</span>
                                     </p>
                                     <p v-if="s.meeting_at || s.meeting_place" class="mt-2 flex items-center gap-1.5 text-xs">
                                         <FontAwesomeIcon :icon="['fas', 'calendar-days']" class="size-3 text-(--wp-accent)" aria-hidden="true" />
@@ -732,6 +745,14 @@ const progressPercent = computed(() => {
                             </div>
 
                             <template v-if="booking.payment">
+                                <p v-if="paymentRejected" class="sb-callout sb-tone-danger">
+                                    <FontAwesomeIcon :icon="['fas', 'triangle-exclamation']" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                                    <span>
+                                        Bukti pembayaran ditolak. Silakan unggah ulang bukti yang benar.
+                                        <template v-if="booking.payment.notes"> Alasan: {{ booking.payment.notes }}</template>
+                                    </span>
+                                </p>
+
                                 <div v-if="countdownParts.length" class="rounded-2xl p-4 ring-1 ring-(--sb-warning)/40" role="timer" aria-live="off">
                                     <p class="flex items-center gap-2 text-xs font-medium text-(--sb-warning)">
                                         <FontAwesomeIcon :icon="['fas', 'clock']" class="size-3.5" aria-hidden="true" />
@@ -809,7 +830,9 @@ const progressPercent = computed(() => {
                                 class="space-y-4 border-t border-(--wp-hairline) pt-5"
                                 @submit.prevent="submitBukti"
                             >
-                                <h3 class="text-sm font-semibold">Kirim bukti pembayaran</h3>
+                                <h3 class="text-sm font-semibold">
+                                    {{ paymentRejected ? 'Unggah ulang bukti pembayaran' : 'Kirim bukti pembayaran' }}
+                                </h3>
 
                                 <label
                                     v-if="!form.bukti"

@@ -213,7 +213,9 @@ class BookingController extends Controller
             'grand_total' => (int) $booking->grand_total,
             'subtotal' => (int) $booking->subtotal,
             'addon_total' => (int) $booking->addon_total,
-            'can_upload_bukti' => $booking->status === BookingStatus::AWAITING_PAYMENT,
+            'can_upload_bukti' => $booking->status === BookingStatus::AWAITING_PAYMENT
+                && $payment
+                && in_array($payment->status, ['pending', 'rejected'], true),
             'jenis_sewa' => BookingJenisSewa::of($booking),
             'surat_permohonan_url' => $booking->surat_permohonan_path
                 ? Storage::disk('public')->url($booking->surat_permohonan_path)

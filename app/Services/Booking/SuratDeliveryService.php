@@ -134,7 +134,7 @@ class SuratDeliveryService
 
     private function message(BookingSurat $surat): string
     {
-        $text = "Surat balasan pengajuan {$surat->booking->nomor}\n"
+        $text = "Surat pengajuan {$surat->booking->nomor}\n"
             .$surat->jenisLabel()." — {$surat->nomor_surat}\n"
             ."Perihal: {$surat->perihal}";
 

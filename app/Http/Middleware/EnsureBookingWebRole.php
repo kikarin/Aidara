@@ -23,6 +23,11 @@ class EnsureBookingWebRole
             );
         }
 
+        // Logout harus selalu bisa diakses, termasuk saat email belum terverifikasi.
+        if ($request->routeIs('e-booking.logout')) {
+            return $next($request);
+        }
+
         if ($roles !== [] && ! $user->hasAnyRole($roles)) {
             if ($adminOnly) {
                 return redirect()
@@ -33,6 +38,12 @@ class EnsureBookingWebRole
             return redirect()
                 ->route('e-booking.login')
                 ->with('error', 'Gunakan akun penyewa E-Booking (bukan akun dashboard Dispora).');
+        }
+
+        if (! $user->email_verified_at) {
+            return redirect()
+                ->route('e-booking.otp.show')
+                ->with('error', 'Verifikasi email Anda terlebih dahulu untuk melanjutkan.');
         }
 
         return $next($request);

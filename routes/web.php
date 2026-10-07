@@ -141,6 +141,21 @@ Route::prefix('booking')->group(function () {
     Route::post('/register', [EBookingAuthController::class, 'register'])->name('e-booking.register.store');
 });
 
+Route::prefix('booking')->middleware('auth')->group(function () {
+    Route::get('/otp', [EBookingAuthController::class, 'showOtp'])->name('e-booking.otp.show');
+    Route::post('/otp/verify', [EBookingAuthController::class, 'verifyOtp'])
+        ->middleware('throttle:6,1')
+        ->name('e-booking.otp.verify');
+    Route::post('/otp/resend', [EBookingAuthController::class, 'resendOtp'])
+        ->middleware('throttle:6,1')
+        ->name('e-booking.otp.resend');
+});
+
+// Logout penyewa tidak boleh terhalang verifikasi OTP.
+Route::post('/booking/logout', [EBookingAuthController::class, 'logout'])
+    ->middleware('auth')
+    ->name('e-booking.logout');
+
 Route::post('/booking/quote', [EBookingBookingController::class, 'quote'])->name('e-booking.quote');
 
 Route::get('/booking/surat/{surat}', EBookingSuratSharedController::class)
@@ -149,7 +164,6 @@ Route::get('/booking/surat/{surat}', EBookingSuratSharedController::class)
     ->name('e-booking.surat.shared');
 
 Route::middleware(['booking.web:penyewa,admin_upt'])->prefix('booking')->group(function () {
-    Route::post('/logout', [EBookingAuthController::class, 'logout'])->name('e-booking.logout');
     Route::get('/bookings', [EBookingBookingController::class, 'index'])->name('e-booking.bookings.index');
     Route::post('/bookings', [EBookingBookingController::class, 'store'])->name('e-booking.bookings.store');
     Route::get('/bookings/{id}', [EBookingBookingController::class, 'show'])
@@ -185,9 +199,6 @@ Route::middleware(['booking.web:admin_upt'])->prefix('booking/admin')->group(fun
     Route::post('/bookings/{id}/klarifikasi', [EBookingAdminBookingController::class, 'klarifikasi'])
         ->whereNumber('id')
         ->name('e-booking.admin.bookings.klarifikasi');
-    Route::post('/bookings/{id}/surat', [EBookingAdminSuratController::class, 'store'])
-        ->whereNumber('id')
-        ->name('e-booking.admin.bookings.surat.store');
     Route::get('/surat/{surat}/download', [EBookingAdminSuratController::class, 'download'])
         ->whereNumber('surat')
         ->name('e-booking.admin.bookings.surat.download');

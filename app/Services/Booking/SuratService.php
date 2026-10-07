@@ -9,6 +9,7 @@ use App\Models\Booking\BookingSurat;
 use App\Models\User;
 use App\Support\Booking\SuratTemplate;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
@@ -100,6 +101,37 @@ class SuratService
                 ->pluck('name')
                 ->all(),
         ]);
+    }
+
+    /**
+     * Surat balasan berupa PDF yang diunggah admin. Tidak digenerate di web,
+     * sehingga metadata nomor/perihal dibiarkan kosong.
+     */
+    public function storeBalasan(Booking $booking, User $admin, string $jenis, UploadedFile $file, ?string $catatan = null): BookingSurat
+    {
+        if (! in_array($jenis, BookingSurat::jenisBalasan(), true)) {
+            throw new InvalidArgumentException('Jenis surat balasan tidak dikenal.');
+        }
+
+        return DB::transaction(function () use ($booking, $admin, $jenis, $file, $catatan) {
+            /** @var BookingSurat $surat */
+            $surat = $booking->surats()->create([
+                'jenis'      => $jenis,
+                'isi'        => $catatan,
+                'file_path'  => '',
+                'created_by' => $admin->id,
+            ]);
+
+            $path = "booking-surats/{$booking->id}/balasan-{$surat->id}.pdf";
+
+            if (! Storage::disk('local')->put($path, $file->get())) {
+                throw new InvalidArgumentException('Gagal menyimpan berkas surat.');
+            }
+
+            $surat->update(['file_path' => $path]);
+
+            return $surat->refresh();
+        });
     }
 
     public function generateNomor(): string

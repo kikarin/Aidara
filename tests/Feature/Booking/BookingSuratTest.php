@@ -19,6 +19,7 @@ use App\Support\Booking\BookingSatuan;
 use App\Support\Booking\BookingStatus;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -50,51 +51,6 @@ class BookingSuratTest extends TestCase
 
         Storage::fake('local');
         $this->seedMinimal();
-    }
-
-    #[Test]
-    public function admin_creates_surat_and_pdf_is_generated(): void
-    {
-        $booking = $this->makeBooking();
-
-        $response = $this->actingAs($this->admin)
-            ->post(route('e-booking.admin.bookings.surat.store', $booking->id), [
-                'jenis'         => 'undangan_meeting',
-                'nomor_surat'   => '042/E-BK/IX/2026',
-                'perihal'       => 'Undangan Meeting Penyewaan',
-                'isi'           => 'Mohon hadir pada meeting pembahasan pengajuan.',
-                'meeting_at'    => now()->addDays(3)->format('Y-m-d H:i:s'),
-                'meeting_place' => 'Ruang Rapat UPT',
-                'dokumen'       => ['Surat Izin Kepolisian', 'Proposal Kegiatan'],
-            ]);
-
-        $response->assertRedirect(route('e-booking.admin.bookings.show', $booking->id));
-        $this->assertDatabaseHas('booking_surats', [
-            'booking_id'  => $booking->id,
-            'jenis'       => 'undangan_meeting',
-            'nomor_surat' => '042/E-BK/IX/2026',
-        ]);
-
-        $surat = $booking->surats()->first();
-        $this->assertNotNull($surat);
-        $this->assertSame(['Surat Izin Kepolisian', 'Proposal Kegiatan'], $surat->dokumen);
-        Storage::disk('local')->assertExists($surat->file_path);
-        $this->assertStringStartsWith('%PDF', Storage::disk('local')->get($surat->file_path));
-    }
-
-    #[Test]
-    public function undangan_meeting_requires_meeting_fields(): void
-    {
-        $booking = $this->makeBooking();
-
-        $this->actingAs($this->admin)
-            ->post(route('e-booking.admin.bookings.surat.store', $booking->id), [
-                'jenis'       => 'undangan_meeting',
-                'nomor_surat' => '043/E-BK/IX/2026',
-                'perihal'     => 'Undangan Meeting',
-                'isi'         => 'Isi surat.',
-            ])
-            ->assertSessionHasErrors(['meeting_at', 'meeting_place']);
     }
 
     #[Test]
@@ -233,12 +189,87 @@ class BookingSuratTest extends TestCase
                 'force'            => false,
                 'priority_rule_id' => '',
                 'admin_notes'      => '',
+                'surat_balasan'    => UploadedFile::fake()->create('persetujuan.pdf', 10, 'application/pdf'),
             ])
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
 
         Mail::assertQueued(BookingApprovedMail::class, function (BookingApprovedMail $mail) {
             return in_array('Surat Izin Kepolisian', $mail->dokumenWajib, true);
         });
+
+        $surat = $booking->surats()->where('jenis', BookingSurat::JENIS_BALASAN_PERSETUJUAN)->first();
+        $this->assertNotNull($surat);
+        $this->assertNotNull($surat->sent_email_at);
+        Mail::assertSent(BookingSuratMail::class, fn (BookingSuratMail $mail) => $mail->surat->id === $surat->id);
+    }
+
+    #[Test]
+    public function approve_event_without_pdf_is_rejected(): void
+    {
+        Mail::fake();
+
+        $booking = $this->makeBooking();
+        $booking->items()->update(['satuan' => BookingSatuan::PER_DAY]);
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+        $booking->load('items');
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.approve', $booking->id), [
+                'force'            => false,
+                'priority_rule_id' => '',
+                'admin_notes'      => '',
+            ])
+            ->assertSessionHasErrors('surat_balasan');
+
+        $this->assertSame(BookingStatus::MENUNGGU_APPROVAL, $booking->fresh()->status);
+        $this->assertSame(0, $booking->surats()->where('jenis', BookingSurat::JENIS_BALASAN_PERSETUJUAN)->count());
+    }
+
+    #[Test]
+    public function reject_event_creates_penolakan_surat_and_emails(): void
+    {
+        Mail::fake();
+
+        $booking = $this->makeBooking();
+        $booking->items()->update(['satuan' => BookingSatuan::PER_DAY]);
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+        $booking->load('items');
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.reject', $booking->id), [
+                'reason'        => 'Dokumen persyaratan tidak lengkap',
+                'surat_balasan' => UploadedFile::fake()->create('penolakan.pdf', 10, 'application/pdf'),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(BookingStatus::REJECTED, $booking->fresh()->status);
+
+        $surat = $booking->surats()->where('jenis', BookingSurat::JENIS_BALASAN_PENOLAKAN)->first();
+        $this->assertNotNull($surat);
+        $this->assertSame('Dokumen persyaratan tidak lengkap', $surat->isi);
+        $this->assertNotNull($surat->sent_email_at);
+        Mail::assertSent(BookingSuratMail::class, fn (BookingSuratMail $mail) => $mail->surat->id === $surat->id);
+    }
+
+    #[Test]
+    public function reject_event_without_pdf_is_rejected(): void
+    {
+        Mail::fake();
+
+        $booking = $this->makeBooking();
+        $booking->items()->update(['satuan' => BookingSatuan::PER_DAY]);
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+        $booking->load('items');
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.reject', $booking->id), [
+                'reason' => 'Alasan apapun',
+            ])
+            ->assertSessionHasErrors('surat_balasan');
+
+        $this->assertSame(BookingStatus::MENUNGGU_APPROVAL, $booking->fresh()->status);
     }
 
     #[Test]
@@ -343,15 +374,19 @@ class BookingSuratTest extends TestCase
 
     private function makeSurat($booking)
     {
-        $this->actingAs($this->admin)
-            ->post(route('e-booking.admin.bookings.surat.store', $booking->id), [
-                'jenis'       => 'balasan_persetujuan',
-                'nomor_surat' => 'SURAT/'.uniqid().'/2026',
-                'perihal'     => 'Persetujuan Pengajuan Sewa',
-                'isi'         => 'Pengajuan Anda disetujui.',
-            ]);
+        $surat = $booking->surats()->create([
+            'jenis'       => BookingSurat::JENIS_BALASAN_PERSETUJUAN,
+            'nomor_surat' => 'SURAT/'.uniqid().'/2026',
+            'perihal'     => 'Persetujuan Pengajuan Sewa',
+            'isi'         => 'Pengajuan Anda disetujui.',
+            'file_path'   => '',
+        ]);
 
-        return $booking->surats()->firstOrFail();
+        $path = "booking-surats/{$booking->id}/surat-{$surat->id}.pdf";
+        Storage::disk('local')->put($path, "%PDF-1.4\n%%EOF\n");
+        $surat->update(['file_path' => $path]);
+
+        return $surat->refresh();
     }
 
     private function makeUser(string $roleName, string $email): User

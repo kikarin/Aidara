@@ -33,12 +33,21 @@ class BookingPaymentService
 
         $payment = $booking->payments()
             ->where('gateway', 'manual')
-            ->whereIn('status', ['pending', 'awaiting_verification'])
             ->latest('id')
             ->first();
 
         if (! $payment) {
             throw new InvalidArgumentException('Instruksi pembayaran belum tersedia. Hubungi admin.');
+        }
+
+        // Hanya boleh upload pertama kali (pending) atau kirim ulang setelah ditolak.
+        // Setelah bukti diverifikasi, booking tidak lagi berstatus awaiting_payment.
+        if (! in_array($payment->status, ['pending', 'rejected'], true)) {
+            throw new InvalidArgumentException(
+                $payment->status === 'awaiting_verification'
+                    ? 'Bukti pembayaran sedang diperiksa admin.'
+                    : 'Pembayaran sudah diverifikasi dan tidak bisa diunggah ulang.'
+            );
         }
 
         $path = $file->store('booking/payments/'.$booking->id, 'public');
@@ -48,6 +57,8 @@ class BookingPaymentService
             'status' => 'awaiting_verification',
             'paid_at' => now(),
             'notes' => $notes,
+            'verified_at' => null,
+            'verified_by' => null,
         ]);
 
         $payment = $payment->refresh();
