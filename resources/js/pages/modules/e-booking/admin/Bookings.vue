@@ -1,14 +1,8 @@
 <script setup lang="ts">
 import SeoHead from '@/components/SeoHead.vue';
 import SbStatusBadge from '@/components/sibola/SbStatusBadge.vue';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import SimpleSelect from '@/components/ui/select/SimpleSelect.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import AdminLayout from '@/layouts/e-booking/AdminLayout.vue';
@@ -29,17 +23,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { Deferred, Link, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
-library.add(
-    faArrowRight,
-    faCalendarDay,
-    faClipboardList,
-    faFileArrowDown,
-    faList,
-    faMagnifyingGlass,
-    faShieldHalved,
-    faUsers,
-    faWallet,
-);
+library.add(faArrowRight, faCalendarDay, faClipboardList, faFileArrowDown, faList, faMagnifyingGlass, faShieldHalved, faUsers, faWallet);
 
 type Row = {
     id: number;
@@ -77,6 +61,7 @@ const props = defineProps<{
     counts?: Counts;
     filters: { tab: string; status: string };
     status_options: string[];
+    available_years?: number[];
 }>();
 
 const activeTab = ref(props.filters.tab || 'active');
@@ -219,11 +204,59 @@ const displayStatus = (item: Row) => {
 const activeTabLabel = computed(() => tabs.value.find((t) => t.key === activeTab.value)?.label ?? 'Pengajuan');
 
 const exporting = ref(false);
+const exportOpen = ref(false);
+const exportYear = ref('all');
+const exportMonth = ref('all');
+const exportMeetingOnly = ref(false);
+const exportPaidOnly = ref(false);
 
-const currentMonth = (() => {
+const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+const currentYear = new Date().getFullYear();
+
+const yearOptions = computed(() => {
+    const years = new Set((props.available_years ?? []).map(String));
+    years.add(String(currentYear));
+
+    return [
+        { value: 'all', label: 'Semua tahun' },
+        ...[...years].sort((a, b) => Number(b) - Number(a)).map((year) => ({ value: year, label: year })),
+    ];
+});
+
+const monthOptions = computed(() => [
+    { value: 'all', label: 'Semua bulan' },
+    ...monthNames.map((label, index) => ({ value: String(index + 1).padStart(2, '0'), label })),
+]);
+
+const periodSummary = computed(() => {
+    if (exportYear.value === 'all') {
+        return 'Semua periode (seluruh tahun)';
+    }
+
+    if (exportMonth.value === 'all') {
+        return `Seluruh tahun ${exportYear.value}`;
+    }
+
+    return `${monthNames[Number(exportMonth.value) - 1]} ${exportYear.value}`;
+});
+
+const applyPresetThisMonth = () => {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-})();
+    exportYear.value = String(now.getFullYear());
+    exportMonth.value = String(now.getMonth() + 1).padStart(2, '0');
+};
+
+const applyPresetThisYear = () => {
+    exportYear.value = String(new Date().getFullYear());
+    exportMonth.value = 'all';
+};
+
+watch(exportYear, (year) => {
+    if (!year || year === 'all') {
+        exportMonth.value = 'all';
+    }
+});
 
 const runExport = (params: Record<string, string | undefined>) => {
     const search = new URLSearchParams();
@@ -243,11 +276,42 @@ const runExport = (params: Record<string, string | undefined>) => {
     }, 1500);
 };
 
-const exportCurrentFilter = () =>
+const exportPeriode = () => {
+    const params: Record<string, string | undefined> = {};
+
+    const year = exportYear.value === 'all' ? '' : exportYear.value;
+    const month = exportMonth.value === 'all' ? '' : exportMonth.value;
+
+    if (year && month) {
+        params.month = `${year}-${month}`;
+    } else if (year) {
+        params.year = year;
+    }
+
+    if (exportMeetingOnly.value) {
+        params.has_meeting = '1';
+    }
+
+    if (exportPaidOnly.value) {
+        params.has_paid = '1';
+    }
+
+    runExport(params);
+    exportOpen.value = false;
+};
+
+const exportCurrentFilter = () => {
     runExport({
         tab: activeTab.value,
         ...(activeTab.value === 'all' && statusFilter.value ? { status: statusFilter.value } : {}),
     });
+    exportOpen.value = false;
+};
+
+const exportAll = () => {
+    runExport({});
+    exportOpen.value = false;
+};
 </script>
 
 <template>
@@ -262,35 +326,111 @@ const exportCurrentFilter = () =>
                 </p>
             </div>
 
-            <DropdownMenu>
-                <DropdownMenuTrigger as-child>
+            <Dialog v-model:open="exportOpen">
+                <DialogTrigger as-child>
                     <button type="button" class="wp-btn wp-btn-quiet shrink-0 px-4 py-2 text-sm" :disabled="exporting">
                         <FontAwesomeIcon :icon="['fas', 'file-arrow-down']" class="size-3.5" aria-hidden="true" />
                         {{ exporting ? 'Menyiapkan…' : 'Export Excel' }}
                     </button>
-                </DropdownMenuTrigger>
+                </DialogTrigger>
 
-                <DropdownMenuContent align="end" class="w-64 rounded-xl p-1.5">
-                    <DropdownMenuLabel class="text-muted-foreground px-2 py-1.5 text-xs font-medium">Export pengajuan</DropdownMenuLabel>
-                    <DropdownMenuItem class="gap-2.5 rounded-lg" @click="runExport({ month: currentMonth })">
-                        <FontAwesomeIcon :icon="['fas', 'calendar-day']" class="size-3.5 text-muted-foreground" aria-hidden="true" />
-                        Bulan ini (semua status)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem class="gap-2.5 rounded-lg" @click="runExport({ month: currentMonth, has_meeting: '1' })">
-                        <FontAwesomeIcon :icon="['fas', 'users']" class="size-3.5 text-muted-foreground" aria-hidden="true" />
-                        Bulan ini + sudah meeting
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem class="gap-2.5 rounded-lg" @click="exportCurrentFilter()">
-                        <FontAwesomeIcon :icon="['fas', 'list']" class="size-3.5 text-muted-foreground" aria-hidden="true" />
-                        Sesuai filter aktif
-                    </DropdownMenuItem>
-                    <DropdownMenuItem class="gap-2.5 rounded-lg" @click="runExport({})">
-                        <FontAwesomeIcon :icon="['fas', 'clipboard-list']" class="size-3.5 text-muted-foreground" aria-hidden="true" />
-                        Semua pengajuan
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+                <DialogContent class="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Export pengajuan sewa</DialogTitle>
+                        <DialogDescription>Pilih periode data yang ingin diunduh, lalu klik Unduh Excel.</DialogDescription>
+                    </DialogHeader>
+
+                    <div class="grid gap-5 py-1">
+                        <section class="grid gap-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold">1. Pilih periode</h3>
+                                <div class="flex items-center gap-1.5">
+                                    <button type="button" class="sb-chip px-2.5 py-1 text-xs" @click="applyPresetThisMonth">Bulan ini</button>
+                                    <button type="button" class="sb-chip px-2.5 py-1 text-xs" @click="applyPresetThisYear">Tahun ini</button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div class="grid gap-1.5">
+                                    <label class="text-muted-foreground text-xs font-medium">Tahun</label>
+                                    <SimpleSelect
+                                        v-model="exportYear"
+                                        :options="yearOptions"
+                                        placeholder="Pilih tahun"
+                                        trigger-class="h-10 w-full rounded-xl border-(--wp-hairline) bg-card px-3 text-sm shadow-none"
+                                    />
+                                </div>
+
+                                <div class="grid gap-1.5">
+                                    <label class="text-muted-foreground text-xs font-medium">Bulan</label>
+                                    <SimpleSelect
+                                        v-model="exportMonth"
+                                        :options="monthOptions"
+                                        placeholder="Semua bulan"
+                                        :disabled="exportYear === 'all'"
+                                        trigger-class="h-10 w-full rounded-xl border-(--wp-hairline) bg-card px-3 text-sm shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+                                    />
+                                </div>
+                            </div>
+
+                            <p v-if="exportYear === 'all'" class="text-muted-foreground text-xs">Pilih tahun dulu untuk memfilter per bulan.</p>
+
+                            <div class="bg-muted/50 flex items-center gap-2.5 rounded-xl px-3.5 py-2.5">
+                                <FontAwesomeIcon :icon="['fas', 'calendar-day']" class="size-3.5 shrink-0 text-(--wp-accent)" aria-hidden="true" />
+                                <p class="text-sm">
+                                    <span class="text-muted-foreground">Akan diekspor: </span>
+                                    <span class="text-foreground font-semibold">{{ periodSummary }}</span>
+                                </p>
+                            </div>
+                        </section>
+
+                        <section class="grid gap-3">
+                            <h3 class="text-sm font-semibold">2. Opsi tambahan</h3>
+
+                            <div class="grid gap-2">
+                                <div class="flex items-start gap-3 rounded-xl border border-(--wp-hairline) px-3.5 py-2.5">
+                                    <Checkbox v-model="exportMeetingOnly" class="mt-0.5" aria-label="Hanya yang sudah meeting" />
+                                    <button type="button" class="flex-1 text-left text-sm" @click="exportMeetingOnly = !exportMeetingOnly">
+                                        <span class="text-foreground block font-medium">Hanya yang sudah meeting</span>
+                                        <span class="text-muted-foreground block text-xs"
+                                            >Centang bila hanya ingin data pengajuan yang sudah dijadwalkan meeting.</span
+                                        >
+                                    </button>
+                                </div>
+
+                                <div class="flex items-start gap-3 rounded-xl border border-(--wp-hairline) px-3.5 py-2.5">
+                                    <Checkbox v-model="exportPaidOnly" class="mt-0.5" aria-label="Hanya yang sudah bayar" />
+                                    <button type="button" class="flex-1 text-left text-sm" @click="exportPaidOnly = !exportPaidOnly">
+                                        <span class="text-foreground block font-medium">Hanya yang sudah bayar</span>
+                                        <span class="text-muted-foreground block text-xs"
+                                            >Centang bila hanya ingin data pengajuan yang pembayarannya sudah lunas/terverifikasi.</span
+                                        >
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <DialogFooter class="gap-2 sm:justify-between">
+                        <div class="flex flex-col gap-2 sm:flex-row">
+                            <button type="button" class="wp-btn wp-btn-quiet px-4 py-2 text-sm" @click="exportAll">Semua pengajuan</button>
+                            <button type="button" class="wp-btn wp-btn-quiet px-4 py-2 text-sm" @click="exportCurrentFilter">
+                                Sesuai filter aktif
+                            </button>
+                        </div>
+                        <button
+                            type="button"
+                            class="wp-btn wp-btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm"
+                            :disabled="exporting || exportYear === 'all'"
+                            :title="exportYear === 'all' ? 'Pilih tahun terlebih dahulu' : 'Unduh data sesuai periode'"
+                            @click="exportPeriode"
+                        >
+                            <FontAwesomeIcon :icon="['fas', 'file-arrow-down']" class="size-3.5" aria-hidden="true" />
+                            {{ exporting ? 'Menyiapkan…' : 'Unduh Excel' }}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </header>
 
         <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

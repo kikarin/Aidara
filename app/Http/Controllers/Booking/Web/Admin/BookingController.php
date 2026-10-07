@@ -135,6 +135,13 @@ class BookingController extends Controller
                 'tab'    => $tab,
                 'status' => is_string($status) ? $status : '',
             ],
+            'available_years' => Booking::query()
+                ->whereNotNull('submitted_at')
+                ->selectRaw('DISTINCT YEAR(submitted_at) as tahun')
+                ->orderByDesc('tahun')
+                ->pluck('tahun')
+                ->map(fn ($year) => (int) $year)
+                ->all(),
             'status_options' => [
                 BookingStatus::MENUNGGU_APPROVAL,
                 BookingStatus::PERLU_KLARIFIKASI,
@@ -227,10 +234,17 @@ class BookingController extends Controller
             $query->where('status', $status);
         }
 
-        $month = $request->query('month');
+        $month        = $request->query('month');
+        $monthApplied = false;
         if (is_string($month) && preg_match('/^(\d{4})-(\d{2})$/', $month, $matches) === 1) {
             $query->whereYear('submitted_at', (int) $matches[1])
                 ->whereMonth('submitted_at', (int) $matches[2]);
+            $monthApplied = true;
+        }
+
+        $year = $request->query('year');
+        if (! $monthApplied && is_string($year) && preg_match('/^\d{4}$/', $year) === 1) {
+            $query->whereYear('submitted_at', (int) $year);
         }
 
         $dateFrom = $request->query('date_from');
@@ -248,6 +262,10 @@ class BookingController extends Controller
                 $sub->where('status', BookingStatus::MENUNGGU_MEETING)
                     ->orWhereHas('surats', fn ($s) => $s->where('jenis', BookingSurat::JENIS_UNDANGAN_MEETING));
             });
+        }
+
+        if ($request->boolean('has_paid')) {
+            $query->whereHas('payments', fn ($q) => $q->whereIn('status', ['paid', 'verified']));
         }
 
         return $query;
