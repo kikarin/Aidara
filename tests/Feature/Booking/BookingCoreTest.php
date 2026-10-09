@@ -26,10 +26,12 @@ use App\Services\Booking\AdminApprovalService;
 use App\Services\Booking\AvailabilityService;
 use App\Services\Booking\BookingPaymentExpireService;
 use App\Services\Booking\BookingPaymentService;
+use App\Services\Booking\BookingPaymentWindow;
 use App\Services\Booking\BookingSubmitService;
 use App\Services\Booking\ConflictResolver;
 use App\Services\Booking\PricingService;
 use App\Services\Booking\VenuePolicyService;
+use App\Support\Booking\BookingJenisSewa;
 use App\Support\Booking\BookingSatuan;
 use App\Support\Booking\BookingStatus;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -577,6 +579,65 @@ class BookingCoreTest extends TestCase
             $this->penyewa,
             UploadedFile::fake()->image('bukti-lagi.jpg'),
         );
+    }
+
+    #[Test]
+    public function payment_opens_h_minus_before_event_for_per_jam_when_configured(): void
+    {
+        Mail::fake();
+
+        $rules = BookingPaymentWindow::defaults();
+        $rules[BookingJenisSewa::REGULER]['mode'] = BookingPaymentWindow::MODE_BEFORE_EVENT;
+        $rules[BookingJenisSewa::REGULER]['days_before'] = 3;
+        BookingSetting::setValue(BookingPaymentWindow::SETTING_KEY, $rules);
+
+        $start = now()->addDays(10)->setTime(8, 0);
+        $booking = app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload([
+            'starts_at' => $start->toDateTimeString(),
+            'ends_at' => $start->copy()->addHour()->toDateTimeString(),
+        ]));
+
+        $this->assertSame(BookingStatus::AWAITING_PAYMENT, $booking->fresh()->status);
+
+        $payment = BookingPayment::query()->where('booking_id', $booking->id)->firstOrFail();
+        $window = app(BookingPaymentWindow::class);
+        $expectedOpen = $start->copy()->subDays(3)->startOfDay();
+
+        $this->assertSame(BookingPaymentWindow::MODE_BEFORE_EVENT, $payment->meta['open_mode']);
+        $this->assertTrue($window->opensAt($booking->fresh(), $payment)->equalTo($expectedOpen));
+        $this->assertFalse($window->isOpen($booking->fresh(), $payment));
+        $this->assertStringContainsString('H-3', $window->message($booking->fresh(), $payment));
+
+        $result = app(BookingPaymentExpireService::class)->expireDue(now()->addDays(5));
+        $this->assertNotContains($booking->id, $result['ids']);
+
+        try {
+            app(BookingPaymentService::class)->uploadBukti($booking->fresh(), $this->penyewa, UploadedFile::fake()->image('bukti.jpg'));
+            $this->fail('Upload seharusnya ditolak sebelum pembayaran dibuka.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString('H-3', $e->getMessage());
+        }
+
+        $this->travelTo($expectedOpen->copy()->addHour());
+
+        $this->assertTrue($window->isOpen($booking->fresh(), $payment->fresh()));
+        $uploaded = app(BookingPaymentService::class)->uploadBukti($booking->fresh(), $this->penyewa, UploadedFile::fake()->image('bukti.jpg'));
+        $this->assertSame('awaiting_verification', $uploaded->status);
+    }
+
+    #[Test]
+    public function payment_opens_immediately_by_default(): void
+    {
+        Mail::fake();
+
+        BookingSetting::setValue(BookingPaymentWindow::SETTING_KEY, BookingPaymentWindow::defaults());
+
+        $booking = app(BookingSubmitService::class)->submit($this->penyewa, $this->validSubmitPayload());
+        $payment = BookingPayment::query()->where('booking_id', $booking->id)->firstOrFail();
+
+        $this->assertSame(BookingPaymentWindow::MODE_AFTER_APPROVAL, $payment->meta['open_mode']);
+        $this->assertTrue(app(BookingPaymentWindow::class)->isOpen($booking->fresh(), $payment));
+        $this->assertSame(48, $payment->meta['expire_hours']);
     }
 
     /** @param  array<string, mixed>  $overrides */

@@ -58,6 +58,10 @@ type PaymentInfo = {
     bukti_url: string | null;
     expires_at: string | null;
     expire_hours: number | null;
+    opens_at: string | null;
+    is_open: boolean;
+    open_mode: 'after_approval' | 'before_event';
+    message: string;
     notes: string | null;
 };
 
@@ -198,7 +202,11 @@ const paymentStatusLabel = (status: string) => {
     return map[status] ?? statusLabel(status);
 };
 
-const awaitingTransfer = computed(() => props.booking.status === 'awaiting_payment' && props.booking.payment?.status === 'pending');
+const paymentNotOpen = computed(() => props.booking.status === 'awaiting_payment' && props.booking.payment?.is_open === false);
+
+const awaitingTransfer = computed(
+    () => props.booking.status === 'awaiting_payment' && props.booking.payment?.status === 'pending' && !paymentNotOpen.value,
+);
 
 const awaitingVerification = computed(() => props.booking.status === 'awaiting_payment' && props.booking.payment?.status === 'awaiting_verification');
 
@@ -270,6 +278,9 @@ const title = computed(() => {
     if (paymentRejected.value) {
         return 'Bukti ditolak';
     }
+    if (paymentNotOpen.value) {
+        return 'Pembayaran belum dibuka';
+    }
     if (props.booking.status === 'awaiting_payment') {
         return 'Menunggu pembayaran';
     }
@@ -291,7 +302,7 @@ const nextStepText = computed(() => {
         return 'Bukti pembayaran Anda ditolak pengelola. Silakan cek alasan penolakan, lalu unggah ulang bukti yang benar.';
     }
     if (props.booking.status === 'awaiting_payment') {
-        return 'Silakan transfer sesuai petunjuk di bawah, lalu kirim bukti pembayaran.';
+        return props.booking.payment?.message || 'Silakan transfer sesuai petunjuk di bawah, lalu kirim bukti pembayaran.';
     }
     if (props.booking.status === 'menunggu_approval' && isReguler.value) {
         return 'Pengajuan sewa per jam Anda sudah masuk dan langsung terbooking. Petunjuk pembayaran muncul otomatis di halaman ini.';
@@ -365,6 +376,12 @@ const parseDate = (raw: string | null) => {
 
 const dateFormatter = new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 const timeFormatter = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+const formatDateTime = (raw: string) => {
+    const date = parseDate(raw);
+
+    return date ? `${dateFormatter.format(date)}, ${timeFormatter.format(date)}` : raw;
+};
 
 const schedule = computed(() => {
     const start = parseDate(props.booking.starts_at);
@@ -740,7 +757,7 @@ const progressPercent = computed(() => {
                                     v-if="booking.payment"
                                     class="sb-badge"
                                     :class="booking.payment.status === 'verified' ? 'sb-tone-success' : 'sb-tone-neutral'"
-                                    >{{ paymentStatusLabel(booking.payment.status) }}</span
+                                    >{{ paymentNotOpen ? 'Belum dibuka' : paymentStatusLabel(booking.payment.status) }}</span
                                 >
                             </div>
 
@@ -752,6 +769,17 @@ const progressPercent = computed(() => {
                                         <template v-if="booking.payment.notes"> Alasan: {{ booking.payment.notes }}</template>
                                     </span>
                                 </p>
+
+                                <div v-if="paymentNotOpen" class="rounded-2xl bg-(--wp-accent-soft) p-4 text-sm leading-relaxed">
+                                    <p class="flex items-center gap-2 text-xs font-semibold text-(--wp-accent-strong)">
+                                        <FontAwesomeIcon :icon="['fas', 'clock']" class="size-3.5" aria-hidden="true" />
+                                        Pembayaran dibuka mulai
+                                    </p>
+                                    <p v-if="booking.payment.opens_at" class="mt-1 text-base font-semibold tabular-nums">
+                                        {{ formatDateTime(booking.payment.opens_at) }}
+                                    </p>
+                                    <p class="text-muted-foreground mt-2">{{ booking.payment.message }}</p>
+                                </div>
 
                                 <div v-if="countdownParts.length" class="rounded-2xl p-4 ring-1 ring-(--sb-warning)/40" role="timer" aria-live="off">
                                     <p class="flex items-center gap-2 text-xs font-medium text-(--sb-warning)">
@@ -783,7 +811,7 @@ const progressPercent = computed(() => {
                                     <span class="text-xl font-bold tabular-nums">{{ formatRp(booking.payment.amount) }}</span>
                                 </div>
 
-                                <div v-if="booking.payment.bank" class="bg-muted/70 rounded-2xl p-4 text-sm">
+                                <div v-if="booking.payment.bank && !paymentNotOpen" class="bg-muted/70 rounded-2xl p-4 text-sm">
                                     <p class="text-muted-foreground text-xs">{{ booking.payment.bank }}</p>
                                     <div class="mt-1 flex items-center justify-between gap-3">
                                         <p class="font-mono text-lg font-semibold tracking-wider tabular-nums">{{ booking.payment.rekening }}</p>

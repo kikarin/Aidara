@@ -254,6 +254,64 @@ class VenueAdminTest extends TestCase
     }
 
     #[Test]
+    public function admin_can_upload_replace_and_remove_area_photo(): void
+    {
+        Storage::fake('public');
+
+        $venue = BookingVenue::query()->create([
+            'code' => 'venue_'.substr(uniqid(), -6),
+            'name' => 'Venue Foto Area',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.areas.store', $venue->id), [
+                'code' => 'area_a',
+                'name' => 'Area A',
+                'is_active' => true,
+                'photo' => UploadedFile::fake()->image('area-a.jpg', 400, 300),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $area = BookingArea::query()->where('venue_id', $venue->id)->where('code', 'area_a')->firstOrFail();
+        $firstPath = $area->photo_path;
+        $this->assertNotNull($firstPath);
+        Storage::disk('public')->assertExists($firstPath);
+        $this->assertNotNull($area->photo_url);
+
+        $this->travel(2)->seconds();
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.areas.update', $area->id), [
+                '_method' => 'put',
+                'code' => 'area_a',
+                'name' => 'Area A',
+                'photo' => UploadedFile::fake()->image('area-a-baru.png', 400, 300),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $secondPath = $area->fresh()->photo_path;
+        $this->assertNotSame($firstPath, $secondPath);
+        Storage::disk('public')->assertMissing($firstPath);
+        Storage::disk('public')->assertExists($secondPath);
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.areas.update', $area->id), [
+                '_method' => 'put',
+                'code' => 'area_a',
+                'name' => 'Area A',
+                'remove_photo' => '1',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull($area->fresh()->photo_path);
+        Storage::disk('public')->assertMissing($secondPath);
+    }
+
+    #[Test]
     public function admin_can_update_venue_rules(): void
     {
         $venue = BookingVenue::query()->create([

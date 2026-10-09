@@ -27,7 +27,7 @@
                             <td style="padding:2px 0;color:#64748b;">Jumlah</td>
                             <td style="padding:2px 0;text-align:right;font-weight:bold;">Rp {{ number_format((int) $payment->amount, 0, ',', '.') }}</td>
                         </tr>
-                        @if ($payment->bank)
+                        @if ($payment->bank && $paymentOpen)
                             <tr>
                                 <td style="padding:2px 0;color:#64748b;">Bank</td>
                                 <td style="padding:2px 0;text-align:right;">{{ $payment->bank }}</td>
@@ -51,10 +51,21 @@
                 </div>
             @endif
 
+            @if ($paymentMessage)
+                <p style="margin:0 0 16px;padding:12px 16px;border-radius:8px;background:#ecfdf5;font-size:14px;line-height:1.6;color:#065f46;">
+                    {{ $paymentMessage }}
+                </p>
+            @endif
+
             <p style="margin:0 0 20px;font-size:14px;line-height:1.6;">
-                Silakan transfer sesuai petunjuk di atas, lalu unggah bukti pembayaran di halaman detail pesanan.
-                Jadwal sudah kami tahan untuk Anda sampai batas waktu pembayaran. Setelah bukti diunggah,
-                pengelola akan memvalidasi pembayaran Anda.
+                @if ($paymentOpen)
+                    Silakan transfer sesuai petunjuk di atas, lalu unggah bukti pembayaran di halaman detail pesanan.
+                    Jadwal sudah kami tahan untuk Anda sampai batas waktu pembayaran. Setelah bukti diunggah,
+                    pengelola akan memvalidasi pembayaran Anda.
+                @else
+                    Jadwal sudah kami tahan untuk Anda. Petunjuk transfer akan tampil di halaman detail pesanan
+                    saat pembayaran dibuka.
+                @endif
             </p>
         @else
             <p style="margin:0 0 20px;font-size:14px;line-height:1.6;">

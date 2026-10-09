@@ -18,6 +18,7 @@ use App\Models\Booking\BookingPriorityRule;
 use App\Models\Booking\BookingSurat;
 use App\Services\Booking\AdminApprovalService;
 use App\Services\Booking\BookingPaymentService;
+use App\Services\Booking\BookingPaymentWindow;
 use App\Services\Booking\BookingStatusService;
 use App\Services\Booking\SuratDeliveryService;
 use App\Services\Booking\SuratService;
@@ -376,7 +377,7 @@ class BookingController extends Controller
                     ? Storage::disk('public')->url($payment->bukti_path)
                     : null,
                 'notes'      => $payment->notes,
-                'expires_at' => $payment->meta['expires_at'] ?? null,
+                ...app(BookingPaymentWindow::class)->payload($booking, $payment),
             ] : null,
             'conflict'       => $conflict,
             'priority_rules' => BookingPriorityRule::query()

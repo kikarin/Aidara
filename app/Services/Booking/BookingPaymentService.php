@@ -19,6 +19,7 @@ class BookingPaymentService
         private readonly AvailabilityService $availability,
         private readonly RulesEngine $rules,
         private readonly BookingNotifier $notifier,
+        private readonly BookingPaymentWindow $window,
     ) {}
 
     public function uploadBukti(Booking $booking, User $user, UploadedFile $file, ?string $notes = null): BookingPayment
@@ -48,6 +49,10 @@ class BookingPaymentService
                     ? 'Bukti pembayaran sedang diperiksa admin.'
                     : 'Pembayaran sudah diverifikasi dan tidak bisa diunggah ulang.'
             );
+        }
+
+        if (! $this->window->isOpen($booking, $payment)) {
+            throw new InvalidArgumentException($this->window->message($booking, $payment));
         }
 
         $path = $file->store('booking/payments/'.$booking->id, 'public');

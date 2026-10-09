@@ -166,6 +166,7 @@ class VenueController extends Controller
                 'id' => $a->id,
                 'code' => $a->code,
                 'name' => $a->name,
+                'photo_url' => $a->photo_url,
                 'is_tentative' => (bool) $a->is_tentative,
                 'is_active' => (bool) $a->is_active,
                 'sort_order' => (int) $a->sort_order,
@@ -283,6 +284,9 @@ class VenueController extends Controller
                     'is_active' => $row['is_active'] ?? true,
                     'sort_order' => $row['sort_order'] ?? ($i + 1),
                 ]);
+                if (($row['photo'] ?? null) instanceof UploadedFile) {
+                    $area->update(['photo_path' => $this->storeAreaPhoto($row['photo'], $venue->code, $area->id)]);
+                }
                 $areaIds[$row['code']] = $area->id;
             }
 
@@ -377,7 +381,7 @@ class VenueController extends Controller
         $venue = BookingVenue::query()->findOrFail($venueId);
         $data = $this->validateArea($request, $venue->id);
 
-        $venue->areas()->create([
+        $area = $venue->areas()->create([
             'code' => $data['code'],
             'name' => $data['name'],
             'is_tentative' => $data['is_tentative'] ?? false,
@@ -385,12 +389,16 @@ class VenueController extends Controller
             'sort_order' => $data['sort_order'] ?? 0,
         ]);
 
+        if ($request->hasFile('photo')) {
+            $area->update(['photo_path' => $this->storeAreaPhoto($request->file('photo'), $venue->code, $area->id)]);
+        }
+
         return back()->with('success', 'Area ditambahkan.');
     }
 
     public function updateArea(Request $request, int $id): RedirectResponse
     {
-        $area = BookingArea::query()->findOrFail($id);
+        $area = BookingArea::query()->with('venue:id,code')->findOrFail($id);
         $data = $this->validateArea($request, $area->venue_id, $area->id);
 
         $area->update([
@@ -400,6 +408,14 @@ class VenueController extends Controller
             'is_active' => $data['is_active'] ?? $area->is_active,
             'sort_order' => $data['sort_order'] ?? $area->sort_order,
         ]);
+
+        if ($request->hasFile('photo')) {
+            $this->deleteCover($area->photo_path);
+            $area->update(['photo_path' => $this->storeAreaPhoto($request->file('photo'), $area->venue?->code ?? 'venue', $area->id)]);
+        } elseif ($request->boolean('remove_photo')) {
+            $this->deleteCover($area->photo_path);
+            $area->update(['photo_path' => null]);
+        }
 
         return back()->with('success', 'Area diperbarui.');
     }
@@ -535,6 +551,7 @@ class VenueController extends Controller
             'areas.*.is_tentative' => ['nullable', 'boolean'],
             'areas.*.is_active' => ['nullable', 'boolean'],
             'areas.*.sort_order' => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'areas.*.photo' => ['nullable', 'file', 'mimes:'.implode(',', self::COVER_EXT), 'max:5120'],
         ]);
 
         return $data['areas'];
@@ -637,6 +654,8 @@ class VenueController extends Controller
             'is_tentative' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'photo' => ['nullable', 'file', 'mimes:'.implode(',', self::COVER_EXT), 'max:5120'],
+            'remove_photo' => ['nullable', 'boolean'],
         ]);
     }
 
@@ -691,6 +710,14 @@ class VenueController extends Controller
         $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
 
         return $file->storeAs('booking/venues', $code.'.'.$ext, 'public');
+    }
+
+    private function storeAreaPhoto(UploadedFile $file, string $venueCode, int $areaId): string
+    {
+        $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
+
+        // Nama unik supaya cache browser tidak menampilkan foto lama setelah diganti.
+        return $file->storeAs('booking/areas', $venueCode.'-'.$areaId.'-'.now()->format('YmdHis').'.'.$ext, 'public');
     }
 
     private function deleteCover(?string $path): void

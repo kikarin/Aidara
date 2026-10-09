@@ -4,6 +4,7 @@ import BookingAvailabilityCalendar from '@/components/e-booking/BookingAvailabil
 import FacilityIcon from '@/components/e-booking/FacilityIcon.vue';
 import InputError from '@/components/InputError.vue';
 import SeoHead from '@/components/SeoHead.vue';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SimpleSelect from '@/components/ui/select/SimpleSelect.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import EBookingLayout from '@/layouts/e-booking/EBookingLayout.vue';
@@ -49,15 +50,24 @@ library.add(
 
 const selectTriggerClass = 'h-11 w-full rounded-xl border-(--wp-hairline) bg-background px-3.5 text-sm shadow-none';
 
+const previewArea = ref<VenueArea | null>(null);
+const openAreaPreview = (area: VenueArea | undefined) => {
+    if (area?.photo_url) previewArea.value = area;
+};
+const areaById = (id: number | '') => (id === '' ? undefined : props.venue.areas.find((area) => area.id === Number(id)));
+const areasWithPhoto = computed(() => props.venue.areas.filter((area) => area.photo_url));
+
 type VenueDetail = {
     id: number;
     code: string;
     name: string;
     description: string | null;
     cover_url: string | null;
-    areas: Array<{ id: number; code: string; name: string; is_tentative: boolean }>;
+    areas: VenueArea[];
     facilities: Array<{ id: number; name: string; icon: string | null }>;
 };
+
+type VenueArea = { id: number; code: string; name: string; photo_url: string | null; is_tentative: boolean };
 
 type DaySlot = {
     starts_at: string;
@@ -1085,6 +1095,33 @@ const slotTitle = (slot: DaySlot) => {
                         </li>
                     </ul>
                 </div>
+
+                <div v-if="areasWithPhoto.length" class="mt-8">
+                    <h2 id="area-venue" class="text-sm font-semibold tracking-tight">Foto area</h2>
+                    <p class="text-muted-foreground mt-1 text-xs">Klik foto untuk melihat lokasi area yang akan disewa.</p>
+                    <ul class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3" aria-labelledby="area-venue">
+                        <li v-for="area in areasWithPhoto" :key="area.id">
+                            <button
+                                type="button"
+                                class="group block w-full overflow-hidden rounded-xl text-left ring-1 ring-(--wp-hairline) transition hover:ring-(--wp-accent) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--wp-accent)"
+                                :aria-label="`Lihat foto ${area.name}`"
+                                @click="openAreaPreview(area)"
+                            >
+                                <span class="bg-muted relative block aspect-[4/3] overflow-hidden">
+                                    <AppImage
+                                        :src="area.photo_url!"
+                                        :alt="area.name"
+                                        class="size-full object-cover transition duration-300 group-hover:scale-105"
+                                    />
+                                </span>
+                                <span class="flex items-center justify-between gap-2 px-3 py-2">
+                                    <span class="truncate text-xs font-semibold">{{ area.name }}</span>
+                                    <span v-if="area.is_tentative" class="sb-badge sb-tone-warning shrink-0 text-[10px]">Tentatif</span>
+                                </span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
             </div>
 
             <div class="order-1 space-y-4 lg:order-2">
@@ -1239,6 +1276,18 @@ const slotTitle = (slot: DaySlot) => {
                                         <FontAwesomeIcon :icon="['fas', 'xmark']" class="size-4" aria-hidden="true" />
                                     </button>
                                 </div>
+                                <button
+                                    v-if="areaById(row.area_id)?.photo_url"
+                                    type="button"
+                                    class="bg-card mt-3 flex w-full items-center gap-3 rounded-xl p-2 text-left ring-1 ring-(--wp-hairline) transition hover:ring-(--wp-accent) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--wp-accent)"
+                                    @click="openAreaPreview(areaById(row.area_id))"
+                                >
+                                    <AppImage :src="areaById(row.area_id)!.photo_url!" alt="" class="h-12 w-16 shrink-0 rounded-lg object-cover" />
+                                    <span class="min-w-0 text-xs">
+                                        <span class="block truncate font-semibold">{{ areaById(row.area_id)!.name }}</span>
+                                        <span class="font-medium text-(--wp-accent-strong)">Lihat foto area</span>
+                                    </span>
+                                </button>
                                 <div class="mt-3 grid gap-3 sm:grid-cols-2">
                                     <div v-if="tarifForRow(row) && needsQty(tarifForRow(row)!.satuan)">
                                         <label :for="`row-qty-${row.uid}`" class="sb-label">{{ qtyLabel }}</label>
@@ -1301,7 +1350,12 @@ const slotTitle = (slot: DaySlot) => {
                     <div class="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
                         <div>
                             <p class="sb-label">Kalender ketersediaan</p>
-                            <BookingAvailabilityCalendar v-model="selectedDate" :venue-id="venue.id" :area-ids="selectedAreaIds" :is-per-hari="isPerHari" />
+                            <BookingAvailabilityCalendar
+                                v-model="selectedDate"
+                                :venue-id="venue.id"
+                                :area-ids="selectedAreaIds"
+                                :is-per-hari="isPerHari"
+                            />
                         </div>
 
                         <div class="space-y-5">
@@ -1665,9 +1719,7 @@ const slotTitle = (slot: DaySlot) => {
                         <label for="surat-permohonan" class="text-sm font-semibold">
                             Surat permohonan <span class="text-(--sb-danger)">*</span>
                         </label>
-                        <p class="text-muted-foreground mt-1 text-xs">
-                            Sewa per hari wajib melampirkan surat permohonan (PDF, maks 5MB).
-                        </p>
+                        <p class="text-muted-foreground mt-1 text-xs">Sewa per hari wajib melampirkan surat permohonan (PDF, maks 5MB).</p>
                         <input
                             id="surat-permohonan"
                             type="file"
@@ -1675,9 +1727,7 @@ const slotTitle = (slot: DaySlot) => {
                             class="mt-3 block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-(--wp-accent-soft) file:px-3 file:py-2 file:text-sm file:font-medium file:text-(--wp-accent-strong)"
                             @change="onSuratPermohonanChange"
                         />
-                        <p v-if="form.surat_permohonan" class="text-muted-foreground mt-2 text-xs">
-                            Terpilih: {{ form.surat_permohonan.name }}
-                        </p>
+                        <p v-if="form.surat_permohonan" class="text-muted-foreground mt-2 text-xs">Terpilih: {{ form.surat_permohonan.name }}</p>
                         <InputError :message="form.errors.surat_permohonan" class="mt-1" />
                     </div>
 
@@ -1745,5 +1795,30 @@ const slotTitle = (slot: DaySlot) => {
                 </section>
             </aside>
         </div>
+
+        <Dialog
+            :open="previewArea !== null"
+            @update:open="
+                (value: boolean) => {
+                    if (!value) previewArea = null;
+                }
+            "
+        >
+            <DialogContent class="bg-card overflow-hidden rounded-3xl border-(--wp-hairline) p-0 sm:max-w-3xl">
+                <AppImage
+                    v-if="previewArea?.photo_url"
+                    :src="previewArea.photo_url"
+                    :alt="previewArea.name"
+                    :lazy="false"
+                    class="max-h-[70vh] w-full bg-black/5 object-contain"
+                />
+                <DialogHeader class="gap-1 px-6 pt-1 pb-6">
+                    <DialogTitle class="text-foreground text-lg font-semibold tracking-tight">{{ previewArea?.name }}</DialogTitle>
+                    <DialogDescription class="text-muted-foreground text-sm">
+                        {{ venue.name }}<template v-if="previewArea?.is_tentative"> · Area tentatif</template>
+                    </DialogDescription>
+                </DialogHeader>
+            </DialogContent>
+        </Dialog>
     </EBookingLayout>
 </template>

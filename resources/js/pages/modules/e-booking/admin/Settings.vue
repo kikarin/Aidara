@@ -15,9 +15,28 @@ type SettingBag = {
     description: string | null;
 };
 
+type PaymentOpenMode = 'after_approval' | 'before_event';
+
+type PaymentOpenRule = {
+    mode: PaymentOpenMode;
+    days_before: number;
+    message_waiting: string;
+    message_open: string;
+};
+
+type JenisSewa = 'event' | 'reguler';
+
 const props = defineProps<{
     settings: Record<string, SettingBag>;
+    paymentOpenRules: Record<JenisSewa, PaymentOpenRule>;
+    paymentOpenDefaults: Record<JenisSewa, PaymentOpenRule>;
+    paymentPlaceholders: Record<string, string>;
 }>();
+
+const kategoriList: Array<{ key: JenisSewa; label: string; hint: string }> = [
+    { key: 'event', label: 'Event', hint: 'Sewa per hari' },
+    { key: 'reguler', label: 'Latihan', hint: 'Sewa per jam' },
+];
 
 const rek = computed(() => {
     const v = props.settings.rekening_transfer?.value;
@@ -52,7 +71,59 @@ const form = useForm({
     surat_telp: kop.value.telp || '',
     surat_penandatangan_nama: kop.value.penandatangan_nama || '',
     surat_penandatangan_jabatan: kop.value.penandatangan_jabatan || '',
+    payment_open_rules: {
+        event: { ...props.paymentOpenRules.event },
+        reguler: { ...props.paymentOpenRules.reguler },
+    } as Record<JenisSewa, PaymentOpenRule>,
 });
+
+const ruleError = (jenis: JenisSewa, field: keyof PaymentOpenRule) =>
+    (form.errors as Record<string, string | undefined>)[`payment_open_rules.${jenis}.${field}`];
+
+const resetMessages = (jenis: JenisSewa) => {
+    form.payment_open_rules[jenis].message_waiting = props.paymentOpenDefaults[jenis].message_waiting;
+    form.payment_open_rules[jenis].message_open = props.paymentOpenDefaults[jenis].message_open;
+};
+
+const formatTanggal = (d: Date) =>
+    new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(
+        d,
+    );
+
+/** Contoh kegiatan 14 hari dari sekarang jam 08:00, untuk pratinjau pesan. */
+const previewMessage = (jenis: JenisSewa, template: string) => {
+    const rule = form.payment_open_rules[jenis];
+    const days = Math.max(1, Number(rule.days_before) || 1);
+    const hours = Math.max(1, Number(form.payment_expire_hours) || 72);
+
+    const kegiatan = new Date();
+    kegiatan.setDate(kegiatan.getDate() + 14);
+    kegiatan.setHours(8, 0, 0, 0);
+
+    let buka = new Date();
+    if (rule.mode === 'before_event') {
+        buka = new Date(kegiatan);
+        buka.setDate(buka.getDate() - days);
+        buka.setHours(0, 0, 0, 0);
+    }
+    let batas = new Date(buka.getTime() + hours * 3_600_000);
+    if (rule.mode === 'before_event' && batas > kegiatan) {
+        batas = kegiatan;
+    }
+
+    const values: Record<string, string> = {
+        '{nomor}': 'BK-2026-0001',
+        '{jenis}': jenis === 'reguler' ? 'Latihan' : 'Event',
+        '{h}': String(days),
+        '{tanggal_kegiatan}': formatTanggal(kegiatan),
+        '{tanggal_buka}': formatTanggal(buka),
+        '{batas_bayar}': formatTanggal(batas),
+        '{jam_bayar}': String(hours),
+        '{kontak}': form.kontak_klarifikasi || '-',
+    };
+
+    return Object.entries(values).reduce((text, [key, value]) => text.split(key).join(value), template || '');
+};
 
 const submit = () => {
     form.put(route('e-booking.admin.settings.update'), { preserveScroll: true });
@@ -128,7 +199,7 @@ const submit = () => {
                         />
                     </div>
                     <div>
-                        <label for="set-expire" class="sb-label">Batas waktu bayar setelah disetujui (jam)</label>
+                        <label for="set-expire" class="sb-label">Batas waktu bayar setelah pembayaran dibuka (jam)</label>
                         <input
                             id="set-expire"
                             v-model.number="form.payment_expire_hours"
@@ -137,7 +208,10 @@ const submit = () => {
                             class="sb-input tabular-nums"
                             aria-describedby="set-expire-hint"
                         />
-                        <p id="set-expire-hint" class="sb-hint">Default 72 jam (3 hari). Lewat dari itu, booking otomatis batal.</p>
+                        <p id="set-expire-hint" class="sb-hint">
+                            Default 72 jam (3 hari). Lewat dari itu, booking otomatis batal. Untuk mode H- kegiatan, tenggat tidak melewati jam mulai
+                            kegiatan.
+                        </p>
                     </div>
                     <div>
                         <label for="set-sla" class="sb-label">Lama proses pengajuan (hari kerja)</label>
@@ -151,6 +225,126 @@ const submit = () => {
                             aria-describedby="set-sla-hint"
                         />
                         <p id="set-sla-hint" class="sb-hint">Ditampilkan ke penyewa saat mengirim pengajuan. Default 7 hari kerja.</p>
+                    </div>
+
+                    <div class="space-y-4 sm:col-span-2">
+                        <div>
+                            <span class="sb-label">Waktu pembayaran dibuka per kategori</span>
+                            <p class="sb-hint">
+                                Event = sewa per hari, Latihan = sewa per jam. Atur apakah pembayaran langsung dibuka setelah disetujui, atau baru
+                                dibuka H- sekian hari sebelum kegiatan.
+                            </p>
+                        </div>
+
+                        <div
+                            v-for="kat in kategoriList"
+                            :key="kat.key"
+                            class="space-y-4 rounded-2xl p-4 ring-1 ring-(--wp-hairline)"
+                            :aria-labelledby="`rule-${kat.key}-title`"
+                            role="group"
+                        >
+                            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                                <h3 :id="`rule-${kat.key}-title`" class="text-sm font-semibold">
+                                    {{ kat.label }} <span class="text-muted-foreground font-normal">({{ kat.hint }})</span>
+                                </h3>
+                                <button type="button" class="text-xs font-semibold text-(--wp-accent-strong)" @click="resetMessages(kat.key)">
+                                    Pakai pesan default
+                                </button>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <label
+                                    v-for="opt in [
+                                        {
+                                            value: 'after_approval',
+                                            title: 'Dibuka setelah disetujui',
+                                            desc: 'Petunjuk bayar langsung muncul begitu booking disetujui.',
+                                        },
+                                        {
+                                            value: 'before_event',
+                                            title: 'Dibuka H- kegiatan',
+                                            desc: 'Petunjuk bayar baru muncul beberapa hari sebelum kegiatan.',
+                                        },
+                                    ]"
+                                    :key="opt.value"
+                                    class="flex cursor-pointer gap-3 rounded-xl p-3 text-sm ring-1 transition"
+                                    :class="
+                                        form.payment_open_rules[kat.key].mode === opt.value
+                                            ? 'bg-(--wp-accent-soft) ring-(--wp-accent)'
+                                            : 'ring-(--wp-hairline) hover:ring-(--wp-accent)/50'
+                                    "
+                                >
+                                    <input
+                                        v-model="form.payment_open_rules[kat.key].mode"
+                                        type="radio"
+                                        :name="`rule-${kat.key}-mode`"
+                                        :value="opt.value"
+                                        class="mt-0.5 accent-(--wp-accent)"
+                                    />
+                                    <span>
+                                        <span class="block font-medium">{{ opt.title }}</span>
+                                        <span class="text-muted-foreground block text-xs">{{ opt.desc }}</span>
+                                    </span>
+                                </label>
+                            </div>
+                            <p v-if="ruleError(kat.key, 'mode')" class="sb-error">{{ ruleError(kat.key, 'mode') }}</p>
+
+                            <div v-if="form.payment_open_rules[kat.key].mode === 'before_event'" class="max-w-xs">
+                                <label :for="`rule-${kat.key}-days`" class="sb-label">Dibuka H- berapa hari sebelum kegiatan</label>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-muted-foreground text-sm font-semibold">H-</span>
+                                    <input
+                                        :id="`rule-${kat.key}-days`"
+                                        v-model.number="form.payment_open_rules[kat.key].days_before"
+                                        type="number"
+                                        min="1"
+                                        max="365"
+                                        class="sb-input tabular-nums"
+                                        :aria-invalid="ruleError(kat.key, 'days_before') ? 'true' : undefined"
+                                    />
+                                </div>
+                                <p v-if="ruleError(kat.key, 'days_before')" class="sb-error">{{ ruleError(kat.key, 'days_before') }}</p>
+                            </div>
+
+                            <div v-if="form.payment_open_rules[kat.key].mode === 'before_event'">
+                                <label :for="`rule-${kat.key}-waiting`" class="sb-label">Pesan saat pembayaran belum dibuka</label>
+                                <textarea
+                                    :id="`rule-${kat.key}-waiting`"
+                                    v-model="form.payment_open_rules[kat.key].message_waiting"
+                                    rows="3"
+                                    class="sb-input"
+                                    :aria-invalid="ruleError(kat.key, 'message_waiting') ? 'true' : undefined"
+                                />
+                                <p v-if="ruleError(kat.key, 'message_waiting')" class="sb-error">{{ ruleError(kat.key, 'message_waiting') }}</p>
+                                <p class="bg-muted/60 mt-2 rounded-lg px-3 py-2 text-xs leading-relaxed">
+                                    <span class="text-muted-foreground">Pratinjau:</span>
+                                    {{ previewMessage(kat.key, form.payment_open_rules[kat.key].message_waiting) }}
+                                </p>
+                            </div>
+
+                            <div>
+                                <label :for="`rule-${kat.key}-open`" class="sb-label">Pesan saat pembayaran sudah dibuka</label>
+                                <textarea
+                                    :id="`rule-${kat.key}-open`"
+                                    v-model="form.payment_open_rules[kat.key].message_open"
+                                    rows="3"
+                                    class="sb-input"
+                                    :aria-invalid="ruleError(kat.key, 'message_open') ? 'true' : undefined"
+                                />
+                                <p v-if="ruleError(kat.key, 'message_open')" class="sb-error">{{ ruleError(kat.key, 'message_open') }}</p>
+                                <p class="bg-muted/60 mt-2 rounded-lg px-3 py-2 text-xs leading-relaxed">
+                                    <span class="text-muted-foreground">Pratinjau:</span>
+                                    {{ previewMessage(kat.key, form.payment_open_rules[kat.key].message_open) }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="text-muted-foreground text-xs leading-relaxed">
+                            <span class="font-medium">Variabel pesan:</span>
+                            <span v-for="(label, key) in paymentPlaceholders" :key="key" class="mr-3 inline-block">
+                                <code class="text-foreground">{{ key }}</code> {{ label }}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </section>

@@ -22,7 +22,7 @@ class BookingUserSeeder extends Seeder
         $penyewaRole = Role::query()->where('name', 'penyewa')->where('guard_name', 'web')->firstOrFail();
 
         $admin = User::query()->updateOrCreate(
-            ['email' => 'nikoagustio@gmail.com'],
+            ['email' => 'zanftfanny@gmail.com'],
             [
                 'name'              => 'Admin UPT E-Booking',
                 'password'          => Hash::make('Sewdaq123'),

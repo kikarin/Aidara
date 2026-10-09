@@ -4,6 +4,7 @@ namespace App\Mail\Booking;
 
 use App\Models\Booking\Booking;
 use App\Models\Booking\BookingPayment;
+use App\Services\Booking\BookingPaymentWindow;
 use App\Support\Booking\BookingJenisSewa;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
@@ -44,7 +45,7 @@ class BookingApprovedMail extends Mailable implements ShouldQueueAfterCommit
             view: 'booking.emails.approved',
             with: [
                 'reguler' => $this->jenisSewa === BookingJenisSewa::REGULER,
-                'expiresAt' => $this->payment?->meta['expires_at'] ?? null,
+                ...BookingPaymentWindow::mailData($this->booking, $this->payment),
             ],
         );
     }

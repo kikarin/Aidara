@@ -130,6 +130,10 @@ const props = defineProps<{
         bukti_url: string | null;
         notes: string | null;
         expires_at: string | null;
+        opens_at?: string | null;
+        is_open?: boolean;
+        open_mode?: 'after_approval' | 'before_event';
+        message?: string;
     } | null;
     conflict: ConflictSummary | null;
     priority_rules: Array<{ id: number; name: string; priority_order: number; code: string }>;
@@ -1153,6 +1157,12 @@ onUnmounted(() => {
                             <p v-if="payment.bank" class="text-muted-foreground mt-2 text-xs">
                                 {{ payment.bank }} · <span class="font-mono tabular-nums">{{ payment.rekening }}</span>
                                 <template v-if="payment.atas_nama"> · {{ payment.atas_nama }}</template>
+                            </p>
+                            <p
+                                v-if="payment.open_mode === 'before_event' && payment.opens_at"
+                                class="text-muted-foreground mt-1 text-xs tabular-nums"
+                            >
+                                {{ payment.is_open ? 'Dibuka sejak' : 'Pembayaran dibuka' }} {{ payment.opens_at }}
                             </p>
                             <p v-if="payment.expires_at" class="text-muted-foreground mt-1 text-xs tabular-nums">
                                 Batas bayar {{ payment.expires_at }}

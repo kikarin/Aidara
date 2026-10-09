@@ -5,10 +5,14 @@ namespace App\Services\Booking\Payment;
 use App\Models\Booking\Booking;
 use App\Models\Booking\BookingPayment;
 use App\Models\Booking\BookingSetting;
-use Carbon\Carbon;
+use App\Services\Booking\BookingPaymentWindow;
 
 class ManualTransferGateway implements PaymentGatewayInterface
 {
+    public function __construct(
+        private readonly BookingPaymentWindow $window,
+    ) {}
+
     public function name(): string
     {
         return 'manual';
@@ -41,12 +45,7 @@ class ManualTransferGateway implements PaymentGatewayInterface
             ];
         }
 
-        $expireHours = (int) (BookingSetting::getValue('payment_expire_hours', 72) ?? 72);
-        if ($expireHours < 1) {
-            $expireHours = 48;
-        }
-
-        $expiresAt = Carbon::now()->addHours($expireHours);
+        $window = $this->window->metaForNewPayment($booking);
 
         return BookingPayment::query()->create([
             'booking_id' => $booking->id,
@@ -56,10 +55,7 @@ class ManualTransferGateway implements PaymentGatewayInterface
             'bank' => $rekening['bank'] ?? null,
             'rekening' => $rekening['rekening'] ?? null,
             'atas_nama' => $rekening['atas_nama'] ?? null,
-            'meta' => array_merge($payload, [
-                'expires_at' => $expiresAt->toDateTimeString(),
-                'expire_hours' => $expireHours,
-            ]),
+            'meta' => array_merge($payload, $window),
         ]);
     }
 }

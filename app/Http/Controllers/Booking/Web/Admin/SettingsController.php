@@ -4,13 +4,19 @@ namespace App\Http\Controllers\Booking\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking\BookingSetting;
+use App\Services\Booking\BookingPaymentWindow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class SettingsController extends Controller
 {
+    public function __construct(
+        private readonly BookingPaymentWindow $window,
+    ) {}
+
     /** @var list<string> */
     private array $editableKeys = [
         'payment_mode',
@@ -41,6 +47,9 @@ class SettingsController extends Controller
 
         return Inertia::render('modules/e-booking/admin/Settings', [
             'settings' => $form,
+            'paymentOpenRules' => $this->window->rules(),
+            'paymentOpenDefaults' => BookingPaymentWindow::defaults(),
+            'paymentPlaceholders' => BookingPaymentWindow::PLACEHOLDERS,
         ]);
     }
 
@@ -61,7 +70,35 @@ class SettingsController extends Controller
             'surat_telp' => ['nullable', 'string', 'max:64'],
             'surat_penandatangan_nama' => ['nullable', 'string', 'max:150'],
             'surat_penandatangan_jabatan' => ['nullable', 'string', 'max:150'],
+            'payment_open_rules' => ['nullable', 'array'],
+            'payment_open_rules.*.mode' => ['required', Rule::in(BookingPaymentWindow::MODES)],
+            'payment_open_rules.*.days_before' => ['required_if:payment_open_rules.*.mode,'.BookingPaymentWindow::MODE_BEFORE_EVENT, 'nullable', 'integer', 'min:1', 'max:365'],
+            'payment_open_rules.*.message_waiting' => ['nullable', 'string', 'max:1000'],
+            'payment_open_rules.*.message_open' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'payment_open_rules.*.days_before.required_if' => 'Isi jumlah hari H- sebelum kegiatan.',
+            'payment_open_rules.*.days_before.min' => 'Minimal H-1.',
         ]);
+
+        if (! empty($data['payment_open_rules'])) {
+            $current = $this->window->rules();
+            foreach ($data['payment_open_rules'] as $jenis => $rule) {
+                if (! array_key_exists($jenis, $current)) {
+                    continue;
+                }
+                $current[$jenis] = [
+                    'mode' => $rule['mode'],
+                    'days_before' => (int) ($rule['days_before'] ?? $current[$jenis]['days_before']),
+                    'message_waiting' => trim((string) ($rule['message_waiting'] ?? '')),
+                    'message_open' => trim((string) ($rule['message_open'] ?? '')),
+                ];
+            }
+            BookingSetting::setValue(
+                BookingPaymentWindow::SETTING_KEY,
+                $current,
+                'Kapan pembayaran dibuka per kategori (event = sewa per hari, reguler/latihan = sewa per jam) + pesan ke penyewa'
+            );
+        }
 
         if (array_key_exists('branding_name', $data) && $data['branding_name'] !== null) {
             BookingSetting::setValue('branding_name', $data['branding_name']);

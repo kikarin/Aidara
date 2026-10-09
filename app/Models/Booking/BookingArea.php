@@ -20,11 +20,25 @@ class BookingArea extends Model
         'venue_id',
         'code',
         'name',
+        'photo_path',
         'is_tentative',
         'is_active',
         'meta',
         'sort_order',
     ];
+
+    protected $appends = [
+        'photo_url',
+    ];
+
+    public function getPhotoUrlAttribute(): ?string
+    {
+        if (! $this->photo_path) {
+            return null;
+        }
+
+        return asset('storage/'.$this->photo_path);
+    }
 
     protected function casts(): array
     {

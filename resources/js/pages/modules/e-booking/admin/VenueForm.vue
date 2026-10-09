@@ -26,6 +26,7 @@ import {
     faTag,
     faTrash,
     faTriangleExclamation,
+    faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { Link, useForm } from '@inertiajs/vue3';
@@ -50,6 +51,7 @@ library.add(
     faTag,
     faTrash,
     faTriangleExclamation,
+    faXmark,
 );
 
 const selectTrigger = 'h-10 w-full rounded-xl border-(--wp-hairline) bg-background px-3.5 text-sm shadow-none';
@@ -95,6 +97,7 @@ type AreaInput = {
     is_tentative: boolean;
     is_active: boolean;
     sort_order: number | string;
+    photo: File | null;
 };
 
 type TarifInput = {
@@ -161,7 +164,18 @@ const dayTypeOptions = [
 
 const AREA_ALL = '__all__';
 
-const newArea = (index: number): AreaInput => ({ code: '', name: '', is_tentative: false, is_active: true, sort_order: index + 1 });
+const newArea = (index: number): AreaInput => ({ code: '', name: '', is_tentative: false, is_active: true, sort_order: index + 1, photo: null });
+
+const areaPhotoUrls = new WeakMap<File, string>();
+const areaPhotoPreview = (area: AreaInput) => {
+    if (!area.photo) return null;
+    if (!areaPhotoUrls.has(area.photo)) areaPhotoUrls.set(area.photo, URL.createObjectURL(area.photo));
+
+    return areaPhotoUrls.get(area.photo) ?? null;
+};
+const onAreaPhotoChange = (area: AreaInput, event: Event) => {
+    area.photo = (event.target as HTMLInputElement).files?.[0] ?? null;
+};
 
 const newTarif = (): TarifInput => ({
     area_code: AREA_ALL,
@@ -738,7 +752,51 @@ const submit = () => {
                                     Aktif
                                 </label>
                             </div>
-                            <div class="flex items-end sm:justify-end">
+                            <div class="sm:col-span-2">
+                                <span :id="`area-${index}-photo-label`" class="sb-label">Foto area (opsional)</span>
+                                <div class="flex items-center gap-3">
+                                    <label
+                                        :for="`area-${index}-photo`"
+                                        class="bg-card flex flex-1 cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-(--wp-hairline) p-3 transition-colors focus-within:border-(--wp-accent) hover:border-(--wp-accent)"
+                                    >
+                                        <AppImage
+                                            v-if="areaPhotoPreview(area)"
+                                            :src="areaPhotoPreview(area)!"
+                                            :alt="`Pratinjau foto ${area.name || 'area'}`"
+                                            class="h-14 w-20 shrink-0 rounded-lg object-cover"
+                                        />
+                                        <span v-else class="wp-icon size-10 shrink-0" aria-hidden="true">
+                                            <FontAwesomeIcon :icon="['fas', 'cloud-arrow-up']" class="size-4" />
+                                        </span>
+                                        <span class="min-w-0">
+                                            <span class="block text-sm font-semibold">{{ area.photo ? 'Ganti foto' : 'Pilih foto' }}</span>
+                                            <span class="text-muted-foreground block truncate text-xs">{{
+                                                area.photo ? area.photo.name : 'Supaya penyewa tahu lokasi area ini.'
+                                            }}</span>
+                                        </span>
+                                        <input
+                                            :id="`area-${index}-photo`"
+                                            type="file"
+                                            accept=".jpg,.jpeg,.png,.webp,.svg"
+                                            class="sr-only"
+                                            :aria-labelledby="`area-${index}-photo-label`"
+                                            :aria-invalid="invalid(areaError(index, 'photo'))"
+                                            @change="onAreaPhotoChange(area, $event)"
+                                        />
+                                    </label>
+                                    <button
+                                        v-if="area.photo"
+                                        type="button"
+                                        class="text-muted-foreground hover:bg-card inline-flex size-8 items-center justify-center rounded-lg transition-colors hover:text-(--sb-danger) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--wp-accent)"
+                                        :aria-label="`Hapus foto area ${index + 1}`"
+                                        @click="area.photo = null"
+                                    >
+                                        <FontAwesomeIcon :icon="['fas', 'xmark']" class="size-3.5" aria-hidden="true" />
+                                    </button>
+                                </div>
+                                <p v-if="areaError(index, 'photo')" class="sb-error">{{ areaError(index, 'photo') }}</p>
+                            </div>
+                            <div class="flex items-end sm:col-span-2 sm:justify-end">
                                 <button
                                     v-if="area.code"
                                     type="button"

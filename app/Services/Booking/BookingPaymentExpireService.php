@@ -13,6 +13,7 @@ class BookingPaymentExpireService
 {
     public function __construct(
         private readonly BookingStatusService $statuses,
+        private readonly BookingPaymentWindow $window,
     ) {}
 
     /**
@@ -51,7 +52,7 @@ class BookingPaymentExpireService
                 continue;
             }
 
-            $expiresAt = $this->resolveExpiresAt($payment, $defaultHours);
+            $expiresAt = $this->resolveExpiresAt($booking, $payment, $defaultHours);
             if ($expiresAt === null || $now->lt($expiresAt)) {
                 $skipped++;
 
@@ -87,9 +88,13 @@ class BookingPaymentExpireService
         return compact('expired', 'skipped', 'ids');
     }
 
-    private function resolveExpiresAt(BookingPayment $payment, int $defaultHours): ?Carbon
+    private function resolveExpiresAt(Booking $booking, BookingPayment $payment, int $defaultHours): ?Carbon
     {
         $meta = $payment->meta ?? [];
+        if (($meta['open_mode'] ?? null) === BookingPaymentWindow::MODE_BEFORE_EVENT) {
+            return $this->window->expiresAt($booking, $payment);
+        }
+
         if (! empty($meta['expires_at'])) {
             return Carbon::parse($meta['expires_at']);
         }

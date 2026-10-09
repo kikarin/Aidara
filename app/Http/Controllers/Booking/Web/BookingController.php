@@ -12,6 +12,7 @@ use App\Models\Booking\BookingSetting;
 use App\Models\Booking\BookingSurat;
 use App\Services\Booking\AvailabilityService;
 use App\Services\Booking\BookingPaymentService;
+use App\Services\Booking\BookingPaymentWindow;
 use App\Services\Booking\BookingSubmitService;
 use App\Services\Booking\PricingService;
 use App\Services\Booking\SuratService;
@@ -31,6 +32,7 @@ class BookingController extends Controller
         private readonly AvailabilityService $availability,
         private readonly BookingSubmitService $submitter,
         private readonly BookingPaymentService $payments,
+        private readonly BookingPaymentWindow $paymentWindow,
     ) {}
 
     public function index(Request $request): Response
@@ -199,6 +201,7 @@ class BookingController extends Controller
     private function detailPayload(Booking $booking): array
     {
         $payment = $booking->payments->first();
+        $window = $payment ? $this->paymentWindow->payload($booking, $payment) : null;
 
         return [
             'id' => $booking->id,
@@ -215,7 +218,8 @@ class BookingController extends Controller
             'addon_total' => (int) $booking->addon_total,
             'can_upload_bukti' => $booking->status === BookingStatus::AWAITING_PAYMENT
                 && $payment
-                && in_array($payment->status, ['pending', 'rejected'], true),
+                && in_array($payment->status, ['pending', 'rejected'], true)
+                && $window['is_open'],
             'jenis_sewa' => BookingJenisSewa::of($booking),
             'surat_permohonan_url' => $booking->surat_permohonan_path
                 ? Storage::disk('public')->url($booking->surat_permohonan_path)
@@ -260,8 +264,12 @@ class BookingController extends Controller
                 'bukti_url' => $payment->bukti_path
                     ? Storage::disk('public')->url($payment->bukti_path)
                     : null,
-                'expires_at' => $payment->meta['expires_at'] ?? null,
+                'expires_at' => $window['expires_at'],
                 'expire_hours' => $payment->meta['expire_hours'] ?? null,
+                'opens_at' => $window['opens_at'],
+                'is_open' => $window['is_open'],
+                'open_mode' => $window['open_mode'],
+                'message' => $window['message'],
                 'notes' => $payment->notes,
             ] : null,
             'status_logs' => $booking->statusLogs->map(fn ($log) => [

@@ -15,6 +15,7 @@ import {
     faBuilding,
     faCircleNotch,
     faFloppyDisk,
+    faImage,
     faLayerGroup,
     faPen,
     faPlus,
@@ -27,7 +28,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, h, ref, type FunctionalComponent } from 'vue';
 
-library.add(faArrowLeft, faBuilding, faCircleNotch, faFloppyDisk, faLayerGroup, faPen, faPlus, faPowerOff, faScroll, faTag, faTrash);
+library.add(faArrowLeft, faBuilding, faCircleNotch, faFloppyDisk, faImage, faLayerGroup, faPen, faPlus, faPowerOff, faScroll, faTag, faTrash);
 
 const faAction =
     (name: IconName): FunctionalComponent =>
@@ -53,6 +54,7 @@ type AreaRow = {
     id: number;
     code: string;
     name: string;
+    photo_url: string | null;
     is_tentative: boolean;
     is_active: boolean;
     sort_order: number;
@@ -137,13 +139,38 @@ const areaForm = useForm<{
     is_tentative: boolean;
     is_active: boolean;
     sort_order: number | string;
+    photo: File | null;
+    remove_photo: boolean;
 }>({
     code: '',
     name: '',
     is_tentative: false,
     is_active: true,
     sort_order: 0,
+    photo: null,
+    remove_photo: false,
 });
+
+const areaPhotoPreview = ref<string | null>(null);
+const areaPhotoInput = ref<HTMLInputElement | null>(null);
+
+const clearAreaPhotoInput = () => {
+    if (areaPhotoInput.value) areaPhotoInput.value.value = '';
+};
+
+const onAreaPhotoChange = (event: Event) => {
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null;
+    areaForm.photo = file;
+    areaForm.remove_photo = false;
+    if (file) areaPhotoPreview.value = URL.createObjectURL(file);
+};
+
+const removeAreaPhoto = () => {
+    areaForm.photo = null;
+    areaForm.remove_photo = areaEditingId.value !== null;
+    areaPhotoPreview.value = null;
+    clearAreaPhotoInput();
+};
 
 const startEditArea = (row: AreaRow) => {
     areaEditingId.value = row.id;
@@ -153,21 +180,28 @@ const startEditArea = (row: AreaRow) => {
     areaForm.is_tentative = row.is_tentative;
     areaForm.is_active = row.is_active;
     areaForm.sort_order = row.sort_order;
+    areaForm.photo = null;
+    areaForm.remove_photo = false;
+    areaPhotoPreview.value = row.photo_url;
+    clearAreaPhotoInput();
 };
 
 const resetAreaForm = () => {
     areaEditingId.value = null;
     areaForm.reset();
     areaForm.clearErrors();
+    areaPhotoPreview.value = null;
+    clearAreaPhotoInput();
 };
 
 const submitArea = () => {
-    const options = { preserveScroll: true, onSuccess: () => resetAreaForm() };
+    const options = { preserveScroll: true, forceFormData: true, onSuccess: () => resetAreaForm() };
 
     if (areaEditingId.value) {
-        areaForm.put(route('e-booking.admin.areas.update', areaEditingId.value), options);
+        // File upload butuh POST multipart; Laravel membaca _method sebagai PUT.
+        areaForm.transform((data) => ({ ...data, _method: 'put' })).post(route('e-booking.admin.areas.update', areaEditingId.value), options);
     } else {
-        areaForm.post(route('e-booking.admin.areas.store', props.venue.id), options);
+        areaForm.transform((data) => data).post(route('e-booking.admin.areas.store', props.venue.id), options);
     }
 };
 
@@ -538,6 +572,57 @@ const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !
                                     Aktif
                                 </label>
                             </fieldset>
+                            <div class="sm:col-span-2">
+                                <span id="area-photo-label" class="sb-label">Foto area (opsional)</span>
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                    <label
+                                        for="area-photo"
+                                        class="group flex flex-1 cursor-pointer items-center gap-4 rounded-2xl border-2 border-dashed border-(--wp-hairline) p-4 transition-colors focus-within:border-(--wp-accent) hover:border-(--wp-accent) hover:bg-(--wp-accent-soft)"
+                                    >
+                                        <AppImage
+                                            v-if="areaPhotoPreview"
+                                            :src="areaPhotoPreview"
+                                            alt="Pratinjau foto area"
+                                            class="h-20 w-28 shrink-0 rounded-xl object-cover"
+                                        />
+                                        <span v-else class="wp-icon size-12 shrink-0" aria-hidden="true">
+                                            <FontAwesomeIcon :icon="['fas', 'image']" class="size-5" />
+                                        </span>
+                                        <span class="min-w-0">
+                                            <span class="block text-sm font-semibold">{{
+                                                areaPhotoPreview ? 'Ganti foto area' : 'Pilih foto area'
+                                            }}</span>
+                                            <span class="text-muted-foreground mt-0.5 block text-xs">
+                                                Ditampilkan ke penyewa supaya tahu lokasi area. JPG, PNG, WEBP, atau SVG, maks. 5 MB.
+                                            </span>
+                                            <span v-if="areaForm.photo" class="text-muted-foreground mt-1 block truncate text-xs">{{
+                                                areaForm.photo.name
+                                            }}</span>
+                                        </span>
+                                        <input
+                                            id="area-photo"
+                                            ref="areaPhotoInput"
+                                            type="file"
+                                            accept=".jpg,.jpeg,.png,.webp,.svg"
+                                            class="sr-only"
+                                            aria-labelledby="area-photo-label"
+                                            :aria-invalid="invalid(areaForm.errors.photo)"
+                                            :aria-describedby="areaForm.errors.photo ? 'area-photo-error' : undefined"
+                                            @change="onAreaPhotoChange"
+                                        />
+                                    </label>
+                                    <button
+                                        v-if="areaPhotoPreview"
+                                        type="button"
+                                        class="wp-btn wp-btn-quiet px-3 py-2 text-xs hover:text-(--sb-danger)"
+                                        @click="removeAreaPhoto"
+                                    >
+                                        <FontAwesomeIcon :icon="['fas', 'trash']" class="size-3" aria-hidden="true" />
+                                        Hapus foto
+                                    </button>
+                                </div>
+                                <p v-if="areaForm.errors.photo" id="area-photo-error" class="sb-error">{{ areaForm.errors.photo }}</p>
+                            </div>
                         </div>
                         <div class="mt-5">
                             <button type="submit" class="wp-btn wp-btn-primary px-5 py-2.5 text-sm" :disabled="areaForm.processing">
@@ -569,7 +654,25 @@ const ruleValueLabel = (value: unknown) => (typeof value === 'object' && value !
                             </thead>
                             <tbody>
                                 <tr v-for="row in areas.data" :key="row.id">
-                                    <td class="font-medium">{{ row.name }}</td>
+                                    <td class="font-medium">
+                                        <span class="flex items-center gap-3">
+                                            <a
+                                                v-if="row.photo_url"
+                                                :href="row.photo_url"
+                                                target="_blank"
+                                                rel="noopener"
+                                                class="shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--wp-accent)"
+                                                :aria-label="`Lihat foto ${row.name}`"
+                                            >
+                                                <AppImage :src="row.photo_url" :alt="''" class="h-10 w-14 rounded-lg object-cover" />
+                                            </a>
+                                            <span v-else class="bg-muted text-muted-foreground grid h-10 w-14 shrink-0 place-items-center rounded-lg">
+                                                <FontAwesomeIcon :icon="['fas', 'image']" class="size-3.5" aria-hidden="true" />
+                                                <span class="sr-only">Belum ada foto</span>
+                                            </span>
+                                            {{ row.name }}
+                                        </span>
+                                    </td>
                                     <td class="text-muted-foreground font-mono text-xs">{{ row.code }}</td>
                                     <td>
                                         <span v-if="row.is_tentative" class="sb-badge sb-tone-warning">Ya</span>

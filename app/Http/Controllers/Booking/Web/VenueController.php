@@ -78,6 +78,7 @@ class VenueController extends Controller
                     'id' => $a->id,
                     'code' => $a->code,
                     'name' => $a->name,
+                    'photo_url' => $a->photo_url,
                     'is_tentative' => (bool) $a->is_tentative,
                 ]),
                 'facilities' => $venue->facilities->map(fn ($f) => [

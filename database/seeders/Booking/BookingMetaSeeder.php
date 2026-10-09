@@ -6,6 +6,7 @@ use App\Models\Booking\BookingAddon;
 use App\Models\Booking\BookingDocumentType;
 use App\Models\Booking\BookingPriorityRule;
 use App\Models\Booking\BookingSetting;
+use App\Services\Booking\BookingPaymentWindow;
 use Illuminate\Database\Seeder;
 
 class BookingMetaSeeder extends Seeder
@@ -140,7 +141,12 @@ class BookingMetaSeeder extends Seeder
         BookingSetting::setValue(
             'payment_expire_hours',
             48,
-            'Tenggat jam menunggu bayar sejak payment dibuat; job booking:expire-payments'
+            'Tenggat jam menunggu bayar sejak payment dibuka; job booking:expire-payments'
+        );
+        BookingSetting::setValue(
+            BookingPaymentWindow::SETTING_KEY,
+            BookingPaymentWindow::defaults(),
+            'Kapan pembayaran dibuka per kategori (event = sewa per hari, reguler/latihan = sewa per jam) + pesan ke penyewa'
         );
         BookingSetting::setValue('terms_tennis', [
             'title' => 'Tata Tertib Lapangan Tennis Kapten Muslihat',
