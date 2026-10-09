@@ -1,0 +1,560 @@
+<?php
+
+namespace Tests\Feature\Booking;
+
+use App\Mail\Booking\BookingApprovedMail;
+use App\Mail\Booking\BookingSuratMail;
+use App\Models\Booking\BookingDocumentType;
+use App\Models\Booking\BookingPenyewaProfile;
+use App\Models\Booking\BookingPriorityRule;
+use App\Models\Booking\BookingRule;
+use App\Models\Booking\BookingSetting;
+use App\Models\Booking\BookingSurat;
+use App\Models\Booking\BookingTarif;
+use App\Models\Booking\BookingVenue;
+use App\Models\Role;
+use App\Models\User;
+use App\Services\Booking\BookingSubmitService;
+use App\Support\Booking\BookingSatuan;
+use App\Support\Booking\BookingStatus;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
+
+class BookingSuratTest extends TestCase
+{
+    use DatabaseTransactions;
+
+    private BookingVenue $venue;
+
+    private BookingTarif $tarifVenueWide;
+
+    private User $penyewa;
+
+    private User $admin;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (! Schema::hasTable('bookings') || ! Schema::hasTable('booking_surats')) {
+            $this->markTestSkipped('Tabel booking/surat belum termigrasi.');
+        }
+
+        Storage::fake('local');
+        $this->seedMinimal();
+    }
+
+    #[Test]
+    public function penyewa_can_download_own_surat(): void
+    {
+        $booking = $this->makeBooking();
+        $surat   = $this->makeSurat($booking);
+
+        $response = $this->actingAs($this->penyewa)
+            ->get(route('e-booking.bookings.surat.download', ['id' => $booking->id, 'surat' => $surat->id]));
+
+        $response->assertOk()->assertDownload();
+    }
+
+    #[Test]
+    public function other_penyewa_cannot_download_surat(): void
+    {
+        $booking = $this->makeBooking();
+        $surat   = $this->makeSurat($booking);
+
+        $penyewaLain = $this->makeUser('penyewa', 'lain.'.uniqid().'@test.local');
+
+        $this->actingAs($penyewaLain)
+            ->get(route('e-booking.bookings.surat.download', ['id' => $booking->id, 'surat' => $surat->id]))
+            ->assertNotFound();
+    }
+
+    #[Test]
+    public function send_email_attaches_pdf_and_marks_sent(): void
+    {
+        Mail::fake();
+
+        $booking = $this->makeBooking();
+        $surat   = $this->makeSurat($booking);
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.surat.email', $surat->id))
+            ->assertRedirect();
+
+        Mail::assertSent(BookingSuratMail::class, function (BookingSuratMail $mail) use ($surat) {
+            return $mail->surat->id === $surat->id && str_starts_with($mail->pdfContent, '%PDF');
+        });
+
+        $this->assertNotNull($surat->fresh()->sent_email_at);
+    }
+
+    #[Test]
+    public function whatsapp_share_sends_message_via_fonnte_and_marks_sent(): void
+    {
+        config([
+            'fonnte.enabled'  => true,
+            'fonnte.token'    => 'test-token',
+            'fonnte.base_url' => 'https://api.fonnte.com',
+        ]);
+
+        Http::fake([
+            'api.fonnte.com/*' => Http::response(['status' => true, 'detail' => 'success'], 200),
+        ]);
+
+        $booking = $this->makeBooking();
+        $surat   = $this->makeSurat($booking);
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.surat.whatsapp', $surat->id))
+            ->assertRedirect();
+
+        Http::assertSent(function (HttpRequest $request) use ($surat) {
+            $data = $this->multipartData($request);
+
+            return $request->url() === 'https://api.fonnte.com/send'
+                && $data['target'] === '6281234567890'
+                && str_contains($data['message'], $surat->nomor_surat);
+        });
+
+        $this->assertNotNull($surat->fresh()->sent_whatsapp_at);
+    }
+
+    #[Test]
+    public function whatsapp_share_fails_when_fonnte_not_configured(): void
+    {
+        config([
+            'fonnte.enabled' => false,
+            'fonnte.token'   => null,
+        ]);
+
+        Http::fake();
+
+        $booking = $this->makeBooking();
+        $surat   = $this->makeSurat($booking);
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.surat.whatsapp', $surat->id))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Http::assertNothingSent();
+        $this->assertNull($surat->fresh()->sent_whatsapp_at);
+    }
+
+    #[Test]
+    public function shared_signed_link_is_downloadable(): void
+    {
+        $booking = $this->makeBooking();
+        $surat   = $this->makeSurat($booking);
+
+        $unsigned = route('e-booking.surat.shared', $surat->id);
+
+        $this->get($unsigned)->assertForbidden();
+
+        $signed = URL::temporarySignedRoute('e-booking.surat.shared', now()->addHour(), ['surat' => $surat->id]);
+
+        $this->get($signed)->assertOk()->assertDownload();
+    }
+
+    #[Test]
+    public function lanjut_sends_balasan_surat_and_moves_to_menunggu_meeting(): void
+    {
+        Mail::fake();
+
+        $booking = $this->makeBooking();
+        // Jadikan sewa per hari (event) agar surat balasan wajib dilampirkan.
+        $booking->items()->update(['satuan' => BookingSatuan::PER_DAY]);
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+        $booking->load('items');
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.lanjut', $booking->id), [
+                'admin_notes'   => 'Silakan hadir sesuai jadwal.',
+                'surat_balasan' => UploadedFile::fake()->create('balasan.pdf', 10, 'application/pdf'),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(BookingStatus::MENUNGGU_MEETING, $booking->fresh()->status);
+
+        $surat = $booking->surats()->where('jenis', BookingSurat::JENIS_BALASAN_PERSETUJUAN)->first();
+        $this->assertNotNull($surat);
+        $this->assertSame('Silakan hadir sesuai jadwal.', $surat->isi);
+        $this->assertNotNull($surat->sent_email_at);
+        Mail::assertSent(BookingSuratMail::class, fn (BookingSuratMail $mail) => $mail->surat->id === $surat->id);
+    }
+
+    #[Test]
+    public function final_approve_after_meeting_initiates_payment_and_sends_email(): void
+    {
+        Mail::fake();
+
+        BookingSetting::setValue('payment_expire_hours', 48);
+        BookingDocumentType::query()->create([
+            'code'        => 'surat_izin_polisi_'.uniqid(),
+            'name'        => 'Surat Izin Kepolisian',
+            'is_required' => true,
+            'is_active'   => true,
+        ]);
+
+        $booking = $this->makeBooking();
+        $booking->items()->update(['satuan' => BookingSatuan::PER_DAY]);
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_MEETING, 'submitted_at' => now()])->save();
+        $booking->load('items');
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.approve', $booking->id), [
+                'force'            => false,
+                'priority_rule_id' => '',
+                'admin_notes'      => '',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(BookingStatus::AWAITING_PAYMENT, $booking->fresh()->status);
+
+        Mail::assertQueued(BookingApprovedMail::class, function (BookingApprovedMail $mail) {
+            return in_array('Surat Izin Kepolisian', $mail->dokumenWajib, true);
+        });
+
+        // Keputusan akhir tidak lagi membuat surat balasan baru.
+        $this->assertSame(0, $booking->surats()->where('jenis', BookingSurat::JENIS_BALASAN_PERSETUJUAN)->count());
+    }
+
+    #[Test]
+    public function final_reject_after_meeting_does_not_require_surat(): void
+    {
+        Mail::fake();
+
+        $booking = $this->makeBooking();
+        $booking->items()->update(['satuan' => BookingSatuan::PER_DAY]);
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_MEETING, 'submitted_at' => now()])->save();
+        $booking->load('items');
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.reject', $booking->id), [
+                'reason' => 'Setelah meeting, kegiatan tidak memenuhi syarat.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(BookingStatus::REJECTED, $booking->fresh()->status);
+    }
+
+    #[Test]
+    public function lanjut_event_without_pdf_is_rejected(): void
+    {
+        Mail::fake();
+
+        $booking = $this->makeBooking();
+        $booking->items()->update(['satuan' => BookingSatuan::PER_DAY]);
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+        $booking->load('items');
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.lanjut', $booking->id), [
+                'admin_notes' => '',
+            ])
+            ->assertSessionHasErrors('surat_balasan');
+
+        $this->assertSame(BookingStatus::MENUNGGU_APPROVAL, $booking->fresh()->status);
+        $this->assertSame(0, $booking->surats()->where('jenis', BookingSurat::JENIS_BALASAN_PERSETUJUAN)->count());
+    }
+
+    #[Test]
+    public function reject_event_creates_penolakan_surat_and_emails(): void
+    {
+        Mail::fake();
+
+        $booking = $this->makeBooking();
+        $booking->items()->update(['satuan' => BookingSatuan::PER_DAY]);
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+        $booking->load('items');
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.reject', $booking->id), [
+                'reason'        => 'Dokumen persyaratan tidak lengkap',
+                'surat_balasan' => UploadedFile::fake()->create('penolakan.pdf', 10, 'application/pdf'),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(BookingStatus::REJECTED, $booking->fresh()->status);
+
+        $surat = $booking->surats()->where('jenis', BookingSurat::JENIS_BALASAN_PENOLAKAN)->first();
+        $this->assertNotNull($surat);
+        $this->assertSame('Dokumen persyaratan tidak lengkap', $surat->isi);
+        $this->assertNotNull($surat->sent_email_at);
+        Mail::assertSent(BookingSuratMail::class, fn (BookingSuratMail $mail) => $mail->surat->id === $surat->id);
+    }
+
+    #[Test]
+    public function reject_event_without_pdf_is_rejected(): void
+    {
+        Mail::fake();
+
+        $booking = $this->makeBooking();
+        $booking->items()->update(['satuan' => BookingSatuan::PER_DAY]);
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+        $booking->load('items');
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.reject', $booking->id), [
+                'reason' => 'Alasan apapun',
+            ])
+            ->assertSessionHasErrors('surat_balasan');
+
+        $this->assertSame(BookingStatus::MENUNGGU_APPROVAL, $booking->fresh()->status);
+    }
+
+    #[Test]
+    public function lanjut_only_creates_balasan_surat(): void
+    {
+        Mail::fake();
+
+        $booking = $this->makeBooking();
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.lanjut', $booking->id), [
+                'admin_notes'   => '',
+                'surat_balasan' => UploadedFile::fake()->create('balasan.pdf', 10, 'application/pdf'),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(BookingStatus::MENUNGGU_MEETING, $booking->fresh()->status);
+        $this->assertSame(1, $booking->surats()->where('jenis', BookingSurat::JENIS_BALASAN_PERSETUJUAN)->count());
+        $this->assertSame(0, $booking->surats()->where('jenis', BookingSurat::JENIS_UNDANGAN_MEETING)->count());
+    }
+
+    #[Test]
+    public function meeting_can_be_sent_after_surat_balasan(): void
+    {
+        Mail::fake();
+
+        config([
+            'fonnte.enabled'  => true,
+            'fonnte.token'    => 'test-token',
+            'fonnte.base_url' => 'https://api.fonnte.com',
+        ]);
+
+        Http::fake([
+            'api.fonnte.com/*' => Http::response(['status' => true, 'detail' => 'success'], 200),
+        ]);
+
+        $booking = $this->makeBooking();
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+
+        // Tahap 1: surat balasan dulu.
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.lanjut', $booking->id), [
+                'admin_notes'   => '',
+                'surat_balasan' => UploadedFile::fake()->create('balasan.pdf', 10, 'application/pdf'),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        // Tahap 2: undangan meeting menyusul, terpisah.
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.meeting', $booking->id), [
+                'admin_notes'   => '',
+                'surat_meeting' => UploadedFile::fake()->createWithContent('undangan.pdf', "%PDF-1.4\n%%EOF\n"),
+                'meeting_at'    => now()->addDays(3)->setTime(10, 0)->format('Y-m-d H:i:s'),
+                'meeting_place' => 'Ruang Rapat UPT',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(BookingStatus::MENUNGGU_MEETING, $booking->fresh()->status);
+
+        $surat = $booking->surats()->where('jenis', BookingSurat::JENIS_UNDANGAN_MEETING)->first();
+        $this->assertNotNull($surat);
+        $this->assertSame('Ruang Rapat UPT', $surat->meeting_place);
+        $this->assertNotNull($surat->sent_email_at);
+        $this->assertNotNull($surat->sent_whatsapp_at);
+
+        Mail::assertSent(BookingSuratMail::class, fn (BookingSuratMail $mail) => $mail->surat->id === $surat->id);
+
+        Http::assertSent(function (HttpRequest $request) use ($surat) {
+            $data = $this->multipartData($request);
+
+            return $request->url() === 'https://api.fonnte.com/send'
+                && $data['target'] === '6281234567890'
+                && str_contains($data['message'], $surat->jenisLabel());
+        });
+    }
+
+    #[Test]
+    public function meeting_requires_pdf(): void
+    {
+        Mail::fake();
+
+        $booking = $this->makeBooking();
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.lanjut', $booking->id), [
+                'surat_balasan' => UploadedFile::fake()->create('balasan.pdf', 10, 'application/pdf'),
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.meeting', $booking->id), [
+                'meeting_place' => 'Ruang Rapat UPT',
+            ])
+            ->assertSessionHasErrors('surat_meeting');
+
+        $this->assertSame(0, $booking->surats()->where('jenis', BookingSurat::JENIS_UNDANGAN_MEETING)->count());
+    }
+
+    #[Test]
+    public function meeting_blocked_without_balasan(): void
+    {
+        Mail::fake();
+        Http::fake();
+
+        $booking = $this->makeBooking();
+        $booking->forceFill(['status' => BookingStatus::MENUNGGU_APPROVAL, 'submitted_at' => now()])->save();
+
+        $this->actingAs($this->admin)
+            ->post(route('e-booking.admin.bookings.meeting', $booking->id), [
+                'surat_meeting' => UploadedFile::fake()->create('undangan.pdf', 10, 'application/pdf'),
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame(0, $booking->surats()->where('jenis', BookingSurat::JENIS_UNDANGAN_MEETING)->count());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function multipartData(HttpRequest $request): array
+    {
+        $data = $request->data();
+
+        if (isset($data[0]['name'])) {
+            return collect($data)->pluck('contents', 'name')->all();
+        }
+
+        return $data;
+    }
+
+    private function makeBooking()
+    {
+        return app(BookingSubmitService::class)->submit($this->penyewa, [
+            'kategori_tarif' => 'non_pemerintah',
+            'areas'          => [],
+            'tarif_id'       => $this->tarifVenueWide->id,
+            'starts_at'      => now()->addDays(2)->setTime(9, 0)->format('Y-m-d H:i:s'),
+            'ends_at'        => now()->addDays(2)->setTime(11, 0)->format('Y-m-d H:i:s'),
+            'qty'            => 1,
+            'tujuan'         => 'Latihan rutin',
+            'keterangan'     => null,
+            'addon_ids'      => [],
+            'terms_accepted' => true,
+        ]);
+    }
+
+    private function makeSurat($booking)
+    {
+        $surat = $booking->surats()->create([
+            'jenis'       => BookingSurat::JENIS_BALASAN_PERSETUJUAN,
+            'nomor_surat' => 'SURAT/'.uniqid().'/2026',
+            'perihal'     => 'Persetujuan Pengajuan Sewa',
+            'isi'         => 'Pengajuan Anda disetujui.',
+            'file_path'   => '',
+        ]);
+
+        $path = "booking-surats/{$booking->id}/surat-{$surat->id}.pdf";
+        Storage::disk('local')->put($path, "%PDF-1.4\n%%EOF\n");
+        $surat->update(['file_path' => $path]);
+
+        return $surat->refresh();
+    }
+
+    private function makeUser(string $roleName, string $email): User
+    {
+        $role = Role::query()->firstOrCreate(
+            ['name' => $roleName, 'guard_name' => 'web'],
+            ['bg' => 'bg-success', 'init_page_login' => 'dashboard', 'is_allow_login' => 1, 'is_vertical_menu' => true]
+        );
+
+        $user = User::query()->create([
+            'name'              => ucfirst($roleName).' '.substr(uniqid(), -5),
+            'email'             => $email,
+            'password'          => Hash::make('password123'),
+            'is_active'         => 1,
+            'email_verified_at' => now(),
+            'current_role_id'   => $role->id,
+        ]);
+        $user->assignRole($role);
+
+        return $user;
+    }
+
+    private function seedMinimal(): void
+    {
+        $this->penyewa = $this->makeUser('penyewa', 'surat.penyewa.'.uniqid().'@test.local');
+        $this->admin   = $this->makeUser('admin_upt', 'surat.admin.'.uniqid().'@test.local');
+
+        BookingPenyewaProfile::query()->create([
+            'user_id'          => $this->penyewa->id,
+            'nama'             => $this->penyewa->name,
+            'no_hp'            => '081234567890',
+            'instansi'         => 'Klub Surat',
+            'kategori_default' => 'non_pemerintah',
+        ]);
+
+        $suffix = substr(uniqid(), -6);
+
+        $this->venue = BookingVenue::query()->create([
+            'code'       => 'surat_venue_'.$suffix,
+            'name'       => 'Venue Surat '.$suffix,
+            'is_active'  => true,
+            'sort_order' => 99,
+        ]);
+
+        $this->tarifVenueWide = BookingTarif::query()->create([
+            'venue_id'             => $this->venue->id,
+            'area_id'              => null,
+            'code'                 => 'tarif_surat_'.$suffix,
+            'uraian'               => 'Sewa seluruh venue',
+            'satuan'               => BookingSatuan::PER_HOUR,
+            'tarif_pemerintah'     => 200_000,
+            'tarif_non_pemerintah' => 300_000,
+            'category'             => 'olahraga',
+            'is_active'            => true,
+        ]);
+
+        BookingRule::query()->updateOrCreate(
+            ['venue_id' => $this->venue->id, 'key' => 'operating_hours'],
+            ['value' => ['start' => '06:00', 'end' => '21:00'], 'is_active' => true]
+        );
+        BookingRule::query()->updateOrCreate(
+            ['venue_id' => $this->venue->id, 'key' => 'buffer_before_days'],
+            ['value' => 0, 'is_active' => true]
+        );
+        BookingRule::query()->updateOrCreate(
+            ['venue_id' => $this->venue->id, 'key' => 'buffer_after_days'],
+            ['value' => 0, 'is_active' => true]
+        );
+
+        BookingPriorityRule::query()->firstOrCreate(
+            ['code' => 'umum_komersial'],
+            ['name' => 'Umum', 'priority_order' => 7, 'is_active' => true]
+        );
+
+        BookingSetting::setValue('payment_expire_hours', 48);
+    }
+}

@@ -14,7 +14,7 @@ defineProps<Props>();
 <template>
     <div class="flex items-center" :class="className" v-bind="$attrs">
         <div class="rounded-xl">
-            <img src="/Logo.png" alt="Logo" class="size-15 object-contain" />
+            <img src="/Logo.svg" alt="Logo Aidara" class="size-15 object-contain" />
         </div>
     </div>
 </template>

@@ -2,9 +2,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useHandleFormSave } from '@/composables/useHandleFormSave';
+import { CardSkeleton } from '@/components/ui/skeleton';
 import FormInput from '@/pages/modules/base-page/FormInput.vue';
 import axios from 'axios';
-import { Loader2, UserCircle2, Users } from 'lucide-vue-next';
+import { UserCircle2, Users } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 
 const { save } = useHandleFormSave();
@@ -174,8 +175,8 @@ const handleSave = (form: any, setFormErrors: (errors: Record<string, string>) =
         url: '/pemeriksaan-khusus',
         mode: props.mode,
         id: props.initialData?.id,
-        successMessage: props.mode === 'create' ? 'Pemeriksaan khusus berhasil ditambahkan' : 'Pemeriksaan khusus berhasil diperbarui',
-        errorMessage: props.mode === 'create' ? 'Gagal menyimpan pemeriksaan khusus' : 'Gagal memperbarui pemeriksaan khusus',
+        successMessage: props.mode === 'create' ? 'Pemeriksaan fisik berhasil ditambahkan' : 'Pemeriksaan fisik berhasil diperbarui',
+        errorMessage: props.mode === 'create' ? 'Gagal menyimpan pemeriksaan fisik' : 'Gagal memperbarui pemeriksaan fisik',
         redirectUrl: '/pemeriksaan-khusus',
         onError: setFormErrors,
     });
@@ -203,11 +204,7 @@ const handleSave = (form: any, setFormErrors: (errors: Record<string, string>) =
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <!-- Loading state -->
-                <div v-if="loadingPeserta" class="flex items-center justify-center py-8">
-                    <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
-                    <span class="ml-2 text-muted-foreground">Memuat peserta...</span>
-                </div>
+                <CardSkeleton v-if="loadingPeserta" :lines="4" />
 
                 <!-- Empty state -->
                 <div v-else-if="totalPeserta === 0" class="py-8 text-center text-muted-foreground">
@@ -263,7 +260,7 @@ const handleSave = (form: any, setFormErrors: (errors: Record<string, string>) =
                 </div>
 
                 <p class="mt-4 text-xs text-muted-foreground">
-                    * Semua peserta aktif dari kategori ini akan otomatis ditambahkan ke pemeriksaan khusus
+                    * Semua peserta aktif dari kategori ini akan otomatis ditambahkan ke pemeriksaan fisik
                 </p>
             </CardContent>
         </Card>

@@ -10,7 +10,7 @@ import ShowPrestasi from './prestasi/ShowPrestasi.vue';
 import ShowSertifikat from './sertifikat/ShowSertifikat.vue';
 import ShowKesehatan from './ShowKesehatan.vue';
 import ShowOrangTua from './ShowOrangTua.vue';
-import ShowParameterUmum from './ShowParameterUmum.vue';
+import ShowPemeriksaanKhusus from './ShowPemeriksaanKhusus.vue';
 
 const { toast } = useToast();
 
@@ -32,8 +32,10 @@ interface Prestasi {
     atlet_id: number;
     nama_event: string;
     tingkat_id?: number;
+    tingkat?: { id: number; nama: string };
     tanggal?: string;
-    peringkat?: string;
+    juara?: string;
+    medali?: string;
     keterangan?: string;
     created_at: string;
     updated_at: string;
@@ -111,6 +113,23 @@ const props = defineProps<{
         kategori_atlet?: { id: number; nama: string } | null;
         kategori_atlets?: Array<{ id: number; nama: string }>;
         kategori_pesertas?: Array<{ id: number; nama: string }>;
+        cabor_kategori_atlet?: Array<{
+            id: number;
+            cabor_id: number;
+            cabor_kategori_id: number | null;
+            posisi_atlet: string | null;
+            posisi_atlet_id: number | null;
+            cabor?: {
+                id: number;
+                nama: string;
+                kategori_peserta_id: number | null;
+                icon?: string | null;
+            };
+            caborKategori?: {
+                id: number;
+                nama: string;
+            } | null;
+        }>;
     };
 }>();
 
@@ -155,8 +174,8 @@ const dynamicTitle = computed(() => {
         return `Dokumen : ${props.item.nama}`;
     } else if (activeTab.value === 'kesehatan-data') {
         return `Kesehatan : ${props.item.nama}`;
-    } else if (activeTab.value === 'parameter-umum-data') {
-        return `Parameter Umum : ${props.item.nama}`;
+    } else if (activeTab.value === 'pemeriksaan-khusus-data') {
+        return `Pemeriksaan Fisik : ${props.item.nama}`;
     }
     return `Atlet: ${props.item.nama}`;
 });
@@ -218,8 +237,42 @@ const fields = computed(() => {
                       ? props.item.kategori_atlets.map((k: { nama: string }) => k.nama).join(', ')
                       : props.item?.kategori_atlet?.nama || '-',
         },
+        {
+            label: 'Cabang Olahraga',
+            value: props.item?.cabor_kategori_atlet && props.item.cabor_kategori_atlet.length > 0
+                ? (() => {
+                    // Filter untuk menghindari duplikasi berdasarkan cabor_id
+                    const uniqueCaborMap = new Map();
+                    props.item.cabor_kategori_atlet.forEach((c: any) => {
+                        const caborId = c.cabor_id;
+                        if (caborId && !uniqueCaborMap.has(caborId)) {
+                            uniqueCaborMap.set(caborId, c);
+                        }
+                    });
+                    
+                    // Convert map values ke array dan format
+                    return Array.from(uniqueCaborMap.values()).map((c: any) => {
+                        const caborName = c.cabor?.nama || 'Cabor tidak diketahui';
+                        const caborIcon = c.cabor?.icon || null;
+                        const posisi = c.posisi_atlet ? ` (${c.posisi_atlet})` : '';
+                        
+                        // Format dengan icon - hanya nama cabor dan posisi (tanpa kategori)
+                        if (caborIcon) {
+                            const iconClass = caborIcon.startsWith('fa-') ? caborIcon : `fa-${caborIcon}`;
+                            return `<span class="flex items-center gap-2 inline-flex"><i class="fa-solid ${iconClass} text-sm text-muted-foreground"></i><span>${caborName}${posisi}</span></span>`;
+                        }
+                        return `${caborName}${posisi}`;
+                    }).join(', ');
+                })()
+                : '-',
+            className: 'sm:col-span-2',
+        },
         { label: 'No HP', value: props.item?.no_hp || '-' },
         { label: 'Email', value: props.item?.email || '-' },
+        // Field NPCI/SOIna - hanya tampilkan jika ada nilai
+        ...(props.item?.disabilitas ? [{ label: 'Disabilitas', value: props.item.disabilitas }] : []),
+        ...(props.item?.klasifikasi ? [{ label: 'Klasifikasi', value: props.item.klasifikasi }] : []),
+        ...(props.item?.iq ? [{ label: 'IQ', value: props.item.iq }] : []),
         {
             label: 'Status',
             value: props.item?.is_active ? 'Aktif' : 'Nonaktif',
@@ -239,29 +292,29 @@ const fields = computed(() => {
 });
 
 const actionFields = computed(() => [
-    { label: 'Created At', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Created By', value: props.item.created_by_user?.name || '-' },
-    { label: 'Updated At', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Updated By', value: props.item.updated_by_user?.name || '-' },
+    { label: 'Dibuat Pada', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Dibuat Oleh', value: props.item.created_by_user?.name || '-' },
+    { label: 'Diperbarui Pada', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Diperbarui Oleh', value: props.item.updated_by_user?.name || '-' },
 ]);
 
 const orangTuaActionFields = computed(() => {
     const o = props.item.atlet_orang_tua;
     return [
         {
-            label: 'Created At',
+            label: 'Dibuat Pada',
             value: o?.created_at ? new Date(o.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-',
         },
         {
-            label: 'Created By',
+            label: 'Dibuat Oleh',
             value: o?.created_by_user?.name || '-',
         },
         {
-            label: 'Updated At',
+            label: 'Diperbarui Pada',
             value: o?.updated_at ? new Date(o.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-',
         },
         {
-            label: 'Updated By',
+            label: 'Diperbarui Oleh',
             value: o?.updated_by_user?.name || '-',
         },
     ];
@@ -271,19 +324,19 @@ const kesehatanActionFields = computed(() => {
     const o = props.item.kesehatan;
     return [
         {
-            label: 'Created At',
+            label: 'Dibuat Pada',
             value: o?.created_at ? new Date(o.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-',
         },
         {
-            label: 'Created By',
+            label: 'Dibuat Oleh',
             value: o?.created_by_user?.name || '-',
         },
         {
-            label: 'Updated At',
+            label: 'Diperbarui Pada',
             value: o?.updated_at ? new Date(o.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-',
         },
         {
-            label: 'Updated By',
+            label: 'Diperbarui Oleh',
             value: o?.updated_by_user?.name || '-',
         },
     ];
@@ -315,8 +368,8 @@ const tabsConfig = [
         label: 'Kesehatan',
     },
     {
-        value: 'parameter-umum-data',
-        label: 'Parameter Umum',
+        value: 'pemeriksaan-khusus-data',
+        label: 'Pemeriksaan Fisik',
     },
 ];
 
@@ -385,7 +438,7 @@ const currentOnEditHandler = computed(() => {
         return undefined;
     } else if (activeTab.value === 'kesehatan-data') {
         return handleEditKesehatan;
-    } else if (activeTab.value === 'parameter-umum-data') {
+    } else if (activeTab.value === 'pemeriksaan-khusus-data') {
         return undefined;
     }
     return undefined;
@@ -404,7 +457,7 @@ const currentOnDeleteHandler = computed(() => {
         return undefined;
     } else if (activeTab.value === 'kesehatan-data') {
         return props.item.kesehatan ? handleDeleteKesehatan : undefined;
-    } else if (activeTab.value === 'parameter-umum-data') {
+    } else if (activeTab.value === 'pemeriksaan-khusus-data') {
         return undefined;
     }
     return undefined;
@@ -437,7 +490,7 @@ function getLamaBergabung(tanggalBergabung: string) {
             activeTab === 'sertifikat-data' ||
             activeTab === 'prestasi-data' ||
             activeTab === 'dokumen-data' ||
-            activeTab === 'parameter-umum-data'
+            activeTab === 'pemeriksaan-khusus-data'
                 ? []
                 : activeTab === 'atlet-data'
                   ? actionFields
@@ -450,15 +503,15 @@ function getLamaBergabung(tanggalBergabung: string) {
         :on-delete="currentOnDeleteHandler"
         :on-edit-label="
             (activeTab === 'orang-tua-data' && !props.item.atlet_orang_tua) || (activeTab === 'kesehatan-data' && !props.item.kesehatan)
-                ? 'Create'
-                : activeTab === 'parameter-umum-data'
+                ? 'Tambah'
+                : activeTab === 'pemeriksaan-khusus-data'
                   ? undefined
-                  : 'Edit'
+                  : 'Ubah'
         "
         :on-edit-icon="
             (activeTab === 'orang-tua-data' && !props.item.atlet_orang_tua) || (activeTab === 'kesehatan-data' && !props.item.kesehatan)
                 ? Plus
-                : activeTab === 'parameter-umum-data'
+                : activeTab === 'pemeriksaan-khusus-data'
                   ? undefined
                   : Pencil
         "
@@ -509,8 +562,8 @@ function getLamaBergabung(tanggalBergabung: string) {
             <div v-if="activeTab === 'kesehatan-data'">
                 <ShowKesehatan :kesehatan="props.item.kesehatan || null" />
             </div>
-            <div v-if="activeTab === 'parameter-umum-data'">
-                <ShowParameterUmum :atlet-id="props.item.id" />
+            <div v-if="activeTab === 'pemeriksaan-khusus-data'">
+                <ShowPemeriksaanKhusus :atlet-id="props.item.id" />
             </div>
         </template>
     </PageShow>

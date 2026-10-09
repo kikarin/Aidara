@@ -114,7 +114,7 @@ const fotoColumn = {
             `;
         }
 
-        return `<div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-xs">No</div>`;
+        return `<div class="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground">No</div>`;
     },
 };
 
@@ -190,12 +190,12 @@ const actions = (row: any) => [
         permission: 'Pemeriksaan Peserta Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/pemeriksaan/${props.pemeriksaan.id}/peserta/${row.id}/edit?jenis_peserta=${jenisPeserta.value}`),
         permission: 'Pemeriksaan Peserta Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => handleDeleteRow(row),
         permission: 'Pemeriksaan Peserta Delete',
     },
@@ -263,7 +263,7 @@ const getPesertaLabel = computed(() => {
                     :badges="[
                         {
                             value: row.jumlah_parameter || 0,
-                            colorClass: 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200',
+                            colorClass: 'stat-chip stat-chip-atlet hover:opacity-90',
                             onClick: () => router.visit(`/pemeriksaan/${pemeriksaan.id}/peserta/${row.id}/parameter?jenis_peserta=${jenisPeserta}`),
                         },
                     ]"

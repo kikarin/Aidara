@@ -35,7 +35,7 @@ const handleTabChange = (tabValue: string) => {
 
 <template>
     <Tabs :model-value="props.modelValue || props.defaultValue" @update:model-value="handleTabChange" class="w-full">
-        <TabsList class="bg-muted inline-flex max-w-full overflow-x-auto rounded-md border">
+        <TabsList class="bg-card inline-flex max-w-full overflow-x-auto rounded-md border">
             <TabsTrigger v-for="tab in tabs" :key="tab.value" :value="tab.value" :disabled="tab.disabled" class="flex-shrink-0">
                 {{ tab.label }}
             </TabsTrigger>

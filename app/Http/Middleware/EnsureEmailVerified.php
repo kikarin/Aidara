@@ -32,7 +32,7 @@ class EnsureEmailVerified
 
         // Cek apakah email sudah verified
         if (!$user->email_verified_at) {
-            return redirect()->route('email.otp.verify')
+            return redirect()->route('email.otp.show')
                 ->with('warning', 'Silakan verifikasi email Anda terlebih dahulu untuk melanjutkan.');
         }
 

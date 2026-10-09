@@ -2,6 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import RowActions from '@/pages/modules/components/tables/RowActions.vue';
 
@@ -34,6 +35,7 @@ interface DataTableProps {
     detailUrl?: string;
     editUrl?: string;
     deleteUrl?: string;
+    loading?: boolean;
 }
 
 const props = withDefaults(defineProps<DataTableProps>(), {
@@ -49,6 +51,7 @@ const props = withDefaults(defineProps<DataTableProps>(), {
     detailUrl: undefined,
     editUrl: undefined,
     deleteUrl: undefined,
+    loading: false,
 });
 
 const emit = defineEmits<{
@@ -69,7 +72,7 @@ const { visibleColumns, totalPages, getPageNumbers, sortBy, toggleSelect, toggle
 );
 
 const selectLabel = computed(() => {
-    if (props.perPage === -1) return 'All';
+    if (props.perPage === -1) return 'Semua';
     return props.perPage.toString();
 });
 
@@ -96,7 +99,7 @@ const handleDelete = (id: string | number) => {
         <div class="ml-1.5 flex flex-col flex-wrap items-center justify-center gap-4 text-center sm:flex-row sm:justify-between">
             <!-- Length -->
             <div v-if="!props.disableLength" class="ml-2 flex items-center gap-2">
-                <span class="text-muted-foreground text-sm">Show</span>
+                <span class="text-muted-foreground text-sm">Tampilkan</span>
                 <Select
                     :model-value="props.perPage.toString()"
                     @update:model-value="(val: string) => emit('update:perPage', val === 'all' ? -1 : Number(val))"
@@ -110,10 +113,10 @@ const handleDelete = (id: string | number) => {
                         <SelectItem value="50">50</SelectItem>
                         <SelectItem value="100">100</SelectItem>
                         <SelectItem value="500">500</SelectItem>
-                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="all">Semua</SelectItem>
                     </SelectContent>
                 </Select>
-                <span class="text-muted-foreground text-sm">entries</span>
+                <span class="text-muted-foreground text-sm">data</span>
             </div>
 
             <!-- Search (selalu tampil di kanan) -->
@@ -121,22 +124,27 @@ const handleDelete = (id: string | number) => {
                 <Input
                     :model-value="props.search"
                     @update:model-value="(val: string) => emit('update:search', val)"
-                    placeholder="Search..."
+                    placeholder="Cari..."
                     class="w-full"
                 />
             </div>
         </div>
         <!-- Table -->
         <div class="rounded-md shadow-sm">
-            <div class="w-full overflow-x-auto">
+            <TableSkeleton
+                v-if="props.loading"
+                :rows="props.perPage === -1 ? 10 : Math.min(props.perPage, 10)"
+                :column-labels="visibleColumns.map((col) => col.label)"
+                :show-checkbox="!props.hideSelect"
+                :show-actions="true"
+            />
+            <div v-else class="w-full overflow-x-auto">
                 <Table class="min-w-max">
                     <TableHeader class="bg-muted">
                         <TableRow>
                             <TableHead class="w-12 text-center">No</TableHead>
                             <TableHead v-if="!props.hideSelectAll" class="w-10 text-center">
-                                <label
-                                    class="bg-background relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-gray-500"
-                                >
+                                <label class="table-checkbox">
                                     <input
                                         type="checkbox"
                                         class="peer sr-only"
@@ -146,7 +154,7 @@ const handleDelete = (id: string | number) => {
                                     <div class="bg-primary h-3 w-3 scale-0 transform rounded-sm transition-all peer-checked:scale-100"></div>
                                 </label>
                             </TableHead>
-                            <TableHead class="w-28 px-2 text-center text-xs break-words whitespace-normal sm:px-4 sm:text-sm">Actions</TableHead>
+                            <TableHead class="w-28 px-2 text-center text-xs break-words whitespace-normal sm:px-4 sm:text-sm">Aksi</TableHead>
                             <TableHead
                                 v-for="col in visibleColumns"
                                 :key="col.key"
@@ -169,9 +177,7 @@ const handleDelete = (id: string | number) => {
                                 {{ (props.page - 1) * props.perPage + index + 1 }}
                             </TableCell>
                             <TableCell v-if="!props.hideSelect" class="px-2 text-center text-xs break-words whitespace-normal sm:px-4 sm:text-sm">
-                                <label
-                                    class="bg-background relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-gray-500"
-                                >
+                                <label class="table-checkbox">
                                     <input
                                         type="checkbox"
                                         class="peer sr-only"
@@ -221,16 +227,16 @@ const handleDelete = (id: string | number) => {
             </div>
             <!-- Pagination Info -->
             <div
-                v-if="!props.hidePagination"
+                v-if="!props.hidePagination && !props.loading"
                 class="text-muted-foreground flex flex-col items-center justify-center gap-2 border-t p-4 text-center text-sm md:flex-row md:justify-between"
             >
                 <span>
-                    Showing {{ (props.page - 1) * props.perPage + 1 }} to {{ Math.min(props.page * props.perPage, props.total) }} of
-                    {{ props.total }} entries
+                    Menampilkan {{ (props.page - 1) * props.perPage + 1 }} sampai {{ Math.min(props.page * props.perPage, props.total) }} dari
+                    {{ props.total }} data
                 </span>
                 <div class="flex flex-wrap items-center justify-center gap-2">
                     <Button size="sm" :disabled="props.page === 1" @click="emit('update:page', props.page - 1)" class="bg-muted/40 text-foreground">
-                        Previous
+                        Sebelumnya
                     </Button>
                     <div class="flex flex-wrap items-center gap-1">
                         <Button
@@ -241,7 +247,7 @@ const handleDelete = (id: string | number) => {
                             :class="[
                                 props.page === page
                                     ? 'bg-primary text-primary-foreground border-primary'
-                                    : 'bg-muted border-input text-black dark:text-white',
+                                    : 'bg-muted border-input text-foreground',
                             ]"
                             @click="emit('update:page', page)"
                         >
@@ -254,7 +260,7 @@ const handleDelete = (id: string | number) => {
                         @click="emit('update:page', props.page + 1)"
                         class="bg-muted/40 text-foreground"
                     >
-                        Next
+                        Selanjutnya
                     </Button>
                 </div>
             </div>

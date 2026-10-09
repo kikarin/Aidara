@@ -2,6 +2,7 @@
 import AppTabs from '@/components/AppTabs.vue';
 import PerbandinganMultiTes from './PerbandinganMultiTes.vue';
 import Ranking from './Ranking.vue';
+import CaborProgramLatihan from './components/CaborProgramLatihan.vue';
 import { useToast } from '@/components/ui/toast/useToast';
 import PageShow from '@/pages/modules/base-page/PageShow.vue';
 import { router, usePage } from '@inertiajs/vue3';
@@ -14,6 +15,7 @@ const props = defineProps<{
         id: number;
         nama: string;
         deskripsi: string;
+        kategori_peserta?: { id: number; nama: string } | null;
         created_at: string;
         created_by_user: { id: number; name: string } | null;
         updated_at: string;
@@ -68,18 +70,23 @@ const tabsConfig = [
         value: 'ranking-data',
         label: 'Ranking',
     },
+    {
+        value: 'program-latihan-data',
+        label: 'Program Latihan',
+    },
 ];
 
 const fields = computed(() => [
     { label: 'Nama Cabor', value: dataItem.value?.nama || '-' },
+    { label: 'Jenis', value: dataItem.value?.kategori_peserta?.nama || '-' },
     { label: 'Deskripsi', value: dataItem.value?.deskripsi || '-' },
 ]);
 
 const actionFields = [
-    { label: 'Created At', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Created By', value: props.item.created_by_user?.name || '-' },
-    { label: 'Updated At', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Updated By', value: props.item.updated_by_user?.name || '-' },
+    { label: 'Dibuat Pada', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Dibuat Oleh', value: props.item.created_by_user?.name || '-' },
+    { label: 'Diperbarui Pada', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Diperbarui Oleh', value: props.item.updated_by_user?.name || '-' },
 ];
 
 const handleEdit = () => {
@@ -118,6 +125,9 @@ const handleDelete = () => {
             </div>
             <div v-if="activeTab === 'ranking-data'">
                 <Ranking :cabor-id="props.item.id" :cabor-nama="props.item.nama" />
+            </div>
+            <div v-if="activeTab === 'program-latihan-data'">
+                <CaborProgramLatihan :cabor-id="props.item.id" :cabor-nama="props.item.nama" />
             </div>
         </template>
     </PageShow>

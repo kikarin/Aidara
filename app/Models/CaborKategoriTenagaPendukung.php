@@ -25,6 +25,7 @@ class CaborKategoriTenagaPendukung extends Model
         'cabor_kategori_id',
         'tenaga_pendukung_id',
         'jenis_tenaga_pendukung',
+        'posisi_atlet',
         'is_active',
         'created_by',
         'updated_by',

@@ -1,2 +1,17 @@
 User-agent: *
-Disallow:
+Allow: /
+Allow: /event-publik
+Allow: /piala-dunia
+Allow: /legal/
+
+Disallow: /dashboard
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /modules/
+Disallow: /settings/
+Disallow: /api/
+
+Sitemap: https://aidara.bogorkab.go.id/sitemap.xml

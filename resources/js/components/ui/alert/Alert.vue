@@ -16,7 +16,7 @@ const alertClasses = computed(() => {
   const baseClasses = 'relative w-full rounded-xl border backdrop-blur-sm transition-all duration-300 ease-in-out shadow-lg hover:shadow-xl'
   
 const variantClasses = {
-  default: 'border-gray-200/50 bg-white/80 text-gray-900 dark:border-gray-700/50 dark:bg-gray-800/80 dark:text-gray-100',
+  default: 'border-border/50 bg-card/80 text-foreground',
   
   destructive:
     'border-red-300/40 bg-red-200/90 text-red-800 ' + // ⬅ lebih kuat di light mode

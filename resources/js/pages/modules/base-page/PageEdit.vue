@@ -40,7 +40,7 @@ const useGrid = computed(() => props.useGrid !== true);
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen space-y-4 bg-gray-100 p-4 dark:bg-neutral-950">
+        <div class="page-surface space-y-4 p-4">
             <div v-if="useGrid" class="grid grid-cols-1 lg:grid-cols-12">
                 <div class="col-span-1 lg:col-span-7 lg:col-start-1">
                     <div v-if="tabsConfig?.length" class="mb-4">

@@ -21,7 +21,7 @@ const columns = [
                     <img src="${row.foto_url}" alt="Foto ${row.nama_event}" class="h-16 w-16 rounded object-cover border hover:shadow-md transition-shadow" />
                 </div>`;
             }
-            return '<div class="h-16 w-16 bg-gray-200 rounded flex items-center justify-center text-gray-500 text-xs">-</div>';
+            return '<div class="flex h-16 w-16 items-center justify-center rounded bg-muted text-xs text-muted-foreground">-</div>';
         },
     },
     { key: 'kategori_event_nama', label: 'Kategori Event', orderable: false },
@@ -60,12 +60,12 @@ const columns = [
         label: 'Status',
         format: (row: any) => {
             const statusMap: Record<string, { label: string; class: string }> = {
-                draft: { label: 'Draft', class: 'bg-gray-500' },
+                draft: { label: 'Draft', class: 'bg-muted-foreground' },
                 publish: { label: 'Publish', class: 'bg-blue-500' },
                 selesai: { label: 'Selesai', class: 'bg-green-500' },
                 dibatalkan: { label: 'Dibatalkan', class: 'bg-red-500' },
             };
-            const status = statusMap[row.status] || { label: row.status, class: 'bg-gray-500' };
+            const status = statusMap[row.status] || { label: row.status, class: 'bg-muted-foreground' };
             return `<span class="px-2 py-1 rounded text-white text-xs ${status.class}">${status.label}</span>`;
         },
     },
@@ -84,12 +84,12 @@ const actions = (row: any) => [
         permission: 'Event Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/event/${row.id}/edit`),
         permission: 'Event Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Event Delete',
     },

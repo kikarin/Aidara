@@ -43,12 +43,12 @@ const actions = (row: any) => [
         permission: 'Cabor Kategori Detail',
     },
     {
-        label: 'Edit',
+        label: 'Ubah',
         onClick: () => router.visit(`/cabor-kategori/${row.id}/edit`),
         permission: 'Cabor Kategori Edit',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => pageIndex.value.handleDeleteRow(row),
         permission: 'Cabor Kategori Delete',
     },
@@ -131,19 +131,19 @@ const handleFilter = (filters: any) => {
                         {
                             label: 'Atlet',
                             value: row.jumlah_atlet || 0,
-                            colorClass: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
+                            colorClass: 'stat-chip stat-chip-atlet hover:opacity-90',
                             onClick: () => router.visit(`/cabor-kategori/${row.id}/atlet`),
                         },
                         {
                             label: 'Pelatih',
                             value: row.jumlah_pelatih || 0,
-                            colorClass: 'bg-green-100 text-green-800 hover:bg-green-200',
+                            colorClass: 'stat-chip stat-chip-pelatih hover:opacity-90',
                             onClick: () => router.visit(`/cabor-kategori/${row.id}/pelatih`),
                         },
                         {
                             label: 'Tenaga Pendukung',
                             value: row.jumlah_tenaga_pendukung || 0,
-                            colorClass: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
+                            colorClass: 'stat-chip stat-chip-tenaga hover:opacity-90',
                             onClick: () => router.visit(`/cabor-kategori/${row.id}/tenaga-pendukung`),
                         },
                     ]"

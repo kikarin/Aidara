@@ -10,7 +10,9 @@ use App\Repositories\RoleRepository;
 use App\Repositories\UsersMenuRepository;
 use App\Repositories\UsersRepository;
 use App\Repositories\UsersRoleRepository;
+use App\Services\UserPesertaLinkService;
 use App\Traits\BaseTrait;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -89,6 +91,8 @@ class UsersController extends Controller implements HasMiddleware
             app(UsersRoleRepository::class)->setRole($user->id, $data['role_id']);
         }
 
+        $this->syncPesertaLink($user, $data);
+
         return redirect()->route('users.index')->with('success', 'User berhasil ditambahkan!');
     }
 
@@ -107,7 +111,48 @@ class UsersController extends Controller implements HasMiddleware
             app(UsersRoleRepository::class)->setRole($user->id, $data['role_id']);
         }
 
+        $this->syncPesertaLink($user->fresh(), $data);
+
         return redirect()->route('users.index')->with('success', 'User berhasil diperbarui!');
+    }
+
+    /**
+     * API: daftar peserta untuk picker form Users.
+     */
+    public function pesertaOptions(Request $request): JsonResponse
+    {
+        $request->validate([
+            'type'    => 'required|in:atlet,pelatih,tenaga_pendukung',
+            'search'  => 'nullable|string|max:100',
+            'user_id' => 'nullable|integer|exists:users,id',
+        ]);
+
+        $linkService = app(UserPesertaLinkService::class);
+        $options       = $linkService->getPesertaOptions(
+            $request->input('type'),
+            $request->integer('user_id') ?: null,
+            $request->input('search'),
+        );
+
+        return response()->json(['data' => $options]);
+    }
+
+    private function syncPesertaLink(User $user, array $data): void
+    {
+        $linkService = app(UserPesertaLinkService::class);
+        $roleIds     = $data['role_id'] ?? [];
+
+        if (!is_array($roleIds) || !$linkService->requiresPesertaLink($roleIds)) {
+            $linkService->unlink($user);
+
+            return;
+        }
+
+        $linkService->link(
+            $user,
+            $data['peserta_type'],
+            (int) $data['peserta_id'],
+        );
     }
 
     public function show($id)

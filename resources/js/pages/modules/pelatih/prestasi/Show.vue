@@ -12,9 +12,15 @@ const props = defineProps<{
         id: number;
         nama_event: string;
         tingkat_id?: number;
+        tingkat?: { id: number; nama: string };
         tanggal?: string;
-        peringkat?: string;
+        juara?: string;
+        medali?: string;
+        jenis_prestasi?: string;
+        kategori_peserta?: { id: number; nama: string };
+        kategori_prestasi_pelatih?: { id: number; nama: string };
         keterangan?: string;
+        bonus?: number;
         created_at: string;
         created_by_user?: { name: string } | null;
         updated_at: string;
@@ -28,8 +34,25 @@ const breadcrumbs = [
     { title: 'Detail Prestasi', href: `/pelatih/${props.pelatihId}/prestasi/${props.item.id}` },
 ];
 
+const formatRupiah = (value: number | null | undefined): string => {
+    if (!value || value === 0) return 'Rp 0';
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0,
+    }).format(value);
+};
+
+const getJenisPrestasiLabel = (jenis: string | undefined) => {
+    if (!jenis) return '-';
+    return jenis === 'individu' ? 'Individu' : 'Ganda/Mixed/Beregu/Double';
+};
+
 const fields = computed(() => [
     { label: 'Nama Event', value: props.item?.nama_event || '-' },
+    { label: 'Kategori Peserta', value: props.item?.kategori_peserta?.nama || '-' },
+    { label: 'Jenis Prestasi', value: getJenisPrestasiLabel(props.item?.jenis_prestasi) },
+    { label: 'Kategori Prestasi Pelatih', value: props.item?.kategori_prestasi_pelatih?.nama || '-' },
     { label: 'Tingkat', value: props.item?.tingkat?.nama || '-' },
     {
         label: 'Tanggal',
@@ -37,15 +60,17 @@ const fields = computed(() => [
             ? new Date(props.item.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'numeric', year: 'numeric' })
             : '-',
     },
-    { label: 'Peringkat', value: props.item?.peringkat || '-' },
+    { label: 'Juara', value: props.item?.juara || '-' },
+    { label: 'Medali', value: props.item?.medali || '-' },
+    { label: 'Bonus', value: formatRupiah(props.item?.bonus || 0) },
     { label: 'Keterangan', value: props.item?.keterangan || '-', className: 'sm:col-span-2' },
 ]);
 
 const actionFields = [
-    { label: 'Created At', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Created By', value: props.item.created_by_user?.name || '-' },
-    { label: 'Updated At', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
-    { label: 'Updated By', value: props.item.updated_by_user?.name || '-' },
+    { label: 'Dibuat Pada', value: new Date(props.item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Dibuat Oleh', value: props.item.created_by_user?.name || '-' },
+    { label: 'Diperbarui Pada', value: new Date(props.item.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) },
+    { label: 'Diperbarui Oleh', value: props.item.updated_by_user?.name || '-' },
 ];
 
 const handleEdit = () => {

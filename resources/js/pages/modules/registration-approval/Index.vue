@@ -24,11 +24,11 @@ const columns = [
         label: 'Status',
         format: (row: any) => {
             const statusColors: Record<string, string> = {
-                'Menunggu Persetujuan': 'bg-yellow-100 text-yellow-800',
-                Disetujui: 'bg-green-100 text-green-800',
+                'Menunggu Persetujuan': 'badge-warning',
+                Disetujui: 'badge-success',
                 Ditolak: 'bg-red-100 text-red-800',
             };
-            const color = statusColors[row.status_label] || 'bg-gray-100 text-gray-800';
+            const color = statusColors[row.status_label] || 'badge-muted';
             return `<span class="px-2 py-1 text-xs font-semibold rounded-full ${color}">${row.status_label}</span>`;
         },
         orderable: false,
@@ -71,7 +71,7 @@ const actions = (row: any) => [
         show: row.status === 'submitted',
     },
     {
-        label: 'Delete',
+        label: 'Hapus',
         onClick: () => handleDeleteRow(row),
         permission: 'Registration Approval Delete',
         show: row.status !== 'approved', // Hanya bisa delete jika belum approved

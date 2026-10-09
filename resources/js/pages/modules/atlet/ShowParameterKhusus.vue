@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericParticipantChartModal from '@/components/GenericParticipantChartModal.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardSkeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast/useToast';
 import axios from 'axios';
 import { BarChart3 } from 'lucide-vue-next';
@@ -81,7 +82,7 @@ const getTrendColor = (trend: string) => {
 
 // Get performa color
 const getPerformaColor = (persentase: number | null) => {
-    if (persentase === null) return 'text-gray-400';
+    if (persentase === null) return 'text-muted-foreground';
     if (persentase > 75) return 'text-red-600';
     if (persentase >= 40) return 'text-yellow-600';
     return 'text-green-600';
@@ -145,8 +146,8 @@ const chartTargetInfo = computed(() => {
 
 <template>
     <div class="space-y-4">
-        <div v-if="loading" class="py-8 text-center">
-            <p class="text-muted-foreground">Memuat data rekap parameter khusus...</p>
+        <div v-if="loading" class="space-y-6">
+            <CardSkeleton v-for="n in 3" :key="n" :lines="4" />
         </div>
 
         <div v-else-if="rekapData.length === 0" class="py-8 text-center">
@@ -155,7 +156,7 @@ const chartTargetInfo = computed(() => {
 
         <div v-else class="space-y-6">
             <Card v-for="parameter in rekapData" :key="parameter.parameter_id" class="overflow-hidden">
-                <CardHeader class="bg-gray-50 dark:bg-neutral-800">
+                <CardHeader class="bg-muted/60">
                     <div class="flex items-center justify-between">
                         <div>
                             <CardTitle class="text-lg">{{ parameter.nama_parameter }}</CardTitle>
@@ -173,7 +174,7 @@ const chartTargetInfo = computed(() => {
                 <CardContent class="p-0">
                     <div class="overflow-x-auto">
                         <table class="w-full border-collapse">
-                            <thead class="bg-gray-100 dark:bg-neutral-800">
+                            <thead class="bg-muted">
                                 <tr class="border-b">
                                     <th class="p-3 text-left font-medium">Tanggal</th>
                                     <th class="p-3 text-left font-medium">Pemeriksaan</th>
@@ -186,7 +187,7 @@ const chartTargetInfo = computed(() => {
                                 <tr
                                     v-for="(pemeriksaan, index) in parameter.pemeriksaan_list"
                                     :key="index"
-                                    class="border-b hover:bg-gray-50 dark:hover:bg-neutral-800"
+                                    class="border-b hover:bg-muted/50"
                                 >
                                     <td class="p-3">{{ formatDate(pemeriksaan.tanggal) }}</td>
                                     <td class="p-3">{{ pemeriksaan.nama_pemeriksaan }}</td>
